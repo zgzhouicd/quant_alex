@@ -34,6 +34,7 @@ class TechnicalAgent(BaseAgent):
         "get_chip_distribution",
         "get_derivatives_snapshot",
         "get_analysis_context",
+        "get_intraday_signal",
     ]
 
     def system_prompt(self, ctx: AgentContext) -> str:

@@ -226,6 +226,7 @@ CLI 与 Web/API 支持范围不同，需在文档或文件头对齐说明，避�
 
 ## 参考与验证
 
+- **流程图与主链路扩容导读**：[architecture-detailed-guide.md](./architecture-detailed-guide.md)（CLI / API 队列 / Pipeline 双路径 / Agent 编排）。
 - 仓库惯例验证：`./scripts/ci_gate.sh`、`uv run python -m pytest -m "not network"`。
 - 极小用户量/Lab 部署的优先级与禁做项：**[小流量运行边界](small-scale-operations.md)**。
 - 本文问题列表来自代码审阅与静态阅读；修复后应在对应模块补充测试并更新 `docs/CHANGELOG.md` 的 `[Unreleased]`（若对外行为或运维可见）。

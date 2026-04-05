@@ -18,7 +18,7 @@ import json
 import logging
 import re
 import time
-from datetime import datetime, date, timedelta
+from datetime import datetime, date, timedelta, timezone
 from typing import Optional, List, Dict, Any, TYPE_CHECKING, Tuple, Callable, TypeVar
 
 import pandas as pd
@@ -135,6 +135,163 @@ class StockDaily(Base):
             'volume_ratio': self.volume_ratio,
             'data_source': self.data_source,
         }
+
+
+class StockIntradayBar(Base):
+    """分钟级 OHLCV 行情数据。"""
+
+    __tablename__ = "stock_intraday_bar"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    code = Column(String(16), nullable=False, index=True)
+    interval = Column(String(8), nullable=False, index=True)
+    bar_start = Column(DateTime, nullable=False, index=True)
+    session_date = Column(Date, nullable=False, index=True)
+    open = Column(Float)
+    high = Column(Float)
+    low = Column(Float)
+    close = Column(Float)
+    volume = Column(Float)
+    amount = Column(Float)
+    pct_chg = Column(Float)
+    data_source = Column(String(50))
+    created_at = Column(DateTime, default=datetime.now)
+    updated_at = Column(DateTime, default=datetime.now, onupdate=datetime.now)
+
+    __table_args__ = (
+        UniqueConstraint("code", "interval", "bar_start", name="uix_intraday_code_interval_start"),
+        Index("ix_intraday_code_interval_start", "code", "interval", "bar_start"),
+        Index("ix_intraday_session_date", "code", "interval", "session_date"),
+    )
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "code": self.code,
+            "interval": self.interval,
+            "bar_start": self.bar_start,
+            "session_date": self.session_date,
+            "open": self.open,
+            "high": self.high,
+            "low": self.low,
+            "close": self.close,
+            "volume": self.volume,
+            "amount": self.amount,
+            "pct_chg": self.pct_chg,
+            "data_source": self.data_source,
+        }
+
+
+class IntradaySignalRecord(Base):
+    """分钟级信号记录。"""
+
+    __tablename__ = "intraday_signal_record"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    code = Column(String(16), nullable=False, index=True)
+    interval = Column(String(8), nullable=False, index=True)
+    bar_start = Column(DateTime, nullable=False, index=True)
+    signal = Column(String(16), nullable=False, index=True)
+    confidence = Column(Float, nullable=False, default=0.0)
+    setup = Column(String(64), index=True)
+    invalidation = Column(Float)
+    last_price = Column(Float)
+    vwap_session = Column(Float)
+    ema_fast = Column(Float)
+    ema_slow = Column(Float)
+    macd = Column(Float)
+    macd_signal = Column(Float)
+    rsi = Column(Float)
+    volume_ratio = Column(Float)
+    opening_range_high = Column(Float)
+    opening_range_low = Column(Float)
+    recent_high = Column(Float)
+    recent_low = Column(Float)
+    reasons_json = Column(Text)
+    payload_json = Column(Text)
+    created_at = Column(DateTime, default=datetime.now, index=True)
+    updated_at = Column(DateTime, default=datetime.now, onupdate=datetime.now)
+
+    __table_args__ = (
+        UniqueConstraint("code", "interval", "bar_start", name="uix_intraday_signal_code_interval_start"),
+        Index("ix_intraday_signal_lookup", "code", "interval", "bar_start"),
+    )
+
+
+class PaperTradingAccount(Base):
+    """模拟交易账户。"""
+
+    __tablename__ = "paper_trading_accounts"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    name = Column(String(64), nullable=False)
+    market = Column(String(16), nullable=False, default="us")
+    base_currency = Column(String(8), nullable=False, default="USD")
+    initial_cash = Column(Float, nullable=False, default=100000.0)
+    is_active = Column(Boolean, nullable=False, default=True, index=True)
+    created_at = Column(DateTime, default=datetime.now, index=True)
+    updated_at = Column(DateTime, default=datetime.now, onupdate=datetime.now)
+
+
+class PaperTradingOrder(Base):
+    """模拟订单。"""
+
+    __tablename__ = "paper_trading_orders"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    account_id = Column(Integer, ForeignKey("paper_trading_accounts.id"), nullable=False, index=True)
+    symbol = Column(String(16), nullable=False, index=True)
+    interval = Column(String(8), nullable=False, default="1m")
+    side = Column(String(8), nullable=False)
+    quantity = Column(Float, nullable=False)
+    order_type = Column(String(16), nullable=False, default="market")
+    requested_price = Column(Float)
+    signal_bar_start = Column(DateTime, index=True)
+    fill_policy = Column(String(32), nullable=False, default="bar_close")
+    status = Column(String(16), nullable=False, default="pending", index=True)
+    note = Column(String(255))
+    created_at = Column(DateTime, default=datetime.now, index=True)
+    updated_at = Column(DateTime, default=datetime.now, onupdate=datetime.now)
+
+
+class PaperTradingFill(Base):
+    """模拟成交记录。"""
+
+    __tablename__ = "paper_trading_fills"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    order_id = Column(Integer, ForeignKey("paper_trading_orders.id"), nullable=False, index=True)
+    account_id = Column(Integer, ForeignKey("paper_trading_accounts.id"), nullable=False, index=True)
+    symbol = Column(String(16), nullable=False, index=True)
+    interval = Column(String(8), nullable=False, default="1m")
+    side = Column(String(8), nullable=False)
+    quantity = Column(Float, nullable=False)
+    fill_price = Column(Float, nullable=False)
+    fee = Column(Float, nullable=False, default=0.0)
+    fill_timestamp = Column(DateTime, nullable=False, index=True)
+    bar_start = Column(DateTime, index=True)
+    created_at = Column(DateTime, default=datetime.now, index=True)
+
+
+class PortfolioIntradaySnapshot(Base):
+    """模拟账户分钟级权益快照。"""
+
+    __tablename__ = "portfolio_intraday_snapshots"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    account_id = Column(Integer, ForeignKey("paper_trading_accounts.id"), nullable=False, index=True)
+    snapshot_time = Column(DateTime, nullable=False, index=True)
+    cash_balance = Column(Float, nullable=False, default=0.0)
+    market_value = Column(Float, nullable=False, default=0.0)
+    total_equity = Column(Float, nullable=False, default=0.0)
+    realized_pnl = Column(Float, nullable=False, default=0.0)
+    unrealized_pnl = Column(Float, nullable=False, default=0.0)
+    positions_json = Column(Text)
+    created_at = Column(DateTime, default=datetime.now, index=True)
+
+    __table_args__ = (
+        UniqueConstraint("account_id", "snapshot_time", name="uix_portfolio_intraday_snapshot_account_time"),
+        Index("ix_portfolio_intraday_snapshot_lookup", "account_id", "snapshot_time"),
+    )
 
 
 class NewsIntel(Base):
@@ -844,6 +1001,20 @@ class DatabaseManager:
         if isinstance(value, datetime):
             return value.date()
         return value
+
+    @staticmethod
+    def _normalize_bar_timestamp(value: Any) -> Optional[datetime]:
+        if value is None:
+            return None
+        if isinstance(value, pd.Timestamp):
+            value = value.to_pydatetime()
+        if isinstance(value, str):
+            value = pd.to_datetime(value, utc=True).to_pydatetime()
+        if isinstance(value, datetime):
+            if value.tzinfo is not None:
+                return value.astimezone(timezone.utc).replace(tzinfo=None)
+            return value
+        return None
 
     @staticmethod
     def _normalize_sql_value(value: Any) -> Any:
@@ -1590,6 +1761,200 @@ class DatabaseManager:
             ).scalars().all()
             
             return list(results)
+
+    def get_intraday_bars(
+        self,
+        code: str,
+        interval: str,
+        start_time: Optional[datetime] = None,
+        end_time: Optional[datetime] = None,
+        limit: Optional[int] = None,
+    ) -> List[StockIntradayBar]:
+        """获取指定标的和周期的分钟级 K 线。"""
+        with self.get_session() as session:
+            query = select(StockIntradayBar).where(
+                and_(
+                    StockIntradayBar.code == code,
+                    StockIntradayBar.interval == interval,
+                )
+            )
+            if start_time is not None:
+                query = query.where(StockIntradayBar.bar_start >= start_time)
+            if end_time is not None:
+                query = query.where(StockIntradayBar.bar_start <= end_time)
+            query = query.order_by(StockIntradayBar.bar_start)
+            if limit is not None and limit > 0:
+                query = query.limit(limit)
+            return list(session.execute(query).scalars().all())
+
+    def save_intraday_bars(
+        self,
+        df: pd.DataFrame,
+        code: str,
+        interval: str,
+        data_source: str = "Unknown",
+    ) -> int:
+        """按 `(code, interval, bar_start)` UPSERT 分钟级 K 线。"""
+        if df is None or df.empty:
+            return 0
+
+        now = datetime.now()
+        records_by_key: Dict[Tuple[datetime, str], Dict[str, Any]] = {}
+        for row in df.to_dict(orient="records"):
+            bar_start = self._normalize_bar_timestamp(row.get("timestamp") or row.get("bar_start"))
+            if bar_start is None:
+                continue
+            interval_norm = str(row.get("interval") or interval).strip().lower()
+            records_by_key[(bar_start, interval_norm)] = {
+                "code": code,
+                "interval": interval_norm,
+                "bar_start": bar_start,
+                "session_date": bar_start.date(),
+                "open": self._normalize_sql_value(row.get("open")),
+                "high": self._normalize_sql_value(row.get("high")),
+                "low": self._normalize_sql_value(row.get("low")),
+                "close": self._normalize_sql_value(row.get("close")),
+                "volume": self._normalize_sql_value(row.get("volume")),
+                "amount": self._normalize_sql_value(row.get("amount")),
+                "pct_chg": self._normalize_sql_value(row.get("pct_chg")),
+                "data_source": data_source,
+                "created_at": now,
+                "updated_at": now,
+            }
+
+        if not records_by_key:
+            return 0
+
+        records = list(records_by_key.values())
+        keys = list(records_by_key.keys())
+
+        def _write(session: Session) -> int:
+            existing_keys = {
+                (row.bar_start, row.interval)
+                for row in session.execute(
+                    select(StockIntradayBar).where(
+                        and_(
+                            StockIntradayBar.code == code,
+                            StockIntradayBar.interval.in_([key[1] for key in keys]),
+                            StockIntradayBar.bar_start.in_([key[0] for key in keys]),
+                        )
+                    )
+                ).scalars().all()
+            }
+            new_count = 0
+            for record in records:
+                key = (record["bar_start"], record["interval"])
+                existing = session.execute(
+                    select(StockIntradayBar).where(
+                        and_(
+                            StockIntradayBar.code == code,
+                            StockIntradayBar.interval == record["interval"],
+                            StockIntradayBar.bar_start == record["bar_start"],
+                        )
+                    ).limit(1)
+                ).scalar_one_or_none()
+                if existing is None:
+                    session.add(StockIntradayBar(**record))
+                    new_count += 1
+                    continue
+                existing.session_date = record["session_date"]
+                existing.open = record["open"]
+                existing.high = record["high"]
+                existing.low = record["low"]
+                existing.close = record["close"]
+                existing.volume = record["volume"]
+                existing.amount = record["amount"]
+                existing.pct_chg = record["pct_chg"]
+                existing.data_source = record["data_source"]
+                existing.updated_at = record["updated_at"]
+            return new_count
+
+        return self._run_write_transaction(f"save_intraday_bars[{code}:{interval}]", _write)
+
+    def upsert_intraday_signal(
+        self,
+        *,
+        code: str,
+        interval: str,
+        bar_start: datetime,
+        signal: str,
+        confidence: float,
+        setup: Optional[str],
+        invalidation: Optional[float],
+        last_price: Optional[float],
+        vwap_session: Optional[float],
+        ema_fast: Optional[float],
+        ema_slow: Optional[float],
+        macd: Optional[float],
+        macd_signal: Optional[float],
+        rsi: Optional[float],
+        volume_ratio: Optional[float],
+        opening_range_high: Optional[float],
+        opening_range_low: Optional[float],
+        recent_high: Optional[float],
+        recent_low: Optional[float],
+        reasons: Optional[List[str]],
+        payload: Optional[Dict[str, Any]],
+    ) -> None:
+        """写入或更新分钟级信号。"""
+        bar_start = self._normalize_bar_timestamp(bar_start)
+        if bar_start is None:
+            raise ValueError("bar_start is required")
+
+        reasons_json = json.dumps(reasons or [], ensure_ascii=False)
+        payload_json = json.dumps(payload or {}, ensure_ascii=False, default=str)
+        with self.get_session() as session:
+            row = session.execute(
+                select(IntradaySignalRecord).where(
+                    and_(
+                        IntradaySignalRecord.code == code,
+                        IntradaySignalRecord.interval == interval,
+                        IntradaySignalRecord.bar_start == bar_start,
+                    )
+                ).limit(1)
+            ).scalar_one_or_none()
+            if row is None:
+                row = IntradaySignalRecord(
+                    code=code,
+                    interval=interval,
+                    bar_start=bar_start,
+                )
+                session.add(row)
+            row.signal = signal
+            row.confidence = confidence
+            row.setup = setup
+            row.invalidation = invalidation
+            row.last_price = last_price
+            row.vwap_session = vwap_session
+            row.ema_fast = ema_fast
+            row.ema_slow = ema_slow
+            row.macd = macd
+            row.macd_signal = macd_signal
+            row.rsi = rsi
+            row.volume_ratio = volume_ratio
+            row.opening_range_high = opening_range_high
+            row.opening_range_low = opening_range_low
+            row.recent_high = recent_high
+            row.recent_low = recent_low
+            row.reasons_json = reasons_json
+            row.payload_json = payload_json
+            row.updated_at = datetime.now()
+            session.commit()
+
+    def get_latest_intraday_signal(self, code: str, interval: str) -> Optional[IntradaySignalRecord]:
+        """获取最新一条分钟级信号。"""
+        with self.get_session() as session:
+            return session.execute(
+                select(IntradaySignalRecord)
+                .where(
+                    and_(
+                        IntradaySignalRecord.code == code,
+                        IntradaySignalRecord.interval == interval,
+                    )
+                )
+                .order_by(desc(IntradaySignalRecord.bar_start))
+                .limit(1)
+            ).scalar_one_or_none()
     
     def save_daily_data(
         self, 

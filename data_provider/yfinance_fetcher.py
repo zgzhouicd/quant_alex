@@ -311,6 +311,98 @@ class YfinanceFetcher(BaseFetcher):
 
         return df
 
+    def get_intraday_data(
+        self,
+        stock_code: str,
+        interval: str = "1m",
+        lookback_minutes: int = 390,
+    ) -> pd.DataFrame:
+        """使用 yfinance 获取分钟级 OHLCV 数据。"""
+        import yfinance as yf
+
+        interval_norm = (interval or "1m").strip().lower()
+        if interval_norm not in {"1m", "2m", "5m", "15m", "30m", "60m", "90m"}:
+            raise DataFetchError(f"Unsupported yfinance intraday interval: {interval_norm}")
+
+        yf_code = self._convert_stock_code(stock_code)
+        period = self._resolve_intraday_period(interval_norm, int(lookback_minutes or 390))
+        logger.debug(
+            "调用 yfinance.download(%s, period=%s, interval=%s) 获取分钟数据",
+            yf_code,
+            period,
+            interval_norm,
+        )
+
+        try:
+            df = yf.download(
+                tickers=yf_code,
+                period=period,
+                interval=interval_norm,
+                progress=False,
+                auto_adjust=False,
+                prepost=False,
+                multi_level_index=True,
+            )
+        except Exception as exc:
+            raise DataFetchError(f"Yahoo Finance 获取分钟数据失败: {exc}") from exc
+
+        if isinstance(df.columns, pd.MultiIndex):
+            df.columns = df.columns.get_level_values(0)
+
+        if df.empty:
+            raise DataFetchError(f"Yahoo Finance 未查询到 {stock_code} 的分钟数据")
+
+        df = df.reset_index()
+        timestamp_col = next(
+            (col for col in ("Datetime", "Date", "index") if col in df.columns),
+            None,
+        )
+        if timestamp_col is None:
+            raise DataFetchError(f"Yahoo Finance 分钟数据缺少时间列: {stock_code}")
+
+        df = df.rename(
+            columns={
+                timestamp_col: "timestamp",
+                "Open": "open",
+                "High": "high",
+                "Low": "low",
+                "Close": "close",
+                "Volume": "volume",
+            }
+        )
+        df["timestamp"] = pd.to_datetime(df["timestamp"], utc=True)
+        df["pct_chg"] = df["close"].pct_change() * 100
+        df["pct_chg"] = df["pct_chg"].fillna(0.0).round(4)
+        df["amount"] = (df["close"] * df["volume"]).fillna(0.0)
+        df["interval"] = interval_norm
+
+        keep_cols = [
+            "timestamp", "open", "high", "low", "close", "volume", "amount", "pct_chg", "interval"
+        ]
+        df = df[[col for col in keep_cols if col in df.columns]].copy()
+        df = df.dropna(subset=["timestamp", "open", "high", "low", "close"]).reset_index(drop=True)
+
+        cutoff = pd.Timestamp.utcnow() - pd.Timedelta(minutes=max(int(lookback_minutes or 390), 1))
+        df = df[df["timestamp"] >= cutoff].reset_index(drop=True)
+        if df.empty:
+            raise DataFetchError(f"Yahoo Finance 分钟数据窗口为空: {stock_code}")
+        return df
+
+    @staticmethod
+    def _resolve_intraday_period(interval: str, lookback_minutes: int) -> str:
+        """将回看分钟数映射为 yfinance 可接受的 period。"""
+        if interval == "1m":
+            if lookback_minutes <= 390:
+                return "1d"
+            if lookback_minutes <= 1950:
+                return "5d"
+            return "7d"
+        if lookback_minutes <= 390:
+            return "5d"
+        if lookback_minutes <= 3900:
+            return "1mo"
+        return "3mo"
+
     def _fetch_yf_ticker_data(self, yf, yf_code: str, name: str, return_code: str) -> Optional[Dict[str, Any]]:
         """
         通过 yfinance 拉取单个指数/股票的行情数据。

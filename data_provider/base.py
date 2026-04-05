@@ -32,6 +32,9 @@ logger = logging.getLogger(__name__)
 
 # === 标准化列名定义 ===
 STANDARD_COLUMNS = ['date', 'open', 'high', 'low', 'close', 'volume', 'amount', 'pct_chg']
+INTRADAY_STANDARD_COLUMNS = [
+    'timestamp', 'open', 'high', 'low', 'close', 'volume', 'amount', 'pct_chg', 'interval'
+]
 
 
 def unwrap_exception(exc: Exception) -> Exception:
@@ -392,6 +395,15 @@ class BaseFetcher(ABC):
                 f"error_type={error_type}, elapsed={elapsed:.2f}s, reason={error_reason}"
             )
             raise DataFetchError(f"[{self.name}] {stock_code}: {error_reason}") from e
+
+    def get_intraday_data(
+        self,
+        stock_code: str,
+        interval: str = "1m",
+        lookback_minutes: int = 390,
+    ) -> pd.DataFrame:
+        """获取分钟级数据（默认实现：未支持）。"""
+        raise DataFetchError(f"[{self.name}] intraday data not supported")
     
     def _clean_data(self, df: pd.DataFrame) -> pd.DataFrame:
         """
@@ -855,6 +867,57 @@ class DataFetcherManager:
                 end_date=end_date,
                 days=days,
             )
+
+    def get_intraday_data(
+        self,
+        stock_code: str,
+        interval: str = "1m",
+        lookback_minutes: int = 390,
+    ) -> Tuple[pd.DataFrame, str]:
+        """获取分钟级 OHLCV 数据（自动切换数据源）。"""
+        stock_code = normalize_stock_code(stock_code)
+        fetchers = self._get_fetchers_snapshot()
+        errors = []
+        request_start = time.time()
+
+        preferred_order = ["YfinanceFetcher", "LongbridgeFetcher"]
+
+        for source_name in preferred_order:
+            for fetcher in fetchers:
+                if fetcher.name != source_name:
+                    continue
+                if not hasattr(fetcher, "get_intraday_data"):
+                    continue
+                try:
+                    df = self._call_fetcher_method(
+                        fetcher,
+                        "get_intraday_data",
+                        stock_code=stock_code,
+                        interval=interval,
+                        lookback_minutes=lookback_minutes,
+                    )
+                    if df is not None and not df.empty:
+                        elapsed = time.time() - request_start
+                        logger.info(
+                            "[分钟数据] %s interval=%s rows=%s source=%s elapsed=%.2fs",
+                            stock_code,
+                            interval,
+                            len(df),
+                            fetcher.name,
+                            elapsed,
+                        )
+                        return df, fetcher.name
+                except Exception as exc:
+                    error_type, error_reason = summarize_exception(exc)
+                    errors.append(f"[{fetcher.name}] ({error_type}) {error_reason}")
+                break
+
+        error_summary = (
+            f"所有数据源获取 {stock_code} 分钟数据失败: interval={interval}, "
+            f"lookback_minutes={lookback_minutes}\n" + "\n".join(errors)
+        )
+        logger.error(error_summary)
+        raise DataFetchError(error_summary)
 
     def _get_daily_data_unlocked(
         self, 

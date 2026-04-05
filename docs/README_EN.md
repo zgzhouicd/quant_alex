@@ -14,13 +14,13 @@
   <a href="https://hellogithub.com/repository/ZhuLinsen/daily_stock_analysis" target="_blank"><img src="https://api.hellogithub.com/v1/widgets/recommend.svg?rid=6daa16e405ce46ed97b4a57706aeb29f&claim_uid=pfiJMqhR9uvDGlT&theme=neutral" alt="Featured｜HelloGitHub" style="width: 250px; height: 54px;" width="250" height="54" /></a>
 </p>
 
-**AI-powered stock analysis system** (default focus: US equities / US futures / crypto perps; configurable)
+**AI-powered stock analysis system.** **Market data path:** Yahoo Finance (yfinance) plus optional **Longbridge** (US/HK priority when configured). **`main.py` CLI** accepts **US equities, US futures, and crypto contract symbols only**; use the **Web UI or `api/v1`** for workflows aligned with multi-market analysis.
 
 Analyze your watchlist daily → generate a decision dashboard → push to multiple channels (Telegram/Discord/Slack/Email/WeChat Work/Feishu)
 
 **Zero-cost deployment** · Runs on GitHub Actions · No server required
 
-[**Quick Start**](#-quick-start) · [**Key Features**](#-key-features) · [**Sample Output**](#-sample-output) · [**Full Guide**](./full-guide_EN.md) · [**Small-scale ops boundary**](./small-scale-operations.md) · [**FAQ**](./FAQ_EN.md) · [**Contributing**](./CONTRIBUTING_EN.md) · [**All Docs**](./INDEX_EN.md)
+[**Quick Start**](#-quick-start) · [**Key Features**](#-key-features) · [**Sample Output**](#-sample-output) · [**Architecture deep dive (diagrams)**](./architecture-detailed-guide.md) · [**Intraday Refactor Plan**](./intraday-refactor-plan.md) · [**Full Guide**](./full-guide_EN.md) · [**Small-scale ops boundary**](./small-scale-operations.md) · [**FAQ**](./FAQ_EN.md) · [**Contributing**](./CONTRIBUTING_EN.md) · [**All Docs**](./INDEX_EN.md)
 
 English | [简体中文](../README.md) | [繁體中文](README_CHT.md)
 
@@ -41,8 +41,9 @@ English | [简体中文](../README.md) | [繁體中文](README_CHT.md)
 |--------|---------|-------------|
 | AI | Decision Dashboard | One-sentence conclusion + precise entry/exit levels + action checklist |
 | Analysis | Multi-dimensional Analysis | Technicals + chip distribution + sentiment + real-time quotes |
-| Market | Global Markets | A-shares, Hong Kong stocks, US stocks |
-| Search | Smart Autocomplete (MVP) | **[Beta]** Home search supports code/name/pinyin/aliases; the local index now covers A-shares, Hong Kong, and US stocks and can be refreshed from Tushare or AkShare data |
+| Market | Multi-entry & markets | **Web/API** can target A/HK/US symbols and regions as configured; **CLI** is US/futures/crypto-only (see `main.py` header). Quotes/K-lines are primarily **yfinance**, with optional **Longbridge-first** for US/HK when configured. |
+| Intraday Trading | Minute Signals + Paper Trading | New `/api/v1/intraday/*` and `/api/v1/paper-trading/*` endpoints support `1m/5m/15m` bar storage, structured `VWAP/EMA/MACD/RSI` signals, minute scheduler runs, and a paper account / order / fill / intraday snapshot loop. The CLI can also launch the experimental flow with `--intraday`. |
+| Search | Smart Autocomplete (MVP) | **[Beta]** Code/name/pinyin/aliases; index via `scripts/generate_stock_index.py` / `generate_index_from_csv.py`; optional **Tushare** CSV workflow ([guide](./TUSHARE_STOCK_LIST_GUIDE.md)). Legacy AkShare fetchers were removed from `data_provider`. |
 | Review | Market Review | Daily overview, sectors, northbound capital flow |
 | Intel | Announcement + Capital Flow Intelligence | IntelAgent now also pulls listed-company announcements (SSE/SZSE/CNINFO) and A-share main-force capital flow, and exposes `capital_flow_signal` (`inflow/outflow/neutral/not_available`) for flow direction context |
 | Backtest | AI Backtest Validation | Auto-evaluate historical analysis accuracy, with a 1-day next-session validation view for AI prediction vs actual move and accuracy |
@@ -52,15 +53,17 @@ English | [简体中文](../README.md) | [繁體中文](README_CHT.md)
 
 > The Backtest page now includes a 1-day next-session validation view. You can filter by stock code and analysis date range to compare the original AI prediction with the next trading day close and inspect the filtered accuracy rate. This is based on historical analysis plus `eval_window_days=1` backtest data, not real trade execution logs.
 
+> Intraday scope note: the current intraday + paper trading path is phase-1 only. It targets **US equities / US futures / crypto** minute bars from **yfinance**, and it drives simulated execution from structured signals rather than real broker orders.
+
 ### Tech Stack & Data Sources
 
 | Type | Supported |
 |------|----------|
 | LLMs | Gemini (free), OpenAI-compatible, DeepSeek, Qwen, Claude, Ollama |
-| Market Data | AkShare, Tushare, Pytdx, Baostock, YFinance, [Longbridge](https://open.longbridge.com/) (primary for US/HK when configured) |
+| Market Data | **YFinance**, optional **[Longbridge](https://open.longbridge.com/)** (US/HK daily + realtime when configured). Dedicated legacy A-share fetchers were removed from `data_provider`; see `data_provider/__init__.py`. |
 | News Search | Tavily, SerpAPI, Bocha, Brave, MiniMax |
 
-> **Longbridge-first (US/HK only):** With `LONGBRIDGE_APP_KEY` / `LONGBRIDGE_APP_SECRET` / `LONGBRIDGE_ACCESS_TOKEN` set, **daily bars and realtime quotes** for US & HK stocks are fetched from **Longbridge first**; **YFinance / AkShare** are used for **fallback** or **field merge** when Longbridge fails or returns incomplete fields. **If Longbridge is not configured, it is not called** — US/HK still use YFinance / AkShare as before. **US market indices** (e.g. SPX) always prefer **YFinance** (indices are not supported on Longbridge). **A-share** routing is unchanged. See `.env.example` and the [full guide](./full-guide_EN.md).
+> **Longbridge-first (US/HK only):** With `LONGBRIDGE_*` set, **daily bars and realtime** for US/HK are fetched from **Longbridge first**; **YFinance** is used for **fallback** and **field merge**. **If Longbridge is not configured, it is not called** — US/HK and indices use **YFinance**. **US indices** (e.g. SPX) always prefer **YFinance**. The old multi-provider A-share chain is not used for the primary equity path; A-share **market review** enhancements may use optional **TickFlow** independently. See `.env.example`, [architecture deep dive](./architecture-detailed-guide.md), and the [full guide](./full-guide_EN.md).
 
 ### Built-in Trading Rules
 
@@ -197,7 +200,7 @@ The system will:
 #### 1. Clone Repository
 
 ```bash
-git clone https://github.com/ZhuLinsen/daily_stock_analysis.git
+git clone https://github.com/ZhuLinsen/daily_stock_analysis.git  # replace with your fork URL if needed
 cd daily_stock_analysis
 ```
 
@@ -429,8 +432,8 @@ SCHEDULE_ENABLED=true          # Enable scheduled task
 SCHEDULE_TIME=18:00            # Daily run time (HH:MM, 24-hour format)
 MARKET_REVIEW_ENABLED=true     # Enable market review
 
-# === Data Source ===
-TUSHARE_TOKEN=your_token       # Tushare Pro (priority data source if configured)
+# === Optional: stock-list index (not primary market quotes) ===
+TUSHARE_TOKEN=your_token       # Tushare Pro — optional for fetching CSV lists → autocomplete index
 
 # === System ===
 MAX_WORKERS=3                  # Concurrent threads (3 recommended to avoid blocking)
@@ -489,7 +492,7 @@ Enable the FastAPI service for configuration management and triggering analysis 
 The home analysis input now behaves more like a search box, reducing the need to memorize exact symbols.
 
 - **Multi-signal matching**: supports stock code, company name, pinyin abbreviation, and aliases (for example `gzmt` -> 贵州茅台, `tencent` -> 腾讯控股, `aapl` -> Apple Inc.).
-- **Multi-market coverage**: the local index now covers **A-shares, Hong Kong stocks, and US stocks**. It can be regenerated from either Tushare or AkShare source data when needed.
+- **Multi-market coverage**: the index can cover **A-shares, HK, and US** depending on your CSV/mapping source; typical workflow is **Tushare CSV → `generate_index_from_csv.py`**, or `generate_stock_index.py` for MVP from built-in maps.
 - **Graceful fallback**:
   - If the index is outdated, missing a newly listed symbol, or fails to load, the UI falls back to plain manual input without blocking analysis.
   - If no suggestion matches, pressing Enter still submits the original input directly.
@@ -562,7 +565,8 @@ The developers of this tool are not liable for any financial losses resulting fr
 
 ## 🙏 Acknowledgments
 
-- [AkShare](https://github.com/akfamily/akshare) - Stock data source
+- [yfinance](https://github.com/ranaroussi/yfinance) — market quotes and history
+- [Longbridge OpenAPI](https://open.longbridge.com/) — optional US/HK priority data when configured
 - [Google Gemini](https://ai.google.dev/) - AI analysis engine
 - [Tavily](https://tavily.com/) - News search API
 - All contributors who helped improve this project

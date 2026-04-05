@@ -11,6 +11,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 <!-- 新条目格式：- [类型] 描述（类型取值：新功能/改进/修复/文档/测试/chore）-->
 <!-- 每条独立一行追加到本段末尾，无需分类标题，合并时冲突最小 -->
+- [新功能] 新增分钟级 intraday / paper trading 主链路：`stock_intraday_bar`、`intraday_signal_record`、paper account/order/fill/intraday snapshot 模型，`IntradaySignalEngine`（VWAP/EMA/MACD/RSI/量价/开盘区间）、`IntradaySignalService`、`IntradaySchedulerService`、`PaperTradingService`，以及 `/api/v1/intraday/*`、`/api/v1/paper-trading/*` API 与 `main.py --intraday` CLI 入口。
+- [测试] 新增 `tests/test_intraday_signal_engine.py`、`tests/test_intraday_repository.py`、`tests/test_intraday_api.py`，覆盖分钟级信号引擎、分钟线/信号仓储与 intraday + paper trading API 闭环。
+- [文档] 新增 `docs/intraday-refactor-plan.md` 固化分钟级日内交易重构方案；README / `docs/README_EN.md` 补充分钟级信号、paper trading API 与 `--intraday` CLI 实验入口说明，明确当前阶段以 yfinance 的美股 / 美期货 / 加密分钟线为主路径、暂不接真实下单。
+- [文档] README / `docs/README_EN`：与当前数据层（yfinance + 可选 Longbridge、移除遗留 A 股专用 fetcher）、CLI 产品边界及名称解析/补全索引流程对齐；克隆说明注明可替换 fork URL；英文致谢与示例环境变量注释同步。
+- [文档] `docs/architecture-detailed-guide.md`：架构主链路详解与 Mermaid 流程图（`graph` 语法、子图与序列图写法兼容 Mermaid 8.8）；README / README_EN / project-architecture-analysis 交叉链接。
 - [改进] Yahoo 符号转换：美期货（如 `ES=F`）与压缩型加密代码（含 `PERP` 后缀）正确映射，避免误走 A 股 `.SZ` 默认分支；`get_market_for_stock` 对美期货返回 `us`、对永续加密返回 `None`（与交易日检查 fail-open 一致）。
 - [chore] 移除未接线的 `patch/eastmoney_patch.py` 与 `ENABLE_EASTMONEY_PATCH` / `enable_eastmoney_patch` 配置项；删除未使用的 `akshare_sleep_*` 与 `tushare_rate_limit_per_minute` 占位字段。
 - [测试] 新增 `tests/test_yfinance_symbol_convert.py`；`tests/test_trading_calendar.py` 补充 `get_market_for_stock` 期货/永续/沪 A 推断用例。

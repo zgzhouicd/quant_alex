@@ -555,9 +555,64 @@ analyze_pattern_tool = ToolDefinition(
 )
 
 
+def _handle_get_intraday_signal(
+    stock_code: str,
+    interval: str = "1m",
+    lookback_minutes: int = 390,
+) -> dict:
+    """Generate a structured intraday signal from minute bars."""
+    from src.services.intraday_signal_service import IntradaySignalService
+
+    if not (stock_code and str(stock_code).strip()):
+        return {"error": "stock_code is required"}
+    service = IntradaySignalService()
+    try:
+        return service.analyze_symbol(
+            code=stock_code,
+            interval=interval,
+            lookback_minutes=int(lookback_minutes or 390),
+            refresh_data=True,
+        )
+    except Exception as exc:
+        logger.warning("get_intraday_signal(%s): failed: %s", stock_code, exc)
+        return {"error": f"Failed to generate intraday signal for {stock_code}: {exc}"}
+
+
+get_intraday_signal_tool = ToolDefinition(
+    name="get_intraday_signal",
+    description="Generate a structured intraday trading signal from minute bars. "
+                "Returns VWAP, EMA trend, MACD, RSI, opening-range context, "
+                "volume ratio, and a final signal (long/short/neutral).",
+    parameters=[
+        ToolParameter(
+            name="stock_code",
+            type="string",
+            description="Trading symbol, e.g., 'AAPL' or 'ES=F'",
+        ),
+        ToolParameter(
+            name="interval",
+            type="string",
+            description="Minute bar interval: 1m, 5m, 15m, 30m, 60m",
+            required=False,
+            default="1m",
+        ),
+        ToolParameter(
+            name="lookback_minutes",
+            type="integer",
+            description="History window in minutes to pull before computing the signal",
+            required=False,
+            default=390,
+        ),
+    ],
+    handler=_handle_get_intraday_signal,
+    category="analysis",
+)
+
+
 ALL_ANALYSIS_TOOLS = [
     analyze_trend_tool,
     calculate_ma_tool,
     get_volume_analysis_tool,
     analyze_pattern_tool,
+    get_intraday_signal_tool,
 ]

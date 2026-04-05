@@ -214,6 +214,7 @@ def parse_arguments() -> argparse.Namespace:
   python main.py --single-notify    # 启用单股推送模式（每分析完一只立即推送）
   python main.py --schedule         # 启用定时任务模式
   python main.py --market-review    # 仅运行大盘复盘
+  python main.py --intraday --stocks AAPL,ES=F --intraday-intervals 1m,5m
         '''
     )
 
@@ -353,6 +354,47 @@ def parse_arguments() -> argparse.Namespace:
         '--backtest-force',
         action='store_true',
         help='强制回测（即使已有回测结果也重新计算）'
+    )
+
+    parser.add_argument(
+        '--intraday',
+        action='store_true',
+        help='启动分钟级日内信号调度（可选接入 paper trading）'
+    )
+    parser.add_argument(
+        '--intraday-run-once',
+        action='store_true',
+        help='仅执行一轮分钟级日内信号计算后退出'
+    )
+    parser.add_argument(
+        '--intraday-intervals',
+        type=str,
+        default='1m',
+        help='分钟级周期，逗号分隔，如 1m,5m,15m'
+    )
+    parser.add_argument(
+        '--intraday-lookback-minutes',
+        type=int,
+        default=390,
+        help='分钟级回看窗口（分钟）'
+    )
+    parser.add_argument(
+        '--intraday-poll-seconds',
+        type=int,
+        default=60,
+        help='分钟级调度轮询间隔（秒）'
+    )
+    parser.add_argument(
+        '--paper-account-ids',
+        type=str,
+        default='',
+        help='要联动自动模拟交易的 paper account id，逗号分隔'
+    )
+    parser.add_argument(
+        '--paper-order-quantity',
+        type=float,
+        default=1.0,
+        help='自动 paper trading 的默认下单数量'
     )
 
     return parser.parse_args()
@@ -829,6 +871,50 @@ def main() -> int:
                 f"completed={stats.get('completed')} insufficient={stats.get('insufficient')} errors={stats.get('errors')}"
             )
             return 0
+
+        # 模式0.5: 分钟级信号 / 模拟交易
+        if getattr(args, 'intraday', False):
+            from src.services.intraday_scheduler_service import get_intraday_scheduler_service
+
+            runtime_symbols = stock_codes or [canonical_stock_code(c) for c in getattr(config, "stock_list", []) if (c or "").strip()]
+            if not runtime_symbols:
+                logger.error("分钟级模式未提供任何标的，请使用 --stocks 或配置 STOCK_LIST")
+                return 1
+
+            intervals = [i.strip() for i in str(getattr(args, 'intraday_intervals', '1m')).split(',') if i.strip()]
+            paper_account_ids = [
+                int(item.strip())
+                for item in str(getattr(args, 'paper_account_ids', '') or '').split(',')
+                if item.strip()
+            ]
+            scheduler = get_intraday_scheduler_service()
+            if getattr(args, 'intraday_run_once', False):
+                result = scheduler.run_once(
+                    symbols=runtime_symbols,
+                    intervals=intervals,
+                    lookback_minutes=getattr(args, 'intraday_lookback_minutes', 390),
+                    paper_account_ids=paper_account_ids,
+                    order_quantity=getattr(args, 'paper_order_quantity', 1.0),
+                )
+                logger.info("分钟级单轮执行完成: %s", json.dumps(result, ensure_ascii=False, default=str))
+                return 0
+
+            status = scheduler.start(
+                symbols=runtime_symbols,
+                intervals=intervals,
+                lookback_minutes=getattr(args, 'intraday_lookback_minutes', 390),
+                poll_seconds=getattr(args, 'intraday_poll_seconds', 60),
+                paper_account_ids=paper_account_ids,
+                order_quantity=getattr(args, 'paper_order_quantity', 1.0),
+            )
+            logger.info("分钟级调度已启动: %s", json.dumps(status, ensure_ascii=False, default=str))
+            try:
+                while True:
+                    time.sleep(1)
+            except KeyboardInterrupt:
+                scheduler.stop()
+                logger.info("分钟级调度已停止")
+                return 0
 
         # 模式1: 仅大盘复盘
         if args.market_review:
