@@ -11,6 +11,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 <!-- 新条目格式：- [类型] 描述（类型取值：新功能/改进/修复/文档/测试/chore）-->
 <!-- 每条独立一行追加到本段末尾，无需分类标题，合并时冲突最小 -->
+- [改进] Yahoo 符号转换：美期货（如 `ES=F`）与压缩型加密代码（含 `PERP` 后缀）正确映射，避免误走 A 股 `.SZ` 默认分支；`get_market_for_stock` 对美期货返回 `us`、对永续加密返回 `None`（与交易日检查 fail-open 一致）。
+- [chore] 移除未接线的 `patch/eastmoney_patch.py` 与 `ENABLE_EASTMONEY_PATCH` / `enable_eastmoney_patch` 配置项；删除未使用的 `akshare_sleep_*` 与 `tushare_rate_limit_per_minute` 占位字段。
+- [测试] 新增 `tests/test_yfinance_symbol_convert.py`；`tests/test_trading_calendar.py` 补充 `get_market_for_stock` 期货/永续/沪 A 推断用例。
+- [文档] README / FAQ / full-guide（中、英）与 OpenAPI 描述对齐 Yahoo + Longbridge 主路径；更新 `REALTIME_SOURCE_PRIORITY` 示例与实际默认。
+- [改进] 移除 A 股/港股专用数据层实现（AkShare、eFinance、Tushare、Baostock、PyTDX、TickFlow、AkShare 基本面适配器）及对应依赖；默认仅保留 Yfinance + Longbridge；`REALTIME_SOURCE_PRIORITY` 默认改为 `yfinance,longbridge`；`get_fundamental_context` 等与 AkShare 绑定的块统一降级；`is_hk_stock_code` 移至 `us_index_mapping`；名称解析去掉 AkShare 在线列表回退。
+- [文档] 新增 `docs/small-scale-operations.md`（小流量 CLI/Web 边界、双任务队列说明、默认不单机折腾 PG/大拆分）；README 导航链接；`project-architecture-analysis` 阶段三/四与参考节对齐该策略。
+- [改进] 全量架构路线：`DATA_FETCH_MAX_IN_FLIGHT` 限制 `get_daily_data` 同时在飞；`has_today_data` 显式日期归一；`analysis_async_tasks` + 队列持久化/reconcile/hydrate；可选 `DATABASE_URL`；`DATABASE_URL` 注册表单项；时区政策/`utc_now`；PostgreSQL/SQLite 多写/Agent/通知/模块拆分演进文档。
+- [文档] `project-architecture-analysis`：P1 补「已落地」状态；§六总结表与阶段二 P7 与当前实现对齐（全量架构路线图后续项仍按文档分期推进）。
+- [改进] 澄清异步分析任务队列语义：`TaskInfo`/去重仅进程内内存；分析产物由既有链路写库；修正 `task_queue` 误导性「持久化」表述；`api.app` 启动时记录 `semantics=in_memory_singleton` 日志；架构文档 P4/API 流程同步。
+- [改进] 架构治理：`has_today_data` 省略目标日时按有效交易日与市场对齐；API 分析在真实 `Config` 下复用 `PipelineSharedRuntime`（fetcher / LLM / 搜索 / 舆情）；`get_session` 文档引导优先 `session_scope`；`AnalysisService` 在 `get_config` 被 patch 为非 `Config` 时跳过共享运行时以兼容单测。
+- [改进] `run_full_analysis` 返回 `bool`：`main.py` 在正常单次分析路径若返回失败则以退出码 `1` 结束，便于 cron/CI；定时任务内失败时记录 error 日志。系统设置「LLM 通道探测」API Schema 重命名为 `LLMChannelProbeRequest` / `LLMChannelProbeResponse`（消除 pytest 误收集告警）；Web 侧类型同步。新增仓库根 `.gitignore`；`docker-compose` 默认内存上限调至 `1024M`；分析历史「狙击点位」从 dashboard 递归提取（`_find_sniper_in_dashboard`，深度限制）；`test_env.py` 中离线可跑的 `test_config` 使用 `assert`；依赖外网的 `test_data_fetch` / `test_llm` / `test_notification` 标记 `pytest.mark.network` 并在缺配置时 `skip`，避免无 Key 环境误失败。
 - [改进] **CLI 主流程产品范围收窄**：`main.py` 拒收 A股/港股/北交所代码；默认 `STOCK_LIST` / `MARKET_REVIEW_REGION` / GitHub 每日任务兜底改为美股+美期货示例与 `us` 复盘；`test.sh` 与 `.env.example` 同步；新增 `is_legacy_cn_hk_symbol` 供 API/CLI 共用。
 - [chore] 后端依赖改为 **uv** 管理：`pyproject.toml` + `uv.lock` 为真源；CI、Docker、`network-smoke`、`docker-publish`、每日分析工作流使用 `uv sync`；`requirements.txt` 由 `uv export --no-dev` 生成供 pip 备选；移除 `requirements-ci.txt`。
 - [测试] 离线门禁：`test_trigger_analysis_dos_protection` 改用 `symbols` + 合法美股格式以命中批量上限；`test_fetch_and_save_*` / 单股通知线程安全用例补齐 `instrument` 相关 mock 断言。

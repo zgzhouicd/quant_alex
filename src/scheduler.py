@@ -71,8 +71,9 @@ class Scheduler:
         """
         初始化调度器
 
-        Args:
+        参数:
             schedule_time: 每日执行时间，格式 "HH:MM"
+            schedule_time_provider: 可选，返回最新时刻字符串；变化时重建每日任务
         """
         try:
             import schedule
@@ -93,7 +94,7 @@ class Scheduler:
         """
         设置每日定时任务
 
-        Args:
+        参数:
             task: 要执行的任务函数（无参数）
             run_immediately: 是否在设置后立即执行一次
         """
@@ -107,20 +108,20 @@ class Scheduler:
 
     @staticmethod
     def _is_valid_schedule_time(schedule_time: str) -> bool:
-        """Validate time string in HH:MM 24-hour format."""
+        """校验时间串是否为 24 小时制 ``HH:MM``。"""
         candidate = (schedule_time or "").strip()
         if not re.fullmatch(r"(?:[01]\d|2[0-3]):[0-5]\d", candidate):
             return False
         return True
 
     def _cancel_daily_job(self) -> None:
-        """Remove the currently registered daily job if one exists."""
+        """若已注册每日任务则取消之。"""
         if self._daily_job is None:
             return
 
         if hasattr(self.schedule, "cancel_job"):
             self.schedule.cancel_job(self._daily_job)
-        else:  # pragma: no cover - compatibility fallback
+        else:  # pragma: no cover - 兼容旧版 schedule 库
             jobs = getattr(self.schedule, "jobs", None)
             if isinstance(jobs, list) and self._daily_job in jobs:
                 jobs.remove(self._daily_job)
@@ -128,7 +129,7 @@ class Scheduler:
         self._daily_job = None
 
     def _configure_daily_task(self, schedule_time: str) -> bool:
-        """(Re)register the daily job at the requested time."""
+        """在指定时刻（重新）注册每日任务。"""
         candidate = (schedule_time or "").strip()
         if not self._is_valid_schedule_time(candidate):
             logger.warning(
@@ -154,13 +155,13 @@ class Scheduler:
         return True
 
     def _refresh_daily_schedule_if_needed(self) -> None:
-        """Reload daily schedule time from the latest runtime config if needed."""
+        """若配置了 time provider，则按需从最新配置刷新每日执行时刻。"""
         if self._task_callback is None or self._schedule_time_provider is None:
             return
 
         try:
             latest_schedule_time = (self._schedule_time_provider() or "").strip()
-        except Exception as exc:  # pragma: no cover - defensive branch
+        except Exception as exc:  # pragma: no cover - 防御性分支
             logger.warning("读取最新 SCHEDULE_TIME 失败，继续沿用 %s: %s", self.schedule_time, exc)
             return
 
@@ -194,10 +195,10 @@ class Scheduler:
         run_immediately: bool = False,
         name: Optional[str] = None,
     ) -> None:
-        """Register a periodic background task executed inside the scheduler loop.
+        """在调度器循环内注册周期性后台任务。
 
-        Note: The scheduler loop polls every 30 seconds, so *interval_seconds*
-        below 30 will be clamped to 30 to avoid promising unreachable precision.
+        说明：主循环约每 30 秒唤醒一次，故 ``interval_seconds`` 小于 30 时会钳制为 30，
+        避免承诺无法达到的触发精度。
         """
         clamped_interval = max(30, int(interval_seconds))
         if int(interval_seconds) < 30:
@@ -227,7 +228,7 @@ class Scheduler:
             self._start_background_task(entry)
 
     def _start_background_task(self, entry: Dict[str, Any]) -> bool:
-        """Start one background task in a dedicated daemon thread."""
+        """在独立守护线程中启动一条后台任务。"""
         worker = entry.get("thread")
         if worker is not None and worker.is_alive():
             return False
@@ -254,7 +255,7 @@ class Scheduler:
         return True
 
     def _run_background_tasks(self) -> None:
-        """Execute any background tasks whose interval has elapsed."""
+        """对已到间隔的后台任务触发执行。"""
         if not self._background_tasks:
             return
 
@@ -315,15 +316,13 @@ def run_with_schedule(
     """
     便捷函数：使用定时调度运行任务
 
-    Args:
+    参数:
         task: 要执行的任务函数
         schedule_time: 每日执行时间
         run_immediately: 是否立即执行一次
-        background_tasks: 可选的后台任务定义列表。每项为一个字典，
-            需包含 `task` 与 `interval_seconds`，可选包含 `name`
-            和 `run_immediately`。`interval_seconds` 单位为秒。
-        schedule_time_provider: 可选的时间提供器；调度器每轮检查前会读取，
-            当返回值变化时自动重建 daily job。
+        background_tasks: 可选的后台任务列表。每项为 dict，须含 ``task``、
+            ``interval_seconds``，可选 ``name``、``run_immediately``（秒）。
+        schedule_time_provider: 可选；每轮循环读取，若返回时间与当前不同则重建每日任务。
     """
     scheduler = Scheduler(
         schedule_time=schedule_time,

@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""Portfolio service for P0 account/events/snapshot workflow."""
+"""Portfolio P0：账户、流水事件与日末快照等业务流程的服务层。"""
 
 from __future__ import annotations
 

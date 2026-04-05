@@ -10,7 +10,7 @@ WebUI 启动脚本
 等效命令：
     python main.py --webui-only
 
-Usage:
+用法示例:
   python webui.py
   WEBUI_HOST=0.0.0.0 WEBUI_PORT=8000 python webui.py
 """

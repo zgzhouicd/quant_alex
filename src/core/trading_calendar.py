@@ -10,6 +10,8 @@
 3. 支持 per-stock 过滤：只分析当日开市市场的股票
 
 依赖：exchange-calendars（可选，不可用时 fail-open）
+
+时间与存储策略见 ``docs/timezone-policy.md``；UTC 辅助函数见 ``src.utils.timeutil``。
 """
 
 import logging
@@ -68,6 +70,15 @@ def get_market_for_stock(code: str) -> Optional[str]:
     # A-share: 6-digit numeric
     if code.isdigit() and len(code) == 6:
         return "cn"
+
+    from src.services.instrument_resolver import _infer_asset_class
+    from src.schemas.instrument_schema import AssetClass
+
+    inferred = _infer_asset_class(code)
+    if inferred == AssetClass.FUTURE:
+        return "us"
+    if inferred == AssetClass.PERPETUAL:
+        return None
     return None
 
 
@@ -169,6 +180,25 @@ def get_effective_trading_date(
     except Exception as e:
         logger.warning("trading_calendar.get_effective_trading_date fail-open: %s", e)
         return fallback_date
+
+
+def normalize_checkpoint_date_for_stock(code: str, target_date: date) -> date:
+    """
+    Align an explicit calendar date with the daily-bar session date used for resume.
+
+    Anchors at end of that calendar day in the stock's market timezone so
+    weekends/holidays map to the effective session (same family of rules as
+    :func:`get_effective_trading_date`).
+    """
+    market = get_market_for_stock((code or "").strip())
+    tz_name = MARKET_TIMEZONE.get(market or "")
+    if not tz_name:
+        return target_date
+    try:
+        anchor = datetime.combine(target_date, dt_time(23, 59), tzinfo=ZoneInfo(tz_name))
+    except Exception:
+        return target_date
+    return get_effective_trading_date(market, current_time=anchor)
 
 
 def get_open_markets_today() -> Set[str]:

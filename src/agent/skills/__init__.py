@@ -1,9 +1,8 @@
 # -*- coding: utf-8 -*-
 """
-Agent skills package.
+Agent 技能包：可插拔的交易分析技能。
 
-Provides pluggable trading skills for the agent.
-Skills are defined in natural language (YAML files) — no Python code needed.
+技能用自然语言（YAML）描述，无需写 Python。
 """
 
 from src.agent.skills.base import (

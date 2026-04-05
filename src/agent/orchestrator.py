@@ -1,25 +1,24 @@
 # -*- coding: utf-8 -*-
 """
-AgentOrchestrator — multi-agent pipeline coordinator.
+AgentOrchestrator：多 Agent 流水线编排器。
 
-Manages the lifecycle of specialised agents (Technical → Intel → Risk →
-Specialist → Decision) for a single stock analysis run.
+单标的单次分析中，按序调度专业 Agent（Technical → Intel → Risk →
+Specialist → Decision）。
 
-Modes:
-- ``quick``   : Technical only → Decision (fastest, ~2 LLM calls)
-- ``standard``: Technical → Intel → Decision (default)
-- ``full``    : Technical → Intel → Risk → Decision
-- ``specialist``: Technical → Intel → Risk → specialist evaluation → Decision
+模式：
+- ``quick``：仅 Technical → Decision（最快，约 2 次 LLM）
+- ``standard``：Technical → Intel → Decision（默认）
+- ``full``：Technical → Intel → Risk → Decision
+- ``specialist``：Technical → Intel → Risk → 专项评估 → Decision
 
-The orchestrator:
-1. Seeds an :class:`AgentContext` with the user query and stock code
-2. Runs agents sequentially, passing the shared context
-3. Collects :class:`StageResult` from each agent
-4. Produces a unified :class:`OrchestratorResult` with the final dashboard
+编排步骤概览：
+1. 用用户查询与股票代码等填充 :class:`AgentContext`
+2. 串行运行各 Agent，共享同一 context
+3. 收集各阶段的 :class:`StageResult`
+4. 汇总为带最终 dashboard 的 :class:`OrchestratorResult`
 
-Importantly, this class exposes the same ``run(task, context)`` and
-``chat(message, session_id, ...)`` interface as ``AgentExecutor`` so it
-can be a drop-in replacement via the factory.
+与 ``AgentExecutor`` 一样暴露 ``run(task, context)``、``chat(...)`` 等接口，
+便于工厂按需替换实现。
 """
 
 from __future__ import annotations

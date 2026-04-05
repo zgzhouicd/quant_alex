@@ -114,7 +114,7 @@ daily_stock_analysis/
 | `MARKDOWN_TO_IMAGE_CHANNELS` | 将 Markdown 转为图片发送的渠道（用逗号分隔）：telegram,wechat,custom,email,slack；单股推送需同时配置且安装转图工具 | 可选 |
 | `MARKDOWN_TO_IMAGE_MAX_CHARS` | 超过此长度不转图片，避免超大图片（默认 15000） | 可选 |
 | `MD2IMG_ENGINE` | 转图引擎：`wkhtmltoimage`（默认，需 wkhtmltopdf）或 `markdown-to-file`（emoji 更好，需 `npm i -g markdown-to-file`） | 可选 |
-| `PREFETCH_REALTIME_QUOTES` | 设为 `false` 可禁用实时行情预取，避免 efinance/akshare_em 全市场拉取（默认 true） | 可选 |
+| `PREFETCH_REALTIME_QUOTES` | 设为 `false` 可显式跳过实时行情预取路径（当前实现已无 A 股全市场预取，多为兼容开关；默认 `true`） | 可选 |
 
 #### 其他配置
 
@@ -285,8 +285,7 @@ daily_stock_analysis/
 | `ENABLE_REALTIME_QUOTE` | 启用实时行情（关闭后使用历史收盘价分析） | `true` | 可选 |
 | `ENABLE_REALTIME_TECHNICAL_INDICATORS` | 盘中实时技术面：启用时用实时价计算 MA5/MA10/MA20 与多头排列（Issue #234）；关闭则用昨日收盘 | `true` | 可选 |
 | `ENABLE_CHIP_DISTRIBUTION` | 启用筹码分布分析（该接口不稳定，云端部署建议关闭）。GitHub Actions 用户需在 Repository Variables 中设置 `ENABLE_CHIP_DISTRIBUTION=true` 方可启用；workflow 默认关闭。 | `true` | 可选 |
-| `ENABLE_EASTMONEY_PATCH` | 东财接口补丁：东财接口频繁失败（如 RemoteDisconnected、连接被关闭）时建议设为 `true`，注入 NID 令牌与随机 User-Agent 以降低被限流概率 | `false` | 可选 |
-| `REALTIME_SOURCE_PRIORITY` | 实时行情数据源优先级（逗号分隔），如 `tencent,akshare_sina,efinance,akshare_em` | 见 .env.example | 可选 |
+| `REALTIME_SOURCE_PRIORITY` | 实时行情数据源优先级（逗号分隔），如 `yfinance,longbridge` | 见 .env.example | 可选 |
 | `ENABLE_FUNDAMENTAL_PIPELINE` | 基本面聚合总开关；关闭时仅返回 `not_supported` 块，不改变原分析链路 | `true` | 可选 |
 | `FUNDAMENTAL_STAGE_TIMEOUT_SECONDS` | 基本面阶段总时延预算（秒） | `1.5` | 可选 |
 | `FUNDAMENTAL_FETCH_TIMEOUT_SECONDS` | 单能力源调用超时（秒） | `0.8` | 可选 |
@@ -761,41 +760,28 @@ PUSHOVER_API_TOKEN=your_api_token
 
 ## 数据源配置
 
-系统默认使用 AkShare（免费），也支持其他数据源：
+当前主链路日线与实时行情以 **Yahoo Finance（yfinance）** 为主，可选 **Longbridge** 在 Yahoo 缺项时补齐量比、换手率、部分估值等字段。环境变量见上表 `LONGBRIDGE_*`、`REALTIME_SOURCE_PRIORITY`、`ENABLE_REALTIME_QUOTE` 等。
 
-### AkShare（默认）
-- 免费，无需配置
-- 数据来源：东方财富爬虫
-
-### Tushare Pro
-- 需要注册获取 Token
-- 更稳定，数据更全
-- 设置 `TUSHARE_TOKEN`
-
-### Baostock
-- 免费，无需配置
-- 作为备用数据源
-
-### YFinance
-- 免费，无需配置
-- 支持美股/港股数据
-- 美股历史数据与实时行情均统一使用 YFinance，以避免 akshare 美股复权异常导致的技术指标错误
+### Yahoo Finance（yfinance）
+- 免费，无需 API Key
+- 国际标的常用形态的历史 K 线与实时行情
+- A 股等市场若以 6 位代码等形式传入，会在 fetcher 内映射为 Yahoo 符号（如 `.SS` / `.SZ`）
 
 ### Longbridge（长桥）
-- 美股/港股数据兜底，补充 YFinance 缺失的量比、换手率、PE 等字段
+- 在已配置 App Key / Secret / Access Token 时，作为 **Yahoo 的补充**：量比、换手率、PE 等
 - 需从 [open.longbridge.com](https://open.longbridge.com/) 注册并获取 App Key / App Secret / Access Token
 - 设置 `LONGBRIDGE_APP_KEY`、`LONGBRIDGE_APP_SECRET`、`LONGBRIDGE_ACCESS_TOKEN`
 - 接入点可配 `LONGBRIDGE_HTTP_URL`、`LONGBRIDGE_QUOTE_WS_URL`、`LONGBRIDGE_TRADE_WS_URL`、`LONGBRIDGE_REGION`
 - 其余可选参数见官方 [环境变量说明](https://open.longbridge.com/zh-CN/docs/getting-started#环境变量)
-- 仅在 YFinance（美股）或 AkShare（港股）返回数据不完整时自动触发，不影响 A 股链路
+- 在 Yahoo Finance 返回数据不完整、且已配置长桥凭证时自动尝试长桥补齐；未配置长桥时不额外调用
 
-### 东财接口频繁失败时的处理
+### 请求频繁失败或被限流时
 
-若日志出现 `RemoteDisconnected`、`push2his.eastmoney.com` 连接被关闭等，多为东财限流。建议：
+若日志出现连接被重置、超时或熔断：
 
-1. 在 `.env` 中设置 `ENABLE_EASTMONEY_PATCH=true`
-2. 将 `MAX_WORKERS=1` 降低并发
-3. 若已配置 Tushare，可优先使用 Tushare 数据源
+1. 降低并发（如调小 `DATA_FETCH_MAX_IN_FLIGHT` / `MAX_WORKERS`）
+2. 缩小单次分析标的数量，避免短间隔重复全量跑批
+3. 实时行情优先使用默认的 `yfinance,longbridge`，并确认网络与代理（`NO_PROXY`）未误伤行情域名
 
 ---
 
@@ -860,9 +846,8 @@ LITELLM_FALLBACK_MODELS=anthropic/claude-3-5-sonnet-20241022,openai/gpt-4o-mini
 
 > 兼容性说明：`/api/v1/stocks/extract-from-image` 响应在原 `codes` 基础上新增 `items` 字段。若下游客户端使用严格 JSON Schema 且不接受未知字段，请同步更新 schema。
 
-**智能导入**：除图片外，还支持 CSV/Excel 文件及剪贴板粘贴（`/api/v1/stocks/parse-import`），自动解析代码/名称列，名称→代码解析支持本地映射、拼音匹配及 AkShare 在线 fallback。依赖 `pypinyin`（拼音匹配）和 `openpyxl`（Excel 解析），已包含在 `requirements.txt` 中。
+**智能导入**：除图片外，还支持 CSV/Excel 文件及剪贴板粘贴（`/api/v1/stocks/parse-import`），自动解析代码/名称列，名称→代码解析支持本地映射与拼音匹配（已移除 AkShare 在线列表回退）。依赖 `pypinyin`（拼音匹配）和 `openpyxl`（Excel 解析），已包含在 `requirements.txt` 中。
 
-- **AkShare 名称解析缓存**：名称→代码解析使用 AkShare 在线 fallback 时，结果缓存 1 小时（TTL），避免频繁请求；首次调用或缓存过期后会自动刷新。
 - **CSV/Excel 列名**：支持 `code`、`股票代码`、`代码`、`name`、`股票名称`、`名称` 等（不区分大小写）；无表头时默认第 1 列为代码、第 2 列为名称。
 - **常见解析失败**：文件过大（>2MB）、编码非 UTF-8/GBK、Excel 工作表为空或损坏、CSV 分隔符/列数不一致时，API 会返回具体错误提示。
 
@@ -1057,7 +1042,7 @@ python main.py --serve-only --host 0.0.0.0 --port 8888
 A: 企业微信/飞书有消息长度限制，系统已自动分段发送。如需完整内容，可配置飞书云文档功能。
 
 ### Q: 数据获取失败？
-A: AkShare 使用爬虫机制，可能被临时限流。系统已配置重试机制，一般等待几分钟后重试即可。
+A: 公网行情源可能因网络、限流或标的无映射而短暂失败。系统已内置重试与熔断；可稍后重试、缩小单次标的数量，或检查代理/`NO_PROXY` 与 Longbridge 凭证（若已启用）。
 
 ### Q: 如何添加自选股？
 A: 修改 `STOCK_LIST` 环境变量，多个代码用逗号分隔。

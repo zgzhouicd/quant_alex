@@ -1,17 +1,15 @@
 # -*- coding: utf-8 -*-
 """
-Agent Executor — ReAct loop with tool calling.
+Agent 执行器：带工具调用的 ReAct 循环。
 
-Orchestrates the LLM + tools interaction loop:
-1. Build system prompt (persona + tools + skills)
-2. Send to LLM with tool declarations
-3. If tool_call → execute tool → feed result back
-4. If text → parse as final answer
-5. Loop until final answer or max_steps
+编排 LLM 与工具交互：
+1. 组装 system prompt（人设 + 工具 + 技能）
+2. 携带 tool 声明请求 LLM
+3. 若返回 tool_call → 执行工具 → 将结果喂回
+4. 若为文本 → 解析为最终答案
+5. 循环直至得到最终答案或达到 max_steps
 
-The core execution loop is delegated to :mod:`src.agent.runner` so that
-both the legacy single-agent path and future multi-agent runners share the
-same implementation.
+核心循环委托给 :mod:`src.agent.runner`，以便单 Agent 与多 Agent 路径共用实现。
 """
 
 import json
@@ -34,15 +32,15 @@ logger = logging.getLogger(__name__)
 
 @dataclass
 class AgentResult:
-    """Result from an agent execution run."""
+    """单次 Agent 执行的返回结构。"""
     success: bool = False
-    content: str = ""                          # final text answer from agent
-    dashboard: Optional[Dict[str, Any]] = None  # parsed dashboard JSON
-    tool_calls_log: List[Dict[str, Any]] = field(default_factory=list)  # execution trace
+    content: str = ""                          # Agent 最终文本回答
+    dashboard: Optional[Dict[str, Any]] = None  # 解析后的仪表盘 JSON
+    tool_calls_log: List[Dict[str, Any]] = field(default_factory=list)  # 工具调用轨迹
     total_steps: int = 0
     total_tokens: int = 0
     provider: str = ""
-    model: str = ""                            # comma-separated models used (supports fallback)
+    model: str = ""                            # 使用过的模型名，逗号分隔（含降级链）
     error: Optional[str] = None
 
 

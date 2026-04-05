@@ -1,14 +1,14 @@
 # -*- coding: utf-8 -*-
 """
 ===================================
-A股自选股智能分析系统 - 搜索服务模块
+股票智能分析系统 - 搜索服务模块
 ===================================
 
 职责：
-1. 提供统一的新闻搜索接口
-2. 支持 Bocha、Tavily、Brave、SerpAPI、SearXNG 多种搜索引擎
-3. 多 Key 负载均衡和故障转移
-4. 搜索结果缓存和格式化
+1. 统一的新闻 / 网页搜索接口
+2. 支持 Bocha、Tavily、Brave、SerpAPI、SearXNG 等引擎
+3. 多 Key 轮换与失败转移
+4. 结果缓存与格式化
 """
 
 import logging
@@ -41,7 +41,7 @@ from src.config import (
 
 logger = logging.getLogger(__name__)
 
-# Transient network errors (retryable)
+# 可重试的瞬时网络类异常
 _SEARCH_TRANSIENT_EXCEPTIONS = (
     requests.exceptions.SSLError,
     requests.exceptions.ConnectionError,
@@ -57,7 +57,7 @@ _SEARCH_TRANSIENT_EXCEPTIONS = (
     before_sleep=before_sleep_log(logger, logging.WARNING),
 )
 def _post_with_retry(url: str, *, headers: Dict[str, str], json: Dict[str, Any], timeout: int) -> requests.Response:
-    """POST with retry on transient SSL/network errors."""
+    """带重试的 POST（SSL/连接超时等瞬时错误时重试）。"""
     return requests.post(url, headers=headers, json=json, timeout=timeout)
 
 
@@ -71,7 +71,7 @@ def _post_with_retry(url: str, *, headers: Dict[str, str], json: Dict[str, Any],
 def _get_with_retry(
     url: str, *, headers: Dict[str, str], params: Dict[str, Any], timeout: int
 ) -> requests.Response:
-    """GET with retry on transient SSL/network errors."""
+    """带重试的 GET（SSL/连接超时等瞬时错误时重试）。"""
     return requests.get(url, headers=headers, params=params, timeout=timeout)
 
 
@@ -149,7 +149,7 @@ class BaseSearchProvider(ABC):
         """
         初始化搜索引擎
         
-        Args:
+        参数:
             api_keys: API Key 列表（支持多个 key 负载均衡）
             name: 搜索引擎名称
         """
@@ -261,12 +261,12 @@ class BaseSearchProvider(ABC):
         """
         执行搜索
         
-        Args:
+        参数:
             query: 搜索关键词
             max_results: 最大返回结果数
             days: 搜索最近几天的时间范围（默认7天）
             
-        Returns:
+        返回:
             SearchResponse 对象
         """
         return self._execute_search(query, max_results=max_results, days=days)
@@ -1944,7 +1944,7 @@ class SearchService:
         """
         初始化搜索服务
 
-        Args:
+        参数:
             bocha_keys: 博查搜索 API Key 列表
             tavily_keys: Tavily API Key 列表
             brave_keys: Brave Search API Key 列表
@@ -2527,13 +2527,13 @@ class SearchService:
         """
         搜索股票相关新闻
         
-        Args:
+        参数:
             stock_code: 股票代码
             stock_name: 股票名称
             max_results: 最大返回结果数
             focus_keywords: 重点关注的关键词列表
             
-        Returns:
+        返回:
             SearchResponse 对象
         """
         # 策略窗口优先：ultra_short/short/medium/long = 1/3/7/30 天，
@@ -2720,12 +2720,12 @@ class SearchService:
         
         专门针对交易决策相关的重要事件进行搜索
         
-        Args:
+        参数:
             stock_code: 股票代码
             stock_name: 股票名称
             event_types: 事件类型列表
             
-        Returns:
+        返回:
             SearchResponse 对象
         """
         if event_types is None:
@@ -2772,12 +2772,12 @@ class SearchService:
         2. 风险排查 - 减持、处罚、利空
         3. 业绩预期 - 年报预告、业绩快报
         
-        Args:
+        参数:
             stock_code: 股票代码
             stock_name: 股票名称
             max_searches: 最大搜索次数
             
-        Returns:
+        返回:
             {维度名称: SearchResponse} 字典
         """
         results = {}
@@ -2973,11 +2973,11 @@ class SearchService:
         """
         格式化情报搜索结果为报告
         
-        Args:
+        参数:
             intel_results: 多维度搜索结果
             stock_name: 股票名称
             
-        Returns:
+        返回:
             格式化的情报报告文本
         """
         lines = [f"【{stock_name} 情报搜索结果】"]
@@ -3026,12 +3026,12 @@ class SearchService:
         """
         Batch search news for multiple stocks.
         
-        Args:
+        参数:
             stocks: List of stocks
             max_results_per_stock: Max results per stock
             delay_between: Delay between searches (seconds)
             
-        Returns:
+        返回:
             Dict of results
         """
         results = {}
@@ -3058,7 +3058,7 @@ class SearchService:
         """
         Enhance search when data sources fail.
         
-        When all data sources (efinance, akshare, tushare, baostock, etc.) fail to get
+        When primary market data sources (e.g. Yahoo Finance / Longbridge) fail to get
         stock data, use search engines to find stock trends and price info as supplemental data for AI analysis.
         
         Strategy:
@@ -3066,13 +3066,13 @@ class SearchService:
         2. Try all available search engines for each keyword
         3. Aggregate and deduplicate results
         
-        Args:
+        参数:
             stock_code: Stock Code
             stock_name: Stock Name
             max_attempts: Max search attempts (using different keywords)
             max_results: Max results to return
             
-        Returns:
+        返回:
             SearchResponse object with aggregated results
         """
 
@@ -3168,14 +3168,14 @@ class SearchService:
         当 include_price=True 时，会同时搜索新闻和股价信息。
         主要用于数据源完全失败时的兜底方案。
         
-        Args:
+        参数:
             stock_code: 股票代码
             stock_name: 股票名称
             include_news: 是否搜索新闻
             include_price: 是否搜索股价/走势信息
             max_results: 每类搜索的最大结果数
             
-        Returns:
+        返回:
             {'news': SearchResponse, 'price': SearchResponse} 字典
         """
         results = {}
@@ -3201,10 +3201,10 @@ class SearchService:
         """
         将股价搜索结果格式化为 AI 分析上下文
         
-        Args:
+        参数:
             response: 搜索响应对象
             
-        Returns:
+        返回:
             格式化的文本，可直接用于 AI 分析
         """
         if not response.success or not response.results:

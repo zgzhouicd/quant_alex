@@ -31,10 +31,10 @@
 **原因**：默认的某些实时行情源（如新浪接口）不提供量比字段。
 
 **解决方案**：
-1. 已在 v2.3.0 修复，腾讯接口现已支持量比解析
-2. 推荐配置实时行情源优先级：
+1. 当前默认以 Yahoo Finance + 可选 Longbridge 为主路径；量比等字段在长桥可用时会自动补充
+2. 推荐保留默认实时行情优先级：
    ```bash
-   REALTIME_SOURCE_PRIORITY=tencent,akshare_sina,efinance,akshare_em
+   REALTIME_SOURCE_PRIORITY=yfinance,longbridge
    ```
 3. 系统已内置 5 日均量计算作为兜底逻辑
 
@@ -60,11 +60,11 @@
 **原因**：免费数据源（东方财富、新浪等）有反爬机制，短时间大量请求会被限流。
 
 **解决方案**：
-1. 系统已内置多数据源自动切换和熔断保护
+1. 系统已内置熔断保护与失败降级（fail-open）
 2. 减少自选股数量，或增加请求间隔
 3. 避免频繁手动触发分析
-4. 若东财接口频繁失败，可设置 `ENABLE_EASTMONEY_PATCH=true` 启用东财补丁（注入 NID 令牌与随机 User-Agent，降低被限流概率）
-5. 将 `MAX_WORKERS=1` 改为串行获取，减少对东财的并发压力
+4. 降低并发（如调小 `DATA_FETCH_MAX_IN_FLIGHT` / `MAX_WORKERS`），并检查代理/`NO_PROXY` 是否影响行情域名
+5. 实时行情保持 `REALTIME_SOURCE_PRIORITY=yfinance,longbridge`；若已配置 Longbridge，确认 App Key / Token 有效
 
 ---
 

@@ -44,13 +44,13 @@ x-common: &common
     options:
       max-size: "10m"
       max-file: "3"
-  # 资源限制
+  # 资源限制（Python + LLM + pandas 建议 ≥1G；512M 易 OOM，可按主机调整）
   deploy:
     resources:
       limits:
-        memory: 512M
+        memory: 1024M
       reservations:
-        memory: 256M
+        memory: 384M
 
 services:
   # 定时任务模式

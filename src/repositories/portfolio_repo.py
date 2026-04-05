@@ -1,8 +1,5 @@
 # -*- coding: utf-8 -*-
-"""Portfolio repository.
-
-Provides DB access helpers for portfolio account/events/snapshot tables.
-"""
+"""Portfolio 领域：账户、流水、快照等表的仓库层。"""
 
 from __future__ import annotations
 
@@ -31,19 +28,19 @@ logger = logging.getLogger(__name__)
 
 
 class DuplicateTradeUidError(Exception):
-    """Raised when trade_uid conflicts with existing record in one account."""
+    """同一账户下 trade_uid 与已有记录冲突时抛出。"""
 
 
 class DuplicateTradeDedupHashError(Exception):
-    """Raised when dedup hash conflicts with existing record in one account."""
+    """同一账户下去重 hash 与已有记录冲突时抛出。"""
 
 
 class PortfolioBusyError(Exception):
-    """Raised when SQLite write serialization cannot acquire the ledger lock."""
+    """SQLite 写序列化无法取得账本锁时抛出。"""
 
 
 class PortfolioRepository:
-    """DB access layer for portfolio P0 domain."""
+    """Portfolio P0 领域的数据库访问层。"""
 
     def __init__(self, db_manager: Optional[DatabaseManager] = None):
         self.db = db_manager or DatabaseManager.get_instance()
@@ -260,7 +257,7 @@ class PortfolioRepository:
             return self.delete_corporate_action_in_session(session=session, action_id=action_id)
 
     def has_trade_uid(self, account_id: int, trade_uid: Optional[str]) -> bool:
-        """Return True when trade_uid already exists in the account."""
+        """若该账户下已存在相同 trade_uid 则返回 True。"""
         uid = (trade_uid or "").strip()
         if not uid:
             return False
@@ -268,7 +265,7 @@ class PortfolioRepository:
             return self.has_trade_uid_in_session(session=session, account_id=account_id, trade_uid=uid)
 
     def has_trade_dedup_hash(self, account_id: int, dedup_hash: Optional[str]) -> bool:
-        """Return True when dedup hash already exists in the account."""
+        """若该账户下已存在相同去重 hash 则返回 True。"""
         hash_value = (dedup_hash or "").strip()
         if not hash_value:
             return False
@@ -534,7 +531,7 @@ class PortfolioRepository:
         return list(rows)
 
     def get_first_activity_date(self, *, account_id: int, as_of: date) -> Optional[date]:
-        """Return earliest event date (trade/cash/corporate action) for one account."""
+        """返回某账户在 as_of 之前最早一笔业务日期（成交/资金/公司行动等）。"""
         with self.db.get_session() as session:
             first_trade = session.execute(
                 select(func.min(PortfolioTrade.trade_date)).where(
@@ -771,7 +768,7 @@ class PortfolioRepository:
         account_id: Optional[int] = None,
         lookback_days: int = 180,
     ) -> List[PortfolioDailySnapshot]:
-        """Load snapshot rows in ascending date order for risk monitoring."""
+        """按日期升序加载日快照行，供风险监控使用。"""
         with self.db.get_session() as session:
             query = select(PortfolioDailySnapshot).where(
                 and_(
@@ -989,7 +986,7 @@ class PortfolioRepository:
         lots: Iterable[Dict[str, Any]],
         valuation_currency: str,
     ) -> None:
-        """Atomically refresh position cache and daily snapshot in one transaction."""
+        """在同一事务中原子刷新持仓缓存与日度快照。"""
         with self.db.get_session() as session:
             session.execute(
                 delete(PortfolioPosition).where(

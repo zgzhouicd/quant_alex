@@ -10,8 +10,8 @@ import type {
   SystemConfigResponse,
   SystemConfigSchemaResponse,
   SystemConfigValidationErrorResponse,
-  TestLLMChannelRequest,
-  TestLLMChannelResponse,
+  LLMChannelProbeRequest,
+  LLMChannelProbeResponse,
   UpdateSystemConfigRequest,
   UpdateSystemConfigResponse,
   ValidateSystemConfigRequest,
@@ -83,7 +83,7 @@ function toSnakeImportPayload(payload: ImportSystemConfigRequest): Record<string
   };
 }
 
-function toSnakeTestChannelPayload(payload: TestLLMChannelRequest): Record<string, unknown> {
+function toSnakeLLMChannelProbePayload(payload: LLMChannelProbeRequest): Record<string, unknown> {
   return {
     name: payload.name,
     protocol: payload.protocol,
@@ -140,12 +140,12 @@ export const systemConfigApi = {
     return toCamelCase<UpdateSystemConfigResponse>(response.data);
   },
 
-  async testLLMChannel(payload: TestLLMChannelRequest): Promise<TestLLMChannelResponse> {
+  async testLLMChannel(payload: LLMChannelProbeRequest): Promise<LLMChannelProbeResponse> {
     const response = await apiClient.post<Record<string, unknown>>(
       '/api/v1/system/config/llm/test-channel',
-      toSnakeTestChannelPayload(payload),
+      toSnakeLLMChannelProbePayload(payload),
     );
-    return toCamelCase<TestLLMChannelResponse>(response.data);
+    return toCamelCase<LLMChannelProbeResponse>(response.data);
   },
 
   async discoverLLMChannelModels(

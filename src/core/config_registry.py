@@ -1,8 +1,8 @@
 # -*- coding: utf-8 -*-
-"""Configuration field metadata registry.
+"""配置项元数据注册表（单一真源）。
 
-This module is the single source of truth for configuration UI metadata,
-validation hints, and category grouping.
+用于 Web 设置页的分类、展示文案与校验提示等；其中各 category 的英文 title/description
+多为 UI 展示用语，与代码注释分离维护。
 """
 
 from __future__ import annotations
@@ -215,7 +215,7 @@ _FIELD_DEFINITIONS: Dict[str, Dict[str, Any]] = {
     },
     "TUSHARE_TOKEN": {
         "title": "Tushare Token",
-        "description": "Token for Tushare Pro API.",
+        "description": "Legacy: default data layer no longer includes Tushare fetcher; token unused unless you restore the module.",
         "category": "data_source",
         "data_type": "string",
         "ui_control": "password",
@@ -229,7 +229,7 @@ _FIELD_DEFINITIONS: Dict[str, Dict[str, Any]] = {
     },
     "TICKFLOW_API_KEY": {
         "title": "TickFlow API Key",
-        "description": "API key for TickFlow market review enhancement (A-share indices, plus market stats when universe queries are enabled).",
+        "description": "Legacy: TickFlow integration removed with A-share fetchers; key unused in default build.",
         "category": "data_source",
         "data_type": "string",
         "ui_control": "password",
@@ -250,7 +250,7 @@ _FIELD_DEFINITIONS: Dict[str, Dict[str, Any]] = {
         "is_sensitive": False,
         "is_required": False,
         "is_editable": True,
-        "default_value": "tencent,akshare_sina,efinance,akshare_em",
+        "default_value": "yfinance,longbridge",
         "options": [],
         "validation": {},
         "display_order": 20,
@@ -1434,6 +1434,40 @@ _FIELD_DEFINITIONS: Dict[str, Dict[str, Any]] = {
         "options": [],
         "validation": {"min": 1, "max": 20},
         "display_order": 50,
+    },
+    "DATABASE_URL": {
+        "title": "Database URL",
+        "description": (
+            "Optional SQLAlchemy URL (e.g. postgresql+psycopg://...). "
+            "When empty, SQLite file from DATABASE_PATH is used."
+        ),
+        "category": "system",
+        "data_type": "string",
+        "ui_control": "password",
+        "is_sensitive": True,
+        "is_required": False,
+        "is_editable": True,
+        "default_value": "",
+        "options": [],
+        "validation": {},
+        "display_order": 48,
+    },
+    "DATA_FETCH_MAX_IN_FLIGHT": {
+        "title": "Data Fetch Max In-Flight",
+        "description": (
+            "Cap concurrent DataFetcherManager.get_daily_data calls (0 = unlimited). "
+            "Reduces upstream HTTP peaks when MAX_WORKERS is high."
+        ),
+        "category": "system",
+        "data_type": "integer",
+        "ui_control": "number",
+        "is_sensitive": False,
+        "is_required": False,
+        "is_editable": True,
+        "default_value": "0",
+        "options": [],
+        "validation": {"min": 0, "max": 64},
+        "display_order": 49,
     },
     "ANALYSIS_DELAY": {
         "title": "Analysis Delay",

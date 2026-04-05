@@ -14,6 +14,7 @@ import os
 import tempfile
 import unittest
 from datetime import date, timedelta
+from unittest.mock import patch
 
 import pandas as pd
 
@@ -179,6 +180,43 @@ class GetLatestDataTestCase(unittest.TestCase):
         self.assertAlmostEqual(by_date[base_date].volume_ratio or 0.0, 1.8, places=6)
         self.assertEqual(by_date[base_date].data_source, "batch-2")
         self.assertAlmostEqual(by_date[base_date + timedelta(days=2)].close, 122.0, places=6)
+
+    def test_has_today_data_uses_effective_trading_date_when_target_omitted(self) -> None:
+        """Omitted target_date follows trading calendar, not raw calendar today (P2)."""
+        row_date = date(2024, 3, 15)
+        df = pd.DataFrame(
+            [
+                {
+                    "date": row_date,
+                    "open": 99.0,
+                    "high": 101.0,
+                    "low": 98.0,
+                    "close": 100.0,
+                    "volume": 1_000_000,
+                    "amount": 10_000_000,
+                    "pct_chg": 1.0,
+                }
+            ]
+        )
+        self.db.save_daily_data(df, "600519", data_source="Test")
+
+        with patch(
+            "src.core.trading_calendar.get_effective_trading_date",
+            return_value=row_date,
+        ), patch(
+            "src.core.trading_calendar.get_market_for_stock",
+            return_value="cn",
+        ):
+            self.assertTrue(self.db.has_today_data("600519"))
+
+        with patch(
+            "src.core.trading_calendar.get_effective_trading_date",
+            return_value=date(2024, 3, 20),
+        ), patch(
+            "src.core.trading_calendar.get_market_for_stock",
+            return_value="cn",
+        ):
+            self.assertFalse(self.db.has_today_data("600519"))
 
 
 if __name__ == "__main__":

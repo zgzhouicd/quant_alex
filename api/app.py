@@ -15,6 +15,7 @@ FastAPI 应用工厂模块
     app = create_app()
 """
 
+import logging
 import mimetypes
 import os
 from contextlib import asynccontextmanager
@@ -33,11 +34,21 @@ from api.middlewares.error_handler import add_error_handlers
 from api.v1.schemas.common import HealthResponse
 from src.services.system_config_service import SystemConfigService
 
+logger = logging.getLogger(__name__)
+
 
 @asynccontextmanager
 async def app_lifespan(app: FastAPI):
     """Initialize and release shared services for the app lifecycle."""
     app.state.system_config_service = SystemConfigService()
+    # 触达单例并记录语义，便于运维确认任务状态仅进程内有效（重启后清空）
+    from src.services.task_queue import get_task_queue
+
+    get_task_queue()
+    logger.info(
+        "component=analysis_task_queue semantics=in_memory_singleton "
+        "note=process_restart_clears_task_state"
+    )
     try:
         yield
     finally:
@@ -63,7 +74,8 @@ def create_app(static_dir: Optional[Path] = None) -> FastAPI:
     app = FastAPI(
         title="Daily Stock Analysis API",
         description=(
-            "A股/港股/美股自选股智能分析系统 API\n\n"
+            "股票智能分析系统 API（默认产品范围：美股 / 美期货 / 加密永续等；"
+            "部分能力与遗留路径仍可能涉及其他市场符号）\n\n"
             "## 功能模块\n"
             "- 股票分析：触发 AI 智能分析\n"
             "- 历史记录：查询历史分析报告\n"

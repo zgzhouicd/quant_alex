@@ -254,8 +254,7 @@ Default schedule: Every weekday at **18:00 (Beijing Time)** automatic execution.
 | `ENABLE_REALTIME_QUOTE` | Enable real-time quotes (if disabled, uses historical closing prices for analysis) | `true` | Optional |
 | `ENABLE_REALTIME_TECHNICAL_INDICATORS` | Intraday real-time technicals: Calculate MA5/MA10/MA20 and bull trends using real-time prices when enabled (Issue #234); uses yesterday's close if disabled. | `true` | Optional |
 | `ENABLE_CHIP_DISTRIBUTION` | Enable chip distribution analysis (this API is unstable, recommended to disable for cloud deployment). GitHub Actions users must set `ENABLE_CHIP_DISTRIBUTION=true` in Repository Variables to enable; disabled by default in workflows. | `true` | Optional |
-| `ENABLE_EASTMONEY_PATCH` | Eastmoney API patch: Recommended to set to `true` when Eastmoney APIs fail frequently (e.g., RemoteDisconnected, connection closed). Injects NID tokens and random User-Agents to reduce rate limiting probability. | `false` | Optional |
-| `REALTIME_SOURCE_PRIORITY` | Real-time quote source priority (comma-separated), e.g., `tencent,akshare_sina,efinance,akshare_em` | See .env.example | Optional |
+| `REALTIME_SOURCE_PRIORITY` | Real-time quote source priority (comma-separated), e.g., `yfinance,longbridge` | See .env.example | Optional |
 | `ENABLE_FUNDAMENTAL_PIPELINE` | Master switch for fundamental aggregation; when disabled, returns `not_supported` block only, without altering the original analysis pipeline. | `true` | Optional |
 | `FUNDAMENTAL_STAGE_TIMEOUT_SECONDS` | Total latency budget for the fundamental stage (seconds) | `1.5` | Optional |
 | `FUNDAMENTAL_FETCH_TIMEOUT_SECONDS` | Timeout for a single capability source call (seconds) | `0.8` | Optional |
@@ -637,25 +636,16 @@ Features:
 
 ## Data Source Configuration
 
-System defaults to AkShare (free), also supports other data sources:
+The main pipeline uses **Yahoo Finance (yfinance)** for daily bars and real-time quotes, with optional **Longbridge** to backfill volume ratio, turnover, and some valuation fields when Yahoo is incomplete. See `LONGBRIDGE_*`, `REALTIME_SOURCE_PRIORITY`, and `ENABLE_REALTIME_QUOTE` in the configuration tables above.
 
-### AkShare (Default)
-- Free, no configuration needed
-- Data source: Eastmoney scraper
+### Yahoo Finance (yfinance)
+- Free, no API key
+- Historical K-lines and quotes for internationally listed symbols
+- CN-style numeric codes are mapped to Yahoo tickers (e.g. `.SS` / `.SZ`) inside the fetcher when applicable
 
-### Tushare Pro
-- Requires registration to get Token
-- More stable, more comprehensive data
-- Set `TUSHARE_TOKEN`
-
-### Baostock
-- Free, no configuration needed
-- Used as backup data source
-
-### YFinance
-- Free, no configuration needed
-- Supports US/HK stock data
-- US stock historical and real-time data both use YFinance exclusively to avoid technical indicator errors from akshare's US stock adjustment issues
+### Longbridge
+- Supplemental source when credentials (`LONGBRIDGE_APP_KEY`, `LONGBRIDGE_APP_SECRET`, `LONGBRIDGE_ACCESS_TOKEN`) are set
+- Optional endpoints: `LONGBRIDGE_HTTP_URL`, `LONGBRIDGE_QUOTE_WS_URL`, etc. — see vendor docs
 
 ---
 
@@ -887,7 +877,7 @@ python main.py --serve-only --host 0.0.0.0 --port 8888
 A: WeChat Work/Feishu have message length limits, system already auto-segments messages. For complete content, configure Feishu Cloud Document feature.
 
 ### Q: Data fetch failed?
-A: AkShare uses scraping mechanism, may be temporarily rate-limited. System has retry mechanism configured, usually just wait a few minutes and retry.
+A: Public quote APIs may fail intermittently (network, throttling, or symbol mapping). The stack retries and fail-opens; retry later, reduce batch size, and check proxy/`NO_PROXY` plus Longbridge credentials if used.
 
 ### Q: How to add watchlist stocks?
 A: Modify `STOCK_LIST` environment variable, separate multiple codes with commas.

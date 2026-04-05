@@ -14,9 +14,9 @@
   <a href="https://hellogithub.com/repository/ZhuLinsen/daily_stock_analysis" target="_blank"><img src="https://api.hellogithub.com/v1/widgets/recommend.svg?rid=6daa16e405ce46ed97b4a57706aeb29f&claim_uid=pfiJMqhR9uvDGlT&theme=neutral" alt="Featured｜HelloGitHub" style="width: 250px; height: 54px;" width="250" height="54" /></a>
 </p>
 
-> 🤖 基于 AI 大模型的 A股/港股/美股自选股智能分析系统，每日自动分析并推送「决策仪表盘」到企业微信/飞书/Telegram/Discord/Slack/邮箱
+> 🤖 基于 AI 大模型的股票智能分析系统（默认标的范围侧重美股 / 美期货 / 加密永续等，可按配置扩展），每日自动分析并推送「决策仪表盘」到企业微信/飞书/Telegram/Discord/Slack/邮箱
 
-[**功能特性**](#-功能特性) · [**快速开始**](#-快速开始) · [**推送效果**](#-推送效果) · [**完整指南**](docs/full-guide.md) · [**常见问题**](docs/FAQ.md) · [**更新日志**](docs/CHANGELOG.md)
+[**功能特性**](#-功能特性) · [**快速开始**](#-快速开始) · [**推送效果**](#-推送效果) · [**完整指南**](docs/full-guide.md) · [**小流量运行边界**](docs/small-scale-operations.md) · [**常见问题**](docs/FAQ.md) · [**更新日志**](docs/CHANGELOG.md)
 
 简体中文 | [English](docs/README_EN.md) | [繁體中文](docs/README_CHT.md)
 
@@ -164,6 +164,8 @@
 | `REPORT_HISTORY_COMPARE_N` | 历史信号对比条数，`0` 关闭（默认），`>0` 启用 | 可选 |
 | `ANALYSIS_DELAY` | 个股分析和大盘分析之间的延迟（秒），避免API限流，如 `10` | 可选 |
 | `MAX_WORKERS` | 异步分析任务队列并发线程数（默认 `3`）；保存后队列空闲时自动应用，繁忙时延后生效 | 可选 |
+| `DATA_FETCH_MAX_IN_FLIGHT` | 限制 `DataFetcherManager` 日线拉取同时在飞请求数，`0` 表示不限制（默认）；与 `MAX_WORKERS` 叠加可防止数据源 HTTP 尖峰 | 可选 |
+| `DATABASE_URL` | 非空时使用该 SQLAlchemy URL（如 PostgreSQL）；留空则仍用 `DATABASE_PATH` 的 SQLite 文件 | 可选 |
 | `MERGE_EMAIL_NOTIFICATION` | 个股与大盘复盘合并推送（默认 false），减少邮件数量 | 可选 |
 | `MARKDOWN_TO_IMAGE_CHANNELS` | 将 Markdown 转为图片发送的渠道（逗号分隔）：`telegram,wechat,custom,email,slack` | 可选 |
 | `MARKDOWN_TO_IMAGE_MAX_CHARS` | 超过此长度不转图片，避免超大图片（默认 `15000`） | 可选 |
@@ -230,11 +232,10 @@
 >   - `get_stock_info.belong_boards` = 个股所属板块列表；
 >   - `get_stock_info.boards` 为兼容别名，值与 `belong_boards` 相同（未来仅在大版本考虑移除）；
 >   - `get_stock_info.sector_rankings` 与 `fundamental_context.boards.data` 保持一致。
-> - 配置 `TICKFLOW_API_KEY` 后，A 股大盘复盘的主要指数行情会优先尝试 TickFlow；若当前套餐支持标的池查询，市场涨跌统计也会优先尝试 TickFlow。失败或权限不足时会回退到现有数据源。
-> - 该行为按能力分层而非仅按“是否有 Key”判断：有限权限套餐仍可获得 TickFlow 指数增强；支持 `CN_Equity_A` 标的池查询的套餐会额外获得 TickFlow 市场统计增强。
-> - TickFlow 官方 quickstart 展示了 `quotes.get(universes=["CN_Equity_A"])` 的正式用法，但真实线上验证确认：不同套餐权限不同，且 `quotes.get(symbols=[...])` 单次有标的数量限制。
-> - TickFlow 返回的 `change_pct` / `amplitude` 在实际接口中为比例值，本项目已统一转换为内部使用的百分比口径，保证与 AkShare / Tushare / efinance 一致。
-> - 板块涨跌榜采用固定回退顺序：`AkShare(EM->Sina) -> Tushare -> efinance`。
+> - 日线与实时行情以 **Yahoo Finance（yfinance）** 与可选的 **Longbridge** 为主路径；未配置长桥时仍可走 Yahoo 单列。
+> - 若配置 `LONGBRIDGE_*`，量比 / 换手率 / 部分估值字段可在 Yahoo 缺项时由长桥补齐。
+> - 历史上基于东财 / 新浪等的多源实时优先级已收敛；`REALTIME_SOURCE_PRIORITY` 默认 `yfinance,longbridge`，详见 `.env.example` 与 `docs/full-guide.md`。
+> - 仍配置 `TICKFLOW_API_KEY` 时，仅影响 A 股大盘复盘等有限能力；与个股主链路默认数据源相互独立。
 
 #### 3. 启用 Actions
 

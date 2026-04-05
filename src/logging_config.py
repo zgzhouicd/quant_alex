@@ -64,7 +64,7 @@ def setup_logging(
     2. 常规日志文件：INFO 级别，10MB 轮转，保留 5 个备份
     3. 调试日志文件：DEBUG 级别，50MB 轮转，保留 3 个备份
 
-    Args:
+    参数:
         log_prefix: 日志文件名前缀（如 "api_server" -> api_server_20240101.log）
         log_dir: 日志文件目录，默认 ./logs
         console_level: 控制台日志级别（可选，优先于 debug 参数）

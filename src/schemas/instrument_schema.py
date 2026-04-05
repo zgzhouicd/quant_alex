@@ -1,9 +1,9 @@
 # -*- coding: utf-8 -*-
 """
-Unified instrument schema for multi-asset analysis.
+多资产分析用的统一标的模型（InstrumentSchema）。
 
-This module introduces a first-class instrument model so the system can
-move from "stock-code-only" inputs to asset-aware inputs.
+本模块提供一等公民的 instrument 定义，使系统能从「仅股票代码」输入
+过渡到「按资产类别-aware」的输入。
 """
 
 from __future__ import annotations
@@ -21,19 +21,19 @@ class AssetClass(str, Enum):
 
 
 class InstrumentSchema(BaseModel):
-    """Canonical instrument representation used by API/services."""
+    """API / 服务层共用的规范化标的表示。"""
 
-    asset_class: AssetClass = Field(..., description="Asset class")
-    symbol: str = Field(..., description="Instrument symbol")
-    exchange: Optional[str] = Field(None, description="Exchange / venue")
-    quote_currency: Optional[str] = Field(None, description="Quote currency")
-    contract_type: Optional[str] = Field(None, description="equity/future/perpetual")
-    underlying: Optional[str] = Field(None, description="Underlying asset symbol")
-    expiry: Optional[str] = Field(None, description="Contract expiry (if applicable)")
-    is_perpetual: bool = Field(False, description="Whether this is a perpetual contract")
+    asset_class: AssetClass = Field(..., description="资产类别")
+    symbol: str = Field(..., description="标的代码 / 符号")
+    exchange: Optional[str] = Field(None, description="交易所 / 交易场所")
+    quote_currency: Optional[str] = Field(None, description="计价货币")
+    contract_type: Optional[str] = Field(None, description="合约类型：equity / future / perpetual")
+    underlying: Optional[str] = Field(None, description="标的资产符号（期货等）")
+    expiry: Optional[str] = Field(None, description="合约到期（如适用）")
+    is_perpetual: bool = Field(False, description="是否为永续合约")
     session_mode: Optional[str] = Field(
         None,
-        description="Session mode: us_equity_session/futures_session/always_open_24x7",
+        description="会话模式：us_equity_session / futures_session / always_open_24x7",
     )
 
     @field_validator("symbol")

@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""System configuration service for `.env` based settings."""
+"""系统配置服务：基于 `.env` 与运行时可写配置。"""
 
 from __future__ import annotations
 
@@ -90,8 +90,10 @@ class SystemConfigService:
     def _reload_runtime_singletons() -> None:
         """Reset runtime singleton services after config reload."""
         from src.agent.tools.data_tools import reset_fetcher_manager
+        from src.core.pipeline_shared_runtime import reset_pipeline_shared_runtime
         from src.search_service import reset_search_service
 
+        reset_pipeline_shared_runtime()
         reset_fetcher_manager()
         reset_search_service()
 

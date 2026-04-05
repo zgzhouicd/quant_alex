@@ -117,7 +117,7 @@ class MainScheduleModeTestCase(unittest.TestCase):
              patch("main._reload_runtime_config", return_value=config), \
              patch("main._build_schedule_time_provider", return_value=lambda: "18:00"), \
              patch("main.setup_logging"), \
-             patch("main.run_full_analysis") as run_full_analysis, \
+             patch("main.run_full_analysis", return_value=True) as run_full_analysis, \
              patch("main.logger.warning") as warning_log, \
              patch("src.scheduler.run_with_schedule", side_effect=fake_run_with_schedule):
             exit_code = main.main()
@@ -161,7 +161,7 @@ class MainScheduleModeTestCase(unittest.TestCase):
              patch("main._reload_runtime_config", return_value=runtime_config), \
              patch("main._build_schedule_time_provider", return_value=lambda: "09:30"), \
              patch("main.setup_logging"), \
-             patch("main.run_full_analysis") as run_full_analysis, \
+             patch("main.run_full_analysis", return_value=True) as run_full_analysis, \
              patch("src.scheduler.run_with_schedule", side_effect=fake_run_with_schedule):
             exit_code = main.main()
 
@@ -333,11 +333,24 @@ class MainScheduleModeTestCase(unittest.TestCase):
         with patch("main.parse_arguments", return_value=args), \
              patch("main.get_config", return_value=config), \
              patch("main.setup_logging"), \
-             patch("main.run_full_analysis") as run_full_analysis:
+             patch("main.run_full_analysis", return_value=True) as run_full_analysis:
             exit_code = main.main()
 
         self.assertEqual(exit_code, 0)
         run_full_analysis.assert_called_once_with(config, args, ["600519", "000001"])
+
+    def test_run_full_analysis_failure_yields_exit_code_one(self) -> None:
+        """Regression: failed analysis must not exit 0 (automation / cron)."""
+        args = self._make_args()
+        config = self._make_config(run_immediately=True)
+
+        with patch("main.parse_arguments", return_value=args), \
+             patch("main.get_config", return_value=config), \
+             patch("main.setup_logging"), \
+             patch("main.run_full_analysis", return_value=False):
+            exit_code = main.main()
+
+        self.assertEqual(exit_code, 1)
 
     def test_bootstrap_logging_persists_when_config_load_fails(self) -> None:
         """Config load failure must be logged to stderr and return exit code 1.
@@ -380,7 +393,7 @@ class MainScheduleModeTestCase(unittest.TestCase):
              patch("main.get_config", return_value=config), \
              patch("main._setup_bootstrap_logging", side_effect=OSError("read-only fs")), \
              patch("main.setup_logging"), \
-             patch("main.run_full_analysis") as run_mock:
+             patch("main.run_full_analysis", return_value=True) as run_mock:
             exit_code = main.main()
 
         self.assertEqual(exit_code, 0)

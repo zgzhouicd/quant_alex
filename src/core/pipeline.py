@@ -53,6 +53,7 @@ from src.core.trading_calendar import (
 from data_provider.us_index_mapping import is_us_stock_code
 from bot.models import BotMessage
 from src.services.capability_router import MarketCapabilityRouter
+from src.core.pipeline_shared_runtime import PipelineSharedRuntime
 
 
 logger = logging.getLogger(__name__)
@@ -81,6 +82,7 @@ class StockAnalysisPipeline:
         query_source: Optional[str] = None,
         save_context_snapshot: Optional[bool] = None,
         progress_callback: Optional[Callable[[int, str], None]] = None,
+        shared_runtime: Optional[PipelineSharedRuntime] = None,
     ):
         """
         初始化调度器
@@ -88,6 +90,7 @@ class StockAnalysisPipeline:
         Args:
             config: 配置对象（可选，默认使用全局配置）
             max_workers: 最大并发线程数（可选，默认从配置读取）
+            shared_runtime: 可选共享子系统（API 热路径复用 fetcher/analyzer/search 等）
         """
         self.config = config or get_config()
         self.max_workers = max_workers or self.config.max_workers
@@ -101,32 +104,54 @@ class StockAnalysisPipeline:
         
         # 初始化各模块
         self.db = get_db()
-        self.fetcher_manager = DataFetcherManager()
-        self.capability_router = MarketCapabilityRouter(self.fetcher_manager)
-        # 不再单独创建 akshare_fetcher，统一使用 fetcher_manager 获取增强数据
-        self.trend_analyzer = StockTrendAnalyzer()  # 技术分析器
-        self.analyzer = GeminiAnalyzer(config=self.config)
+        if shared_runtime is not None:
+            self.fetcher_manager = shared_runtime.fetcher_manager
+            self.capability_router = shared_runtime.capability_router
+            self.analyzer = shared_runtime.analyzer
+            self.search_service = shared_runtime.search_service
+            self.social_sentiment_service = shared_runtime.social_sentiment_service
+        else:
+            self.fetcher_manager = DataFetcherManager()
+            self.capability_router = MarketCapabilityRouter(self.fetcher_manager)
+            self.analyzer = GeminiAnalyzer(config=self.config)
+            try:
+                self.search_service = SearchService(
+                    bocha_keys=self.config.bocha_api_keys,
+                    tavily_keys=self.config.tavily_api_keys,
+                    brave_keys=self.config.brave_api_keys,
+                    serpapi_keys=self.config.serpapi_keys,
+                    minimax_keys=self.config.minimax_api_keys,
+                    searxng_base_urls=self.config.searxng_base_urls,
+                    searxng_public_instances_enabled=self.config.searxng_public_instances_enabled,
+                    news_max_age_days=self.config.news_max_age_days,
+                    news_strategy_profile=getattr(self.config, "news_strategy_profile", "short"),
+                )
+            except Exception as exc:
+                logger.warning("搜索服务初始化失败，将以无搜索模式运行: %s", exc, exc_info=True)
+                self.search_service = None
+
+            try:
+                self.social_sentiment_service = SocialSentimentService(
+                    api_key=self.config.social_sentiment_api_key,
+                    api_url=self.config.social_sentiment_api_url,
+                )
+                if self.social_sentiment_service.is_available:
+                    logger.info("Social sentiment service enabled (Reddit/X/Polymarket, US stocks only)")
+            except Exception as exc:
+                logger.warning(
+                    "社交舆情服务初始化失败，将跳过舆情分析: %s",
+                    exc,
+                    exc_info=True,
+                )
+                self.social_sentiment_service = None
+
+        self.trend_analyzer = StockTrendAnalyzer()
         self.notifier = NotificationService(source_message=source_message)
         self._single_stock_notify_lock = threading.Lock()
-        
-        # 初始化搜索服务（可选，初始化失败不应阻断主分析流程）
-        try:
-            self.search_service = SearchService(
-                bocha_keys=self.config.bocha_api_keys,
-                tavily_keys=self.config.tavily_api_keys,
-                brave_keys=self.config.brave_api_keys,
-                serpapi_keys=self.config.serpapi_keys,
-                minimax_keys=self.config.minimax_api_keys,
-                searxng_base_urls=self.config.searxng_base_urls,
-                searxng_public_instances_enabled=self.config.searxng_public_instances_enabled,
-                news_max_age_days=self.config.news_max_age_days,
-                news_strategy_profile=getattr(self.config, "news_strategy_profile", "short"),
-            )
-        except Exception as exc:
-            logger.warning("搜索服务初始化失败，将以无搜索模式运行: %s", exc, exc_info=True)
-            self.search_service = None
-        
+
         logger.info(f"调度器初始化完成，最大并发数: {self.max_workers}")
+        if shared_runtime is not None:
+            logger.debug("StockAnalysisPipeline 使用共享运行时（fetcher/analyzer/search/social）")
         logger.info("已启用技术分析引擎（均线/趋势/量价指标）")
         # 打印实时行情/筹码配置状态
         if self.config.enable_realtime_quote:
@@ -143,22 +168,6 @@ class StockAnalysisPipeline:
             logger.info("搜索服务已启用")
         else:
             logger.warning("搜索服务未启用（未配置搜索能力）")
-
-        # 初始化社交舆情服务（仅美股，可选）
-        try:
-            self.social_sentiment_service = SocialSentimentService(
-                api_key=self.config.social_sentiment_api_key,
-                api_url=self.config.social_sentiment_api_url,
-            )
-            if self.social_sentiment_service.is_available:
-                logger.info("Social sentiment service enabled (Reddit/X/Polymarket, US stocks only)")
-        except Exception as exc:
-            logger.warning(
-                "社交舆情服务初始化失败，将跳过舆情分析: %s",
-                exc,
-                exc_info=True,
-            )
-            self.social_sentiment_service = None
 
     def _emit_progress(self, progress: int, message: str) -> None:
         """Best-effort bridge from pipeline stages to task SSE progress."""

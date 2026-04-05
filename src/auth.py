@@ -1,9 +1,9 @@
 # -*- coding: utf-8 -*-
 """
-Web admin authentication module.
+Web 管理端认证（可选）。
 
-Single toggle (ADMIN_AUTH_ENABLED) + file-based credentials.
-First login sets initial password; supports web change-password and CLI reset.
+由 ``ADMIN_AUTH_ENABLED`` 总开关 + 磁盘上的密码哈希文件实现；
+首次登录设初始密码，支持 Web 改密与 CLI 覆盖重置。
 """
 
 from __future__ import annotations
@@ -31,7 +31,7 @@ RATE_LIMIT_MAX_FAILURES = 5
 SESSION_MAX_AGE_HOURS_DEFAULT = 24
 MIN_PASSWORD_LEN = 6
 
-# Lazy-loaded state
+# 延迟加载的运行时状态
 _auth_enabled: Optional[bool] = None
 _session_secret: Optional[bytes] = None
 _password_hash_salt: Optional[bytes] = None
@@ -41,7 +41,7 @@ _rate_limit_lock = None
 
 
 def _get_lock():
-    """Lazy init threading lock for rate limit dict."""
+    """为登录失败频率限制字典按需初始化线程锁。"""
     global _rate_limit_lock
     if _rate_limit_lock is None:
         import threading
@@ -50,24 +50,24 @@ def _get_lock():
 
 
 def _ensure_env_loaded() -> None:
-    """Ensure .env is loaded before reading config."""
+    """读配置前确保已执行 ``setup_env()`` 加载 ``.env``。"""
     from src.config import setup_env
     setup_env()
 
 
 def _get_data_dir() -> Path:
-    """Return DATA_DIR as parent of DATABASE_PATH."""
+    """数据目录：与 ``DATABASE_PATH`` 所在目录一致（父路径）。"""
     db_path = os.getenv("DATABASE_PATH", "./data/stock_analysis.db")
     return Path(db_path).resolve().parent
 
 
 def _get_credential_path() -> Path:
-    """Path to stored password hash file."""
+    """存放管理员密码 PBKDF2 哈希的文件路径。"""
     return _get_data_dir() / ".admin_password_hash"
 
 
 def _is_auth_enabled_from_env() -> bool:
-    """Read ADMIN_AUTH_ENABLED from .env file."""
+    """直接从 ``.env`` 文件读取 ``ADMIN_AUTH_ENABLED``（不经 Config 单例）。"""
     _ensure_env_loaded()
     env_file = os.getenv("ENV_FILE")
     env_path = Path(env_file) if env_file else Path(__file__).resolve().parent.parent / ".env"
@@ -79,7 +79,7 @@ def _is_auth_enabled_from_env() -> bool:
 
 
 def rotate_session_secret() -> bool:
-    """Rotate the session signing secret to invalidate all active sessions."""
+    """轮换会话签名密钥，使既有 Cookie 全部失效。"""
     global _session_secret
     data_dir = _get_data_dir()
     secret_path = data_dir / ".session_secret"
@@ -99,7 +99,7 @@ def rotate_session_secret() -> bool:
 
 
 def _load_session_secret() -> Optional[bytes]:
-    """Load or create session secret."""
+    """加载或创建 ``.session_secret``（32 字节）。"""
     global _session_secret
     if _session_secret is not None:
         return _session_secret
@@ -135,7 +135,7 @@ def _load_session_secret() -> Optional[bytes]:
 
 
 def _parse_password_hash(value: str) -> Optional[Tuple[bytes, bytes]]:
-    """Parse salt_b64:hash_b64. Returns (salt, hash) or None."""
+    """解析 ``salt_b64:hash_b64`` 一行格式；成功返回 (salt, hash)，否则 None。"""
     if not value or ":" not in value:
         return None
     parts = value.strip().split(":", 1)
@@ -153,7 +153,7 @@ def _parse_password_hash(value: str) -> Optional[Tuple[bytes, bytes]]:
 
 
 def _verify_password_hash(submitted: str, salt: bytes, stored_hash: bytes) -> bool:
-    """Verify submitted password against stored pbkdf2 hash."""
+    """将用户输入与磁盘存储的 PBKDF2-HMAC-SHA256 哈希比对（常量时间）。"""
     computed = hashlib.pbkdf2_hmac(
         "sha256",
         submitted.encode("utf-8"),
@@ -164,7 +164,7 @@ def _verify_password_hash(submitted: str, salt: bytes, stored_hash: bytes) -> bo
 
 
 def _load_credential_from_file() -> bool:
-    """Load credential from file into module globals. Returns True if loaded."""
+    """从文件载入密码盐与哈希到模块全局；成功返回 True。"""
     global _password_hash_salt, _password_hash_stored
 
     path = _get_credential_path()
@@ -187,7 +187,7 @@ def _load_credential_from_file() -> bool:
 
 
 def refresh_auth_state() -> None:
-    """Reload auth-related state from disk and env."""
+    """从磁盘与环境重新加载认证相关内存状态。"""
     global _auth_enabled, _session_secret
     _auth_enabled = None
     _session_secret = None
@@ -195,7 +195,7 @@ def refresh_auth_state() -> None:
 
 
 def is_auth_enabled() -> bool:
-    """Return whether admin authentication is enabled (ADMIN_AUTH_ENABLED=true)."""
+    """是否启用管理端认证（``ADMIN_AUTH_ENABLED=true``）。"""
     global _auth_enabled
     if _auth_enabled is not None:
         return _auth_enabled
@@ -204,38 +204,38 @@ def is_auth_enabled() -> bool:
 
 
 def has_stored_password() -> bool:
-    """Return whether a valid stored password hash exists on disk."""
+    """磁盘上是否存在格式有效的已存密码哈希。"""
     return _load_credential_from_file()
 
 
 def verify_stored_password(password: str) -> bool:
-    """Verify password against stored credential even when auth is disabled."""
+    """在认证关闭时仍可与磁盘哈希校验密码（运维/迁移场景）。"""
     if not has_stored_password():
         return False
     return _verify_password_hash(password, _password_hash_salt, _password_hash_stored)
 
 
 def is_password_set() -> bool:
-    """Return whether initial password has been set (credential file exists and valid)."""
+    """在认证启用前提下，是否已完成首次密码设置（文件存在且可解析）。"""
     if not is_auth_enabled():
         return False
     return has_stored_password()
 
 
 def is_password_changeable() -> bool:
-    """Return whether password can be changed via web/CLI (always True when auth enabled)."""
+    """是否允许通过 Web/CLI 改密（认证开启时通常为 True）。"""
     return is_auth_enabled()
 
 
 def _get_session_secret() -> Optional[bytes]:
-    """Return session signing secret."""
+    """返回用于签发 Cookie 的会话密钥字节。"""
     if not is_auth_enabled():
         return None
     return _load_session_secret()
 
 
 def _validate_password(pwd: str) -> Optional[str]:
-    """Return error message if invalid, None if valid."""
+    """校验密码强度；无效返回中文错误文案，合法返回 None。"""
     if not pwd or not pwd.strip():
         return "密码不能为空"
     if len(pwd) < MIN_PASSWORD_LEN:
@@ -245,8 +245,8 @@ def _validate_password(pwd: str) -> Optional[str]:
 
 def set_initial_password(password: str) -> Optional[str]:
     """
-    Set initial password (first-time setup). Returns error message or None on success.
-    Atomic write with 0o600 permissions.
+    首次设置管理员密码；成功返回 None，失败返回错误说明。
+    使用临时文件原子替换写入，权限 0o600。
     """
     err = _validate_password(password)
     if err:
@@ -280,7 +280,7 @@ def set_initial_password(password: str) -> Optional[str]:
 
 
 def verify_password(password: str) -> bool:
-    """Verify password against stored credential. Constant-time where applicable."""
+    """认证开启时与存储哈希校验密码（在适用处使用常量时间比较）。"""
     if not is_auth_enabled():
         return True
     return verify_stored_password(password)
@@ -288,7 +288,7 @@ def verify_password(password: str) -> bool:
 
 def change_password(current: str, new: str) -> Optional[str]:
     """
-    Change password. Verifies current, writes new hash. Returns error message or None on success.
+    修改密码：先验当前密码，再写入新哈希；成功返回 None。
     """
     if not is_auth_enabled():
         return "认证功能未启用"
@@ -321,7 +321,7 @@ def change_password(current: str, new: str) -> Optional[str]:
         tmp_path.write_text(content)
         tmp_path.chmod(0o600)
         tmp_path.replace(cred_path)
-        # Reload into memory so subsequent verify_password uses new hash
+        # 重新载入内存，后续 verify 使用新哈希
         _load_credential_from_file()
         return None
     except OSError as e:
@@ -330,7 +330,7 @@ def change_password(current: str, new: str) -> Optional[str]:
 
 
 def create_session() -> str:
-    """Create a signed session payload. Format: nonce.ts.signature."""
+    """构造已签名的会话载荷，格式 ``nonce.ts.signature``。"""
     secret = _get_session_secret()
     if not secret:
         return ""
@@ -342,7 +342,7 @@ def create_session() -> str:
 
 
 def verify_session(value: str) -> bool:
-    """Verify session cookie and check expiry."""
+    """校验会话 Cookie 签名与是否在 ``ADMIN_SESSION_MAX_AGE_HOURS`` 内。"""
     secret = _get_session_secret()
     if not secret or not value:
         return False
@@ -368,12 +368,10 @@ def verify_session(value: str) -> bool:
 
 
 def get_client_ip(request) -> str:
-    """Get client IP, respecting TRUST_X_FORWARDED_FOR.
+    """获取客户端 IP；若 ``TRUST_X_FORWARDED_FOR=true`` 则信任代理注入的头。
 
-    When behind a single trusted reverse proxy, the proxy appends the real
-    client IP as the rightmost entry in X-Forwarded-For.  We use [-1] instead
-    of [0] so that an attacker cannot spoof an arbitrary leftmost value to
-    rotate rate-limit buckets and bypass brute-force protection.
+    单一可信反向代理通常在 ``X-Forwarded-For`` **最右侧**追加真实客户端 IP；
+    这里取 ``[-1]`` 而非 ``[0]``，避免攻击者在左侧伪造 IP 绕过登录频率限制。
     """
     if os.getenv("TRUST_X_FORWARDED_FOR", "false").lower() == "true":
         forwarded = request.headers.get("X-Forwarded-For")
@@ -385,7 +383,7 @@ def get_client_ip(request) -> str:
 
 
 def check_rate_limit(ip: str) -> bool:
-    """Return True if under limit, False if rate limited."""
+    """若该 IP 未超过失败次数上限返回 True，否则 False（应拒绝尝试）。"""
     lock = _get_lock()
     now = time.time()
     with lock:
@@ -400,7 +398,7 @@ def check_rate_limit(ip: str) -> bool:
 
 
 def record_login_failure(ip: str) -> None:
-    """Record a failed login attempt for rate limiting."""
+    """记录一次登录失败，用于滑动窗口限流。"""
     lock = _get_lock()
     now = time.time()
     with lock:
@@ -415,7 +413,7 @@ def record_login_failure(ip: str) -> None:
 
 
 def clear_rate_limit(ip: str) -> None:
-    """Clear rate limit for IP after successful login."""
+    """登录成功后清除该 IP 的失败计数。"""
     lock = _get_lock()
     with lock:
         _rate_limit.pop(ip, None)
@@ -423,8 +421,8 @@ def clear_rate_limit(ip: str) -> None:
 
 def overwrite_password(new_password: str) -> Optional[str]:
     """
-    Overwrite stored password without verifying current. For CLI reset only.
-    Returns error message or None on success.
+    不经当前密码校验直接覆盖存储哈希（仅供 CLI 紧急重置）。
+    成功返回 None，否则返回错误说明。
     """
     if not is_auth_enabled():
         return "认证功能未启用"
@@ -460,7 +458,7 @@ def overwrite_password(new_password: str) -> Optional[str]:
 
 
 def reset_password_cli() -> int:
-    """Interactive CLI to reset password. Returns exit code."""
+    """交互式 CLI：重置管理员密码，返回进程退出码。"""
     _ensure_env_loaded()
     if not _is_auth_enabled_from_env():
         print("Error: Auth is not enabled. Set ADMIN_AUTH_ENABLED=true in .env", file=sys.stderr)
@@ -489,7 +487,7 @@ def reset_password_cli() -> int:
 
 
 def _main() -> int:
-    """CLI entry: reset_password subcommand."""
+    """子命令入口：``reset_password``（供 ``python -m`` 或包装脚本调用）。"""
     if len(sys.argv) > 1 and sys.argv[1] == "reset_password":
         return reset_password_cli()
     print("Usage: python -m src.auth reset_password", file=sys.stderr)

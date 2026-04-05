@@ -14,13 +14,13 @@
   <a href="https://hellogithub.com/repository/ZhuLinsen/daily_stock_analysis" target="_blank"><img src="https://api.hellogithub.com/v1/widgets/recommend.svg?rid=6daa16e405ce46ed97b4a57706aeb29f&claim_uid=pfiJMqhR9uvDGlT&theme=neutral" alt="Featured｜HelloGitHub" style="width: 250px; height: 54px;" width="250" height="54" /></a>
 </p>
 
-**基於 AI 大模型的 A股/港股/美股 智能分析系統**
+**基於 AI 大模型的股票智能分析系統**（預設偏重美股 / 美期貨 / 加密永續等，可配置擴展）
 
 自動分析自選股 → 生成決策儀表盤 → 多渠道推送（Telegram/Discord/Slack/郵件/企業微信/飛書）
 
 **零成本部署** · GitHub Actions 免費運行 · 無需伺服器
 
-[**功能特性**](#-功能特性) · [**快速開始**](#-快速開始) · [**推送效果**](#-推送效果) · [**完整指南**](./full-guide.md) · [**常見問題**](./FAQ.md) · [**更新日誌**](./CHANGELOG.md)
+[**功能特性**](#-功能特性) · [**快速開始**](#-快速開始) · [**推送效果**](#-推送效果) · [**完整指南**](./full-guide.md) · [**小流量運行邊界**](./small-scale-operations.md) · [**常見問題**](./FAQ.md) · [**更新日誌**](./CHANGELOG.md)
 
  繁體中文 | [English](README_EN.md) | [简体中文](../README.md)
 

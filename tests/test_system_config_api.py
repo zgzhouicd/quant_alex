@@ -17,7 +17,7 @@ from api.v1.endpoints import system_config
 from api.v1.schemas.system_config import (
     DiscoverLLMChannelModelsRequest,
     ImportSystemConfigRequest,
-    TestLLMChannelRequest,
+    LLMChannelProbeRequest,
     UpdateSystemConfigRequest,
 )
 from src.config import Config
@@ -276,7 +276,7 @@ class SystemConfigApiTestCase(unittest.TestCase):
             },
         ) as mock_test:
             payload = system_config.test_llm_channel(
-                request=TestLLMChannelRequest(
+                request=LLMChannelProbeRequest(
                     name="primary",
                     protocol="openai",
                     base_url="https://api.example.com/v1",

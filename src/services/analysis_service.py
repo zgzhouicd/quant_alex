@@ -68,23 +68,31 @@ class AnalysisService:
         try:
             self.last_error = None
             # 导入分析相关模块
-            from src.config import get_config
+            from src.config import Config, get_config
             from src.core.pipeline import StockAnalysisPipeline
+            from src.core.pipeline_shared_runtime import get_pipeline_shared_runtime
             from src.enums import ReportType
             
             # 生成 query_id
             if query_id is None:
                 query_id = uuid.uuid4().hex
             
-            # 获取配置
+            # 获取配置（单元测试可能 patch 为非 Config 替身，此时跳过共享运行时）
             config = get_config()
+
+            shared_runtime = (
+                get_pipeline_shared_runtime(config)
+                if isinstance(config, Config)
+                else None
+            )
             
-            # 创建分析流水线
+            # 创建分析流水线（复用共享 fetcher / LLM / 搜索 / 舆情 子系统）
             pipeline = StockAnalysisPipeline(
                 config=config,
                 query_id=query_id,
                 query_source="api",
                 progress_callback=progress_callback,
+                shared_runtime=shared_runtime,
             )
             
             # 确定报告类型 (API: simple/detailed/full/brief -> ReportType)

@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""Helpers for report output language selection and localization."""
+"""报告输出语言选择与本地化相关辅助逻辑。"""
 
 from __future__ import annotations
 

@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""Backtest orchestration service."""
+"""回测编排服务层。"""
 
 from __future__ import annotations
 
@@ -20,7 +20,7 @@ logger = logging.getLogger(__name__)
 
 
 class BacktestService:
-    """Service layer to run and query backtests."""
+    """执行回测任务并查询回测结果的服务。"""
 
     MAX_DYNAMIC_SUMMARY_ROWS = 2000
 

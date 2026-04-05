@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""Portfolio CSV import service with extensible parser registry."""
+"""组合持仓 CSV 导入：可扩展的券商解析器注册表。"""
 
 from __future__ import annotations
 
@@ -25,7 +25,7 @@ logger = logging.getLogger(__name__)
 
 @dataclass(frozen=True)
 class CsvParserSpec:
-    """CSV parser specification for one broker."""
+    """单个券商的 CSV 解析规格。"""
 
     broker: str
     aliases: Tuple[str, ...]

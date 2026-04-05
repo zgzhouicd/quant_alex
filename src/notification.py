@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """
 ===================================
-A股自选股智能分析系统 - 通知层
+股票智能分析系统 - 通知层
 ===================================
 
 职责：
@@ -260,7 +260,7 @@ class NotificationService(
         """
         检测所有已配置的渠道
         
-        Returns:
+        返回:
             已配置的渠道列表
         """
         channels = []
@@ -352,7 +352,7 @@ class NotificationService(
         """
         从来源消息中提取飞书回复信息（用于 Stream 模式回复）
         
-        Returns:
+        返回:
             包含 chat_id 的字典，或 None
         """
         if not isinstance(self._source_message, BotMessage):
@@ -368,7 +368,7 @@ class NotificationService(
         """
         向基于消息上下文的渠道发送消息（例如钉钉 Stream 会话）
         
-        Args:
+        参数:
             content: Markdown 格式内容
         """
         return self._send_via_source_context(content)
@@ -411,11 +411,11 @@ class NotificationService(
         """
         通过飞书 Stream 模式发送消息到指定会话
         
-        Args:
+        参数:
             chat_id: 飞书会话 ID
             content: 消息内容
             
-        Returns:
+        返回:
             是否发送成功
         """
         try:
@@ -463,13 +463,13 @@ class NotificationService(
         """
         分批发送长消息到飞书（Stream 模式）
         
-        Args:
+        参数:
             reply_client: FeishuReplyClient 实例
             chat_id: 飞书会话 ID
             content: 完整消息内容
             max_bytes: 单条消息最大字节数
             
-        Returns:
+        返回:
             是否全部发送成功
         """
         import time
@@ -530,11 +530,11 @@ class NotificationService(
         """
         生成 Markdown 格式的日报（详细版）
 
-        Args:
+        参数:
             results: 分析结果列表
             report_date: 报告日期（默认今天）
 
-        Returns:
+        返回:
             Markdown 格式的日报内容
         """
         if report_date is None:
@@ -776,11 +776,11 @@ class NotificationService(
 
         格式：市场概览 + 重要信息 + 核心结论 + 数据透视 + 作战计划
 
-        Args:
+        参数:
             results: 分析结果列表
             report_date: 报告日期（默认今天）
 
-        Returns:
+        返回:
             Markdown 格式的决策仪表盘日报
         """
         config = get_config()
@@ -1072,10 +1072,10 @@ class NotificationService(
         
         只保留核心结论和狙击点位
         
-        Args:
+        参数:
             results: 分析结果列表
             
-        Returns:
+        返回:
             精简版决策仪表盘
         """
         config = get_config()
@@ -1235,10 +1235,10 @@ class NotificationService(
         """
         生成企业微信精简版日报（控制在4000字符内）
 
-        Args:
+        参数:
             results: 分析结果列表
 
-        Returns:
+        返回:
             精简版 Markdown 内容
         """
         report_date = datetime.now().strftime('%Y-%m-%d')
@@ -1314,11 +1314,11 @@ class NotificationService(
         """
         Generate brief report (3-5 sentences per stock) for mobile/push.
 
-        Args:
+        参数:
             results: Analysis results list (use [result] for single stock).
             report_date: Report date (default: today).
 
-        Returns:
+        返回:
             Brief markdown content.
         """
         if report_date is None:
@@ -1371,10 +1371,10 @@ class NotificationService(
         
         格式精简但信息完整，适合每分析完一只股票立即推送
         
-        Args:
+        参数:
             result: 单只股票的分析结果
             
-        Returns:
+        返回:
             Markdown 格式的单股报告
         """
         report_date = datetime.now().strftime('%Y-%m-%d %H:%M')
@@ -1572,12 +1572,12 @@ class NotificationService(
           as Markdown text instead.
         - When WeChat image exceeds ~2MB: that channel falls back to Markdown text.
 
-        Args:
+        参数:
             content: 消息内容（Markdown 格式）
             email_stock_codes: 股票代码列表（可选，用于邮件渠道路由到对应分组邮箱，Issue #268）
             email_send_to_all: 邮件是否发往所有配置邮箱（用于大盘复盘等无股票归属的内容）
 
-        Returns:
+        返回:
             是否至少有一个渠道发送成功
         """
         context_success = self.send_to_context(content)
@@ -1701,11 +1701,11 @@ class NotificationService(
         """
         保存日报到本地文件
         
-        Args:
+        参数:
             content: 日报内容
             filename: 文件名（可选，默认按日期生成）
             
-        Returns:
+        返回:
             保存的文件路径
         """
         from pathlib import Path
@@ -1743,7 +1743,7 @@ class NotificationBuilder:
         """
         构建简单的提醒消息
         
-        Args:
+        参数:
             title: 标题
             content: 内容
             alert_type: 类型（info, warning, error, success）

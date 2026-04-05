@@ -1,4 +1,4 @@
-"""Configuration file manager with atomic read/write behavior."""
+"""配置文件管理：原子读写 .env 等键值文件。"""
 
 from __future__ import annotations
 

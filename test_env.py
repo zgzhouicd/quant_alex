@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """
 ===================================
-A股自选股智能分析系统 - 环境验证测试
+股票智能分析系统 - 环境验证脚本
 ===================================
 
 用于验证 .env 配置是否正确，包括：
@@ -20,9 +20,8 @@ A股自选股智能分析系统 - 环境验证测试
 
 """
 import os
-# Proxy config - controlled by USE_PROXY env var, off by default.
-# Set USE_PROXY=true in .env if you need a local proxy (e.g. mainland China).
-# GitHub Actions always skips this regardless of USE_PROXY.
+# 代理：由 USE_PROXY 控制，默认关闭；需在本地翻墙时可在 .env 设 USE_PROXY=true。
+# GitHub Actions 下始终跳过，不受 USE_PROXY 影响。
 if os.getenv("GITHUB_ACTIONS") != "true" and os.getenv("USE_PROXY", "false").lower() == "true":
     proxy_host = os.getenv("PROXY_HOST", "127.0.0.1")
     proxy_port = os.getenv("PROXY_PORT", "10809")
@@ -35,6 +34,8 @@ import logging
 import sys
 from datetime import datetime, date, timedelta
 from typing import Optional
+
+import pytest
 
 # 配置日志
 logging.basicConfig(
@@ -90,8 +91,9 @@ def test_config():
         print(f"{_prefix.get(issue.severity, '  ?')} [{issue.severity.upper()}] {issue.message}")
     if not any(i.severity in ("error", "warning") for i in issues):
         print("  ✓ 关键配置项验证通过")
-    
-    return True
+
+    assert config is not None
+    assert isinstance(config.stock_list, list)
 
 
 def view_database():
@@ -171,12 +173,11 @@ def view_database():
                 print(f"  {row[0]:<10} {row[1]!s:<12} {row[2]:<10.2f} {row[3]:<8.2f} {vol_str:<15} {row[5] or 'Unknown'}")
     finally:
         session.close()
-    
-    return True
 
 
+@pytest.mark.network
 def test_data_fetch(stock_code: str = "600519"):
-    """测试数据获取"""
+    """测试数据获取（依赖行情源网络）。"""
     print_header("3. 数据获取测试")
     
     from data_provider import DataFetcherManager
@@ -202,16 +203,16 @@ def test_data_fetch(stock_code: str = "600519"):
             preview_cols = ['date', 'open', 'high', 'low', 'close', 'pct_chg', 'volume']
             existing_cols = [c for c in preview_cols if c in df.columns]
             print(df[existing_cols].tail().to_string(index=False))
-        
-        return True
-        
+
+        assert not df.empty
+
     except Exception as e:
         print(f"  ✗ 获取失败: {e}")
-        return False
+        pytest.skip(str(e))
 
 
 def _llm_primary_model_label(config) -> str:
-    """Human-readable primary LLM (LiteLLM model string or inferred)."""
+    """用于展示的主模型名（LiteLLM 模型串或从遗留配置推断）。"""
     lm = (getattr(config, "litellm_model", None) or "").strip()
     if lm:
         return lm
@@ -222,9 +223,9 @@ def _llm_primary_model_label(config) -> str:
 
 def _check_llm_connectivity(config) -> tuple[bool, str]:
     """
-    Pre-flight connectivity appropriate for the configured primary model.
+    按当前主模型做一次连通性预检。
 
-    Returns (ok, message). Ollama uses local HTTP; Gemini checks Google; others skip strict check.
+    返回 (ok, message)：Ollama 查本地 HTTP；Gemini 探 Google；其它模型跳过严格检查。
     """
     lm = (getattr(config, "litellm_model", None) or "").strip().lower()
     if lm.startswith("ollama/"):
@@ -276,8 +277,9 @@ def _check_llm_connectivity(config) -> tuple[bool, str]:
     return True, "✓ 跳过云端连通性预检（非 Gemini / 非 Ollama 主模型）"
 
 
+@pytest.mark.network
 def test_llm():
-    """测试 LLM 调用（支持 LiteLLM：Gemini / Ollama / OpenAI 兼容等）"""
+    """测试 LLM 调用（支持 LiteLLM：Gemini / Ollama / OpenAI 兼容等）；需可用模型与网络。"""
     print_header("4. LLM 调用测试")
 
     from src.analyzer import GeminiAnalyzer
@@ -296,7 +298,7 @@ def test_llm():
     ok, msg = _check_llm_connectivity(config)
     print(f"  {msg}")
     if not ok:
-        return False
+        pytest.skip(msg)
 
     analyzer = GeminiAnalyzer()
     
@@ -305,7 +307,7 @@ def test_llm():
         print(f"  ✓ 模型初始化成功")
     else:
         print(f"  ✗ 模型初始化失败（请检查 LITELLM_MODEL / API Key / Ollama 是否运行）")
-        return False
+        pytest.skip("模型初始化失败（请检查 LITELLM_MODEL / API Key / Ollama 是否运行）")
 
     # 构造测试上下文（美股代码便于验证多市场路径）
     test_context = {
@@ -351,8 +353,8 @@ def test_llm():
         
         if not result.success:
             print(f"\n  ⚠ 注意: {result.error_message}")
-        
-        return result.success
+
+        assert result.success, result.error_message or "LLM 分析未成功"
         
     except Exception as e:
         elapsed = time.time() - start_time
@@ -370,12 +372,13 @@ def test_llm():
             print(f"\n  诊断: API Key 可能无效")
         elif 'model' in error_str:
             print(f"\n  诊断: 模型名称可能不正确，检查 .env 中的 LITELLM_MODEL 或 Ollama 模型是否已 pull")
-        
-        return False
+
+        pytest.fail(str(e))
 
 
+@pytest.mark.network
 def test_notification():
-    """测试通知推送"""
+    """测试通知推送（需已配置通知渠道与网络）。"""
     print_header("5. 通知推送测试")
     
     from src.notification import NotificationService
@@ -391,7 +394,7 @@ def test_notification():
         print(f"    URL: {webhook_preview}")
     else:
         print(f"  ✗ 企业微信 Webhook 未配置")
-        return False
+        pytest.skip("企业微信 Webhook 未配置（或其它通知渠道）")
     
     print_section("发送测试消息")
     
@@ -413,12 +416,12 @@ def test_notification():
             print(f"  ✓ 消息发送成功，请检查企业微信")
         else:
             print(f"  ✗ 消息发送失败")
-        
-        return success
+
+        assert success, "企业微信消息发送失败"
         
     except Exception as e:
         print(f"  ✗ 发送异常: {e}")
-        return False
+        pytest.fail(str(e))
 
 
 def run_all_tests():
@@ -432,14 +435,16 @@ def run_all_tests():
     
     # 1. 配置测试
     try:
-        results['配置加载'] = test_config()
+        test_config()
+        results['配置加载'] = True
     except Exception as e:
         print(f"  ✗ 配置测试失败: {e}")
         results['配置加载'] = False
     
     # 2. 数据库查看
     try:
-        results['数据库'] = view_database()
+        view_database()
+        results['数据库'] = True
     except Exception as e:
         print(f"  ✗ 数据库测试失败: {e}")
         results['数据库'] = False

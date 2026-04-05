@@ -1,10 +1,9 @@
 # -*- coding: utf-8 -*-
 """
-Instrument input resolver.
+交易标的输入解析器。
 
-Resolves API inputs (`stock_code`/`symbol` + optional `asset_class`) into a
-canonical InstrumentSchema so downstream code can gradually migrate to
-asset-aware processing while staying backward-compatible.
+将 API 入参（`stock_code` / `symbol` + 可选 `asset_class`）解析为统一的
+InstrumentSchema，便于下游在保持兼容的前提下逐步接入「按资产类型」的处理。
 """
 
 from __future__ import annotations
@@ -23,16 +22,16 @@ _CRYPTO_PAIR_RE = re.compile(r"^[A-Z0-9]{2,20}(?:USDT|USDC|USD|BTC|ETH)$")
 
 def is_legacy_cn_hk_symbol(symbol: str) -> bool:
     """
-    True if the string matches common A-share / HK / BSE code shapes.
+    若字符串符合常见 A 股 / 港股 / 北交所代码形态则返回 True。
 
-    Used by API (with reject flag) and by ``main.py`` CLI to enforce the
-    US equities / futures / crypto-perp product scope.
+    供 API（配合拒收开关）与 ``main.py`` CLI 使用，以落实当前产品范围：
+    美股 / 期货 / 加密永续等。
     """
     return _looks_cn_or_hk_symbol(symbol)
 
 
 def _looks_cn_or_hk_symbol(symbol: str) -> bool:
-    """Detect common CN/HK code shapes that this refactor intentionally excludes."""
+    """识别本轮重构中有意排除的 A 股 / 港股等代码形态。"""
     s = (symbol or "").strip().upper()
     if not s:
         return False
@@ -53,8 +52,7 @@ def _infer_asset_class(symbol: str) -> AssetClass:
         return AssetClass.PERPETUAL
     if _US_FUTURE_YAHOO_RE.fullmatch(s):
         return AssetClass.FUTURE
-    # Common perp symbol shape from exchange APIs can be ambiguous; here we
-    # default to perpetual for crypto pairs unless explicitly overridden.
+    # 交易所返回的永续合约形态可能模糊；若无显式 asset_class，加密币对已按永续处理。
     if _CRYPTO_PAIR_RE.fullmatch(s):
         return AssetClass.PERPETUAL
     return AssetClass.US_EQUITY
@@ -85,11 +83,11 @@ def resolve_instrument_input(
     reject_cn_hk: bool = True,
 ) -> InstrumentSchema:
     """
-    Resolve raw request input into a canonical instrument object.
+    将原始请求字段解析为规范化的 instrument 对象。
 
-    Priority:
-    1. explicit `symbol`
-    2. fallback to legacy `stock_code`
+    优先级：
+    1. 显式传入的 `symbol`
+    2. 否则回退到兼容字段 `stock_code`
     """
     raw_symbol = (symbol or stock_code or "").strip().upper()
     if not raw_symbol:
@@ -125,11 +123,10 @@ def resolve_instrument_input(
 
 def instrument_to_legacy_code(instrument: InstrumentSchema) -> str:
     """
-    Convert instrument to the current legacy pipeline key.
+    将 instrument 转为当前遗留管线使用的主键字符串。
 
-    Existing pipeline/service layers still index by `stock_code`. This helper
-    allows incremental migration by carrying the canonical symbol through
-    legacy entry points.
+    现有管线/服务层仍以 `stock_code` 为索引；本函数在渐进迁移时把规范 symbol
+    从统一入口带到旧代码路径。
     """
     return instrument.symbol
 

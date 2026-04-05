@@ -7,10 +7,8 @@ Markdown 转图片工具模块
 将 Markdown 转为 PNG 图片（用于不支持 Markdown 的通知渠道）。
 支持 wkhtmltoimage (imgkit) 与 markdown-to-file (m2f)，后者对 emoji 支持更好 (Issue #455)。
 
-Security note: imgkit passes HTML to wkhtmltoimage via stdin, not argv, so
-command injection from content is not applicable. Output is rasterized to PNG
-(no script execution). Input is from system-generated reports, not raw user
-input. Risk is considered low for the current use case.
+安全说明：imgkit 经 stdin 把 HTML 交给 wkhtmltoimage，而非拼进命令行参数，内容侧命令注入面有限；
+输出为栅格 PNG（不执行脚本）；入参来自系统生成的报告而非任意用户原文。当前用法下风险视为较低。
 """
 
 import logging
@@ -26,7 +24,7 @@ logger = logging.getLogger(__name__)
 
 
 def _markdown_to_image_m2f(markdown_text: str) -> Optional[bytes]:
-    """Convert Markdown to PNG via markdown-to-file (m2f) CLI. Better emoji support (Issue #455)."""
+    """通过 markdown-to-file (m2f) CLI 将 Markdown 转为 PNG；emoji 表现更好 (Issue #455)。"""
     if shutil.which("m2f") is None:
         logger.warning(
             "m2f (markdown-to-file) not found in PATH. "
@@ -73,7 +71,7 @@ def _markdown_to_image_m2f(markdown_text: str) -> Optional[bytes]:
 
 
 def _markdown_to_image_wkhtml(markdown_text: str) -> Optional[bytes]:
-    """Convert Markdown to PNG via imgkit/wkhtmltoimage."""
+    """通过 imgkit / wkhtmltoimage 将 Markdown 转为 PNG。"""
     try:
         import imgkit
     except ImportError:
@@ -105,21 +103,18 @@ def _markdown_to_image_wkhtml(markdown_text: str) -> Optional[bytes]:
 
 def markdown_to_image(markdown_text: str, max_chars: int = 15000) -> Optional[bytes]:
     """
-    Convert Markdown to PNG image bytes.
+    将 Markdown 转为 PNG 字节。
 
-    Engine is read from config.md2img_engine: wkhtmltoimage (default) or
-    markdown-to-file (better emoji support, Issue #455).
+    引擎由 ``config.md2img_engine`` 决定：默认 wkhtmltoimage，可选 markdown-to-file（emoji 更好, Issue #455）。
 
-    When conversion fails or dependencies unavailable, returns None so caller
-    can fall back to text sending.
+    转换失败或依赖缺失时返回 None，调用方可回退为纯文本推送。
 
-    Args:
-        markdown_text: Raw Markdown content.
-        max_chars: Skip conversion and return None if content exceeds this length
-            (avoids huge images). Default 15000.
+    参数:
+        markdown_text: 原始 Markdown 文本
+        max_chars: 超过该长度则跳过转图并返回 None（避免过大图片），默认 15000
 
-    Returns:
-        PNG bytes, or None if conversion fails or dependencies unavailable.
+    返回:
+        PNG 二进制；失败或缺依赖时为 None
     """
     if len(markdown_text) > max_chars:
         logger.warning(

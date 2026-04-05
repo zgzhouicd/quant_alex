@@ -139,8 +139,8 @@ class ValidateSystemConfigResponse(BaseModel):
     issues: List[ConfigValidationIssue]
 
 
-class TestLLMChannelRequest(BaseModel):
-    """Request payload for testing one LLM channel."""
+class LLMChannelProbeRequest(BaseModel):
+    """Request payload for probing one LLM channel (connectivity / model ping)."""
 
     name: str = "channel"
     protocol: str = "openai"
@@ -151,8 +151,8 @@ class TestLLMChannelRequest(BaseModel):
     timeout_seconds: float = 20.0
 
 
-class TestLLMChannelResponse(BaseModel):
-    """Response payload for one LLM channel connectivity test."""
+class LLMChannelProbeResponse(BaseModel):
+    """Response payload for one LLM channel probe."""
 
     success: bool
     message: str

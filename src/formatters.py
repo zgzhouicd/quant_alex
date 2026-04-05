@@ -14,12 +14,12 @@ import markdown2
 
 TRUNCATION_SUFFIX = "\n\n...(本段内容过长已截断)"
 PAGE_MARKER_PREFIX = f"\n\n📄"
-PAGE_MARKER_SAFE_BYTES = 16 # "\n\n📄 9999/9999"
-PAGE_MARKER_SAFE_LEN = 13   # "\n\n📄 9999/9999"
+PAGE_MARKER_SAFE_BYTES = 16  # 分页标记可能占用的最大字节（如 "\n\n📄 9999/9999"）
+PAGE_MARKER_SAFE_LEN = 13   # 分页标记可能占用的最大字符长度
 MIN_MAX_WORDS = 10
 MIN_MAX_BYTES = 40
 
-# Unicode code point ranges for special characters.
+# 需按多码元计长的 Unicode 辅助平面字符（如部分 emoji）
 _SPECIAL_CHAR_RANGE = (0x10000, 0xFFFFF)
 _SPECIAL_CHAR_REGEX = re.compile(r'[\U00010000-\U000FFFFF]')
 
@@ -31,10 +31,10 @@ def _page_marker(i: int, total: int) -> str:
 def _is_special_char(c: str) -> bool:
     """判断字符是否为特殊字符
     
-    Args:
+    参数:
         c: 字符
         
-    Returns:
+    返回:
         True 如果字符为特殊字符，False 否则
     """
     if len(c) != 1:
@@ -46,11 +46,11 @@ def _is_special_char(c: str) -> bool:
 def _count_special_chars(s: str) -> int:
     """
     计算字符串中的特殊字符数量
-    
-    Args:
+
+    参数:
         s: 字符串
     """
-    # reg find all (0x10000, 0xFFFFF)
+    # 匹配 U+10000–U+FFFFF 区段
     match = _SPECIAL_CHAR_REGEX.findall(s)
     return len(match)
 
@@ -59,11 +59,11 @@ def _effective_len(s: str, special_char_len: int = 2) -> int:
     """
     计算字符串的有效长度
     
-    Args:
+    参数:
         s: 字符串
         special_char_len: 每个特殊字符的长度，默认为 2
         
-    Returns:
+    返回:
         s 的有效长度
     """
     n = len(s)
@@ -75,12 +75,12 @@ def _slice_at_effective_len(s: str, effective_len: int, special_char_len: int = 
     """
     按有效长度分割字符串
     
-    Args:
+    参数:
         s: 字符串
         effective_len: 有效长度
         special_char_len: 每个特殊字符的长度，默认为 2
         
-    Returns:
+    返回:
         分割后的前、后部分字符串
     """
     if _effective_len(s, special_char_len) <= effective_len:
@@ -102,10 +102,10 @@ def markdown_to_html_document(markdown_text: str) -> str:
     Uses markdown2 with table and code block support, wraps with inline CSS
     for compact, readable layout. Reused by notification email and md2img.
 
-    Args:
+    参数:
         markdown_text: Raw Markdown content.
 
-    Returns:
+    返回:
         Full HTML document string with DOCTYPE, head, and body.
     """
     html_content = markdown2.markdown(
@@ -292,12 +292,12 @@ def chunk_content_by_max_bytes(content: str, max_bytes: int, add_page_marker: bo
     """
     按字节数智能分割消息内容
     
-    Args:
+    参数:
         content: 完整消息内容
         max_bytes: 单条消息最大字节数
         add_page_marker: 是否添加分页标记
         
-    Returns:
+    返回:
         分割后的区块列表
     """
     def _chunk(content: str, max_bytes: int) -> List[str]:
@@ -378,11 +378,11 @@ def slice_at_max_bytes(text: str, max_bytes: int) -> tuple[str, str]:
     """
     按字节数截断字符串，确保不会在多字节字符中间截断
 
-    Args:
+    参数:
         text: 要截断的字符串
         max_bytes: 最大字节数
 
-    Returns:
+    返回:
         (截断后的字符串, 剩余未截断内容)
     """
     encoded = text.encode("utf-8")
@@ -408,10 +408,10 @@ def format_feishu_markdown(content: str) -> str:
     - 分隔线统一为细线
     - 表格转换为条目列表
     
-    Args:
+    参数:
         content: 原始 Markdown 内容
         
-    Returns:
+    返回:
         转换后的飞书 Markdown 格式内容
         
     Example:
@@ -497,10 +497,10 @@ def _chunk_by_separators(content: str) -> tuple[list[str], str]:
     """
     通过分割线等特殊字符将消息内容分割为多个区块
     
-    Args:
+    参数:
         content: 完整消息内容
         
-    Returns:
+    返回:
         sections: 分割后的区块列表
         separator: 区块之间的分隔符，None 表示无法分割
     """
@@ -542,12 +542,12 @@ def _chunk_by_max_words(content: str, max_words: int, special_char_len: int = 2)
     """
     按字数分割消息内容
     
-    Args:
+    参数:
         content: 完整消息内容
         max_words: 单条消息最大字数
         special_char_len: 每个特殊字符的长度，默认为 2
         
-    Returns:
+    返回:
         分割后的区块列表
     """
     if _effective_len(content, special_char_len) <= max_words:
@@ -584,13 +584,13 @@ def chunk_content_by_max_words(
     """
     按字数智能分割消息内容
     
-    Args:
+    参数:
         content: 完整消息内容
         max_words: 单条消息最大字数
         special_char_len: 每个特殊字符的长度，默认为 2
         add_page_marker: 是否添加分页标记
         
-    Returns:
+    返回:
         分割后的区块列表
     """
     def _chunk(content: str, max_words: int, special_char_len: int = 2) -> list[str]:

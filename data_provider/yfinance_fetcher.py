@@ -6,16 +6,17 @@ YfinanceFetcher - 兜底数据源 (Priority 4)
 
 数据来源：Yahoo Finance（通过 yfinance 库）
 特点：国际数据源、可能有延迟或缺失
-定位：当所有国内数据源都失败时的最后保障
+定位：与 Longbridge 并列的主路径之一；对 A 股等市场符号做 Yahoo 形态映射时的兜底转换
 
 关键策略：
-1. 自动将 A 股代码转换为 yfinance 格式（.SS / .SZ）
+1. 将 A 股、港股、美股、美股指期货、加密等输入映射为 yfinance 可识别的符号
 2. 处理 Yahoo Finance 的数据格式差异
 3. 失败后指数退避重试
 """
 
 import csv
 import logging
+import re
 from datetime import datetime
 from io import StringIO
 from typing import Optional, List, Dict, Any
@@ -52,6 +53,33 @@ import os
 
 logger = logging.getLogger(__name__)
 
+# 与 src/services/instrument_resolver 保持一致，用于 Yahoo 侧符号归一
+_US_FUTURE_YAHOO_RE = re.compile(r"^[A-Z0-9.\-]+=?F$")
+_PERP_SUFFIX_RE = re.compile(r"(?:[-_/]PERP|PERP)$")
+_CRYPTO_PAIR_RE = re.compile(r"^[A-Z0-9]{2,20}(?:USDT|USDC|USD|BTC|ETH)$")
+_YF_CRYPTO_DASH_RE = re.compile(r"^[A-Z0-9]{2,12}-(?:USD|BTC|ETH|USDT|USDC)$")
+
+
+def _strip_perp_suffix(sym: str) -> str:
+    return _PERP_SUFFIX_RE.sub("", sym)
+
+
+def _compact_crypto_to_yahoo(sym: str) -> Optional[str]:
+    s = sym.strip().upper()
+    if not _CRYPTO_PAIR_RE.fullmatch(s):
+        return None
+    if s.endswith("USDT"):
+        return f"{s[:-4]}-USD"
+    if s.endswith("USDC"):
+        return f"{s[:-4]}-USD"
+    if s.endswith("USD"):
+        return f"{s[:-3]}-USD"
+    if s.endswith("BTC"):
+        return f"{s[:-3]}-BTC"
+    if s.endswith("ETH"):
+        return f"{s[:-3]}-ETH"
+    return None
+
 
 class YfinanceFetcher(BaseFetcher):
     """
@@ -87,6 +115,8 @@ class YfinanceFetcher(BaseFetcher):
         - A股深市：000001.SZ (Shenzhen Stock Exchange)
         - 港股：0700.HK (Hong Kong Stock Exchange)
         - 美股：AAPL, TSLA, GOOGL (无需后缀)
+        - 美股指期货：如 ES=F 原样使用
+        - 加密：如 BTCUSDT / BTC-USD
 
         Args:
             stock_code: 原始代码，如 '600519', 'hk00700', 'AAPL'
@@ -129,26 +159,46 @@ class YfinanceFetcher(BaseFetcher):
         # 去除可能的 .SH 后缀
         code = code.replace('.SH', '')
 
+        # 已是 Yahoo 形态的加密符号
+        if _YF_CRYPTO_DASH_RE.fullmatch(code):
+            return code
+
+        stem = _strip_perp_suffix(code)
+        if stem.isdigit() and len(stem) == 6:
+            code = stem
+
         # ETF: Shanghai ETF (51xx, 52xx, 56xx, 58xx) -> .SS; Shenzhen ETF (15xx, 16xx, 18xx) -> .SZ
-        if len(code) == 6:
+        if len(code) == 6 and code.isdigit():
             if code.startswith(('51', '52', '56', '58')):
                 return f"{code}.SS"
             if code.startswith(('15', '16', '18')):
                 return f"{code}.SZ"
 
-        # BSE (Beijing Stock Exchange): 8xxxxx, 4xxxxx, 920xxx
-        if is_bse_code(code):
-            base = code.split('.')[0] if '.' in code else code
-            return f"{base}.BJ"
+            # BSE (Beijing Stock Exchange): 8xxxxx, 4xxxxx, 920xxx
+            if is_bse_code(code):
+                base = code.split('.')[0] if '.' in code else code
+                return f"{base}.BJ"
 
-        # A股：根据代码前缀判断市场
-        if code.startswith(('600', '601', '603', '688')):
-            return f"{code}.SS"
-        elif code.startswith(('000', '002', '300')):
+            # A股：根据代码前缀判断市场
+            if code.startswith(('600', '601', '603', '688')):
+                return f"{code}.SS"
+            if code.startswith(('000', '002', '300')):
+                return f"{code}.SZ"
+            logger.warning("无法确定 A 股代码 %s 的市场，默认使用深市", code)
             return f"{code}.SZ"
-        else:
-            logger.warning(f"无法确定股票 {code} 的市场，默认使用深市")
-            return f"{code}.SZ"
+
+        # 美期货 Yahoo 符号（如 ES=F）；兼容去掉 PERP 后的形态
+        if _US_FUTURE_YAHOO_RE.fullmatch(code):
+            return code
+        if _US_FUTURE_YAHOO_RE.fullmatch(stem):
+            return stem
+
+        yahoo_crypto = _compact_crypto_to_yahoo(code) or _compact_crypto_to_yahoo(stem)
+        if yahoo_crypto:
+            return yahoo_crypto
+
+        logger.warning("无法将 %s 映射为 Yahoo 符号，原样返回", stock_code)
+        return code
 
     @retry(
         stop=stop_after_attempt(3),

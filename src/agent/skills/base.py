@@ -1,13 +1,11 @@
 # -*- coding: utf-8 -*-
 """
-Trading skill base classes and SkillManager.
+交易技能基类与 SkillManager。
 
-Skills are pluggable trading analysis modules defined in **natural language**
-(YAML files). Each skill describes a common or custom trading pattern
-(e.g., 龙头策略, 缩量回踩, 均线金叉) used for analysis and push notifications.
+技能是可插拔的分析模块，用 **自然语言（YAML）** 定义；每个技能描述一种常见或自定义
+交易范式（如 龙头策略、缩量回踩、均线金叉），用于分析与推送。
 
-Users can write custom skills by creating a YAML file — no Python code needed.
-The built-in YAML files still live under ``strategies/`` for compatibility.
+用户新增 YAML 即可自定义技能。内置 YAML 仍放在 ``strategies/`` 目录以兼容旧路径。
 """
 
 import logging
@@ -19,41 +17,39 @@ from typing import Dict, List, Optional, Union
 
 logger = logging.getLogger(__name__)
 
-# Built-in skill YAML directory (project_root/strategies/ kept for compatibility)
+# 内置技能 YAML 目录（项目根下 strategies/，兼容历史布局）
 _BUILTIN_SKILLS_DIR = Path(__file__).resolve().parent.parent.parent.parent / "strategies"
 
 
 @dataclass
 class Skill:
-    """A trading skill that can be injected into the agent prompt.
+    """可注入 Agent system prompt 的交易技能。
 
-    Each skill represents a common or custom trading pattern used
-    for stock analysis and push notifications. Strategies are typically
-    loaded from YAML files written in natural language.
+    每个技能对应一种常见或自定义交易范式，用于分析与推送；策略通常来自自然语言 YAML。
 
-    Attributes:
-        name: Unique strategy identifier (e.g., "dragon_head").
-        display_name: Human-readable name (e.g., "龙头策略").
-        description: Brief description of when to apply this strategy.
-        instructions: Detailed natural language instructions injected into the system prompt.
-        category: Skill category — "trend" (趋势), "pattern" (形态), "reversal" (反转), "framework" (框架).
-        core_rules: List of core trading rule numbers this strategy relates to (1-7).
-        required_tools: List of tool names this skill depends on.
-        allowed_tools: Optional allowlist metadata from SKILL.md frontmatter.
-        aliases: Optional alias phrases used by NL selectors / bot commands.
-        enabled: Whether this skill is currently active.
-        source: Origin of this skill — "builtin" or file path of a custom definition.
-        entrypoint: Definition file path (YAML or SKILL.md).
-        bundle_dir: Skill bundle directory when loaded from SKILL.md.
-        disable_model_invocation: Whether the model should avoid auto-invoking this skill.
-        user_invocable: Whether the skill should be exposed in user-facing selectors.
-        default_active: Whether this skill participates in the default activation set.
-        default_router: Whether this skill participates in router fallback selection.
-        default_priority: Ordering hint for defaults / selectors (lower comes first).
-        market_regimes: Optional market regime tags used by the skill router.
-        execution_context: Inline/fork execution hint from frontmatter.
-        subagent_type: Optional subagent type hint from frontmatter.
-        preferred_model: Optional model hint from frontmatter.
+    字段说明：
+        name: 唯一策略 id（如 "dragon_head"）。
+        display_name: 展示名（如 「龙头策略」）。
+        description: 适用场景的简短说明。
+        instructions: 写入 system prompt 的详细自然语言指令。
+        category: 技能类别 — "trend"（趋势）、"pattern"（形态）、"reversal"（反转）、"framework"（框架）。
+        core_rules: 关联的核心规则编号列表（1–7）。
+        required_tools: 依赖的工具名列表。
+        allowed_tools: SKILL.md frontmatter 中的工具白名单元数据（可选）。
+        aliases: 自然语言 / Bot 指令可用的别名短语（可选）。
+        enabled: 当前是否激活。
+        source: 来源 — "builtin" 或自定义定义文件路径。
+        entrypoint: 定义文件路径（YAML 或 SKILL.md）。
+        bundle_dir: 从 SKILL.md 加载时的技能包目录。
+        disable_model_invocation: 是否禁止模型自动调用该技能。
+        user_invocable: 是否对用户选择器暴露。
+        default_active: 是否参与默认激活集合。
+        default_router: 是否参与 router 回退选择。
+        default_priority: 默认/选择器排序提示（数值越小越靠前）。
+        market_regimes: 技能路由可选的市场 regime 标签。
+        execution_context: frontmatter 中的内联/分叉执行提示。
+        subagent_type: frontmatter 中的子 Agent 类型提示。
+        preferred_model: frontmatter 中的模型偏好提示。
     """
     name: str
     display_name: str

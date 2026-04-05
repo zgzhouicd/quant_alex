@@ -1,9 +1,8 @@
 # -*- coding: utf-8 -*-
 """
-WebUI frontend asset preparation helper.
+WebUI 前端静态资源准备。
 
-Default behavior runs startup-time frontend auto build.
-Set WEBUI_AUTO_BUILD=false to disable auto build and only verify artifacts.
+默认在启动时自动构建前端；设置 WEBUI_AUTO_BUILD=false 可跳过构建，仅校验产物是否存在。
 """
 
 from __future__ import annotations
@@ -55,7 +54,7 @@ def _tree_latest_mtime(root: Path) -> float:
             if p.is_file():
                 latest = max(latest, _safe_mtime(p))
     except OSError:
-        # Fallback to root mtime when recursive traversal fails on restricted envs.
+        # 受限环境下递归遍历失败时，退回为根目录 mtime
         latest = max(latest, _safe_mtime(root))
     return latest
 
@@ -167,15 +166,14 @@ def _warn_if_assets_missing(artifact_index: Path, frontend_dir: Path) -> None:
 
 def prepare_webui_frontend_assets() -> bool:
     """
-    Prepare frontend assets for WebUI startup.
+    为 WebUI 启动准备前端静态资源。
 
-    Default mode (WEBUI_AUTO_BUILD=true):
-    - Run npm install/build when dependencies or sources changed,
-      or artifacts are missing.
+    默认（WEBUI_AUTO_BUILD=true）：
+    - 依赖或源码变更、或产物缺失时执行 npm install / build。
 
-    Manual mode (WEBUI_AUTO_BUILD=false):
-    - Do not compile frontend during backend startup.
-    - Only check whether existing artifacts are available.
+    手动模式（WEBUI_AUTO_BUILD=false）：
+    - 后端启动时不编译前端；
+    - 仅检查是否已有可用产物。
     """
     frontend_dir = Path(__file__).resolve().parent.parent / "apps" / "dsa-web"
     auto_build_enabled = _is_truthy_env("WEBUI_AUTO_BUILD", "true")

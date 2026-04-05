@@ -17,6 +17,7 @@
 import logging
 import random
 import time
+from contextlib import nullcontext
 from threading import BoundedSemaphore, RLock, Thread
 from abc import ABC, abstractmethod
 from datetime import datetime
@@ -25,8 +26,6 @@ from typing import Callable, Optional, List, Tuple, Dict, Any
 import pandas as pd
 import numpy as np
 from src.data.stock_mapping import STOCK_NAME_MAP, is_meaningful_stock_name
-from .fundamental_adapter import AkshareFundamentalAdapter
-
 # 配置日志
 logger = logging.getLogger(__name__)
 
@@ -502,14 +501,36 @@ class DataFetcherManager:
         else:
             # 默认数据源将在首次使用时延迟加载
             self._init_default_fetchers()
-        self._fundamental_adapter = AkshareFundamentalAdapter()
-        self._tickflow_fetcher = None
-        self._tickflow_api_key: Optional[str] = None
-        self._tickflow_lock = RLock()
         self._fundamental_cache: Dict[str, Dict[str, Any]] = {}
         self._fundamental_cache_lock = RLock()
         self._fundamental_timeout_worker_limit = 8
         self._fundamental_timeout_slots = BoundedSemaphore(self._fundamental_timeout_worker_limit)
+        self._daily_fetch_sem_lock = RLock()
+        self._daily_fetch_sem: Optional[BoundedSemaphore] = None
+        self._daily_fetch_sem_limit: Optional[int] = None
+
+    def _daily_fetch_slot_context(self):
+        """
+        Limit concurrent ``get_daily_data`` calls process-wide per manager instance.
+
+        When ``data_fetch_max_in_flight`` is <= 0 (default), returns a no-op context.
+        """
+        self._ensure_concurrency_guards()
+        from src.config import get_config
+
+        try:
+            limit = int(getattr(get_config(), "data_fetch_max_in_flight", 0))
+        except (TypeError, ValueError):
+            limit = 0
+        if limit <= 0:
+            return nullcontext()
+        if not hasattr(self, "_daily_fetch_sem_lock") or self._daily_fetch_sem_lock is None:
+            self._daily_fetch_sem_lock = RLock()
+        with self._daily_fetch_sem_lock:
+            if self._daily_fetch_sem is None or self._daily_fetch_sem_limit != limit:
+                self._daily_fetch_sem = BoundedSemaphore(limit)
+                self._daily_fetch_sem_limit = limit
+            return self._daily_fetch_sem
 
     def _ensure_concurrency_guards(self) -> None:
         """Lazily initialize thread-safety primitives for test scaffolds using __new__."""
@@ -558,73 +579,14 @@ class DataFetcherManager:
             self._stock_name_cache[stock_code] = name
         return name
 
-    def _get_tickflow_fetcher(self):
-        """Lazily create a TickFlow fetcher for market-review-only calls."""
-        from src.config import get_config
-
-        config = get_config()
-        api_key = (getattr(config, "tickflow_api_key", None) or "").strip()
-
-        if not hasattr(self, "_tickflow_lock") or self._tickflow_lock is None:
-            self._tickflow_lock = RLock()
-
-        with self._tickflow_lock:
-            current_fetcher = getattr(self, "_tickflow_fetcher", None)
-            current_key = getattr(self, "_tickflow_api_key", None)
-
-            if not api_key:
-                if current_fetcher is not None and hasattr(current_fetcher, "close"):
-                    try:
-                        current_fetcher.close()
-                    except Exception as exc:
-                        logger.debug("[TickFlowFetcher] 关闭旧实例失败: %s", exc)
-                self._tickflow_fetcher = None
-                self._tickflow_api_key = None
-                return None
-
-            if current_fetcher is not None and current_key == api_key:
-                return current_fetcher
-
-            if current_fetcher is not None and hasattr(current_fetcher, "close"):
-                try:
-                    current_fetcher.close()
-                except Exception as exc:
-                    logger.debug("[TickFlowFetcher] 切换实例时关闭失败: %s", exc)
-
-            try:
-                from .tickflow_fetcher import TickFlowFetcher
-
-                fetcher = TickFlowFetcher(api_key=api_key)
-                self._tickflow_fetcher = fetcher
-                self._tickflow_api_key = api_key
-                return fetcher
-            except Exception as exc:
-                logger.warning("[TickFlowFetcher] 初始化失败: %s", exc)
-                self._tickflow_fetcher = None
-                self._tickflow_api_key = None
-                return None
-
     def close(self) -> None:
         """Best-effort release of manager-owned resources."""
-        if not hasattr(self, "_tickflow_lock") or self._tickflow_lock is None:
-            self._tickflow_lock = RLock()
-
-        with self._tickflow_lock:
-            current_fetcher = getattr(self, "_tickflow_fetcher", None)
-            self._tickflow_fetcher = None
-            self._tickflow_api_key = None
-
-        if current_fetcher is not None and hasattr(current_fetcher, "close"):
-            try:
-                current_fetcher.close()
-            except Exception as exc:
-                logger.debug("[TickFlowFetcher] 关闭管理器资源失败: %s", exc)
+        return
 
     def __del__(self) -> None:
         try:
             self.close()
         except Exception:
-            # Best-effort cleanup during interpreter shutdown.
             pass
 
     def _get_fundamental_cache_key(self, stock_code: str, budget_seconds: Optional[float] = None) -> str:
@@ -844,14 +806,8 @@ class DataFetcherManager:
         """
         初始化默认数据源列表。
 
-        当前项目已聚焦于美股 / 期货 / 永续合约，A/H 股专属数据源
-        （EfinanceFetcher, AkshareFetcher, PytdxFetcher, BaostockFetcher）
-        已从默认链移除，仅保留多资产能力提供者：
-
-          0. YfinanceFetcher (Priority 0) — 美股 / ETF / 期货主力
-          1. LongbridgeFetcher (Priority 1) — 美股 / 港股兜底（懒加载）
-
-        如需临时恢复 A/H 股能力，可通过 add_fetcher() 手动注册对应 Fetcher。
+        默认链：Yahoo Finance + 长桥（美股 / 期货 / 加密等国际标的）。
+        A 股 / 港股专用 fetcher 已从本仓库移除；扩展数据源请自行实现 BaseFetcher 并 add_fetcher()。
         """
         from .yfinance_fetcher import YfinanceFetcher
         from .longbridge_fetcher import LongbridgeFetcher
@@ -888,6 +844,27 @@ class DataFetcherManager:
     ) -> Tuple[pd.DataFrame, str]:
         """
         获取日线数据（自动切换数据源）
+
+        配置 ``DATA_FETCH_MAX_IN_FLIGHT``（见 Config）> 0 时，限制本管理器内
+        `get_daily_data` 同时在飞请求数，降低线程池拉数峰值（与 ``analysis_delay`` 互补）。
+        """
+        with self._daily_fetch_slot_context():
+            return self._get_daily_data_unlocked(
+                stock_code,
+                start_date=start_date,
+                end_date=end_date,
+                days=days,
+            )
+
+    def _get_daily_data_unlocked(
+        self, 
+        stock_code: str,
+        start_date: Optional[str] = None,
+        end_date: Optional[str] = None,
+        days: int = 30
+    ) -> Tuple[pd.DataFrame, str]:
+        """
+        获取日线数据（自动切换数据源）
         
         故障切换策略：
         1. 美股指数/美股股票直接路由到 YfinanceFetcher
@@ -913,20 +890,21 @@ class DataFetcherManager:
         # Normalize code (strip SH/SZ prefix etc.)
         stock_code = normalize_stock_code(stock_code)
 
+        if _is_hk_market(stock_code):
+            raise DataFetchError(
+                "港股日线数据已移除；请使用美股、美期货或加密货币合约符号。"
+            )
+
         fetchers = self._get_fetchers_snapshot()
         errors = []
         total_fetchers = len(fetchers)
         request_start = time.time()
 
-        # 快速路径：美股/港股使用专用数据源路由
-        #   - 配置长桥凭据后: Longbridge 为首选, YFinance/AkShare 兜底
-        #   - 未配置长桥:     YFinance 为首选（美股）, 通用 fetcher 循环（港股）
-        #   - 美股指数:       始终 YFinance 为首选（Longbridge 不提供指数K线）
+        # 快速路径：美股使用 Yahoo / 长桥
         is_us_index = is_us_index_code(stock_code)
         is_us = is_us_index or is_us_stock_code(stock_code)
-        is_hk = (not is_us) and _is_hk_market(stock_code)
 
-        # 美股（含美股指数）使用 Longbridge/YFinance 特殊路由；港股走下方通用数据源循环
+        # 美股（含美股指数）使用 Longbridge/YFinance 特殊路由
         if is_us:
             prefer_lb = self._longbridge_preferred() and not is_us_index
             source_order = (
@@ -1023,16 +1001,7 @@ class DataFetcherManager:
     
     def prefetch_realtime_quotes(self, stock_codes: List[str]) -> int:
         """
-        批量预取实时行情数据（在分析开始前调用）
-        
-        策略：
-        1. 检查优先级中是否包含全量拉取数据源（efinance/akshare_em）
-        2. 如果不包含，跳过预取（新浪/腾讯是单股票查询，无需预取）
-        3. 如果自选股数量 >= 5 且使用全量数据源，则预取填充缓存
-        
-        这样做的好处：
-        - 使用新浪/腾讯时：每只股票独立查询，无全量拉取问题
-        - 使用 efinance/东财时：预取一次，后续缓存命中
+        批量预取实时行情（已移除 A 股全市场预取；恒返回 0，由按标的拉取覆盖）。
         
         Args:
             stock_codes: 待分析的股票代码列表
@@ -1056,219 +1025,61 @@ class DataFetcherManager:
         if not config.enable_realtime_quote:
             logger.debug("[预取] 实时行情功能已禁用，跳过预取")
             return 0
-        
-        # 检查优先级中是否包含全量拉取数据源
-        # 注意：新增全量接口（如 tushare_realtime）时需同步更新此列表
-        # 全量接口特征：一次 API 调用拉取全市场 5000+ 股票数据
-        priority = config.realtime_source_priority.lower()
-        bulk_sources = ['efinance', 'akshare_em', 'tushare']  # 全量接口列表
-        
-        # 如果优先级中前两个都不是全量数据源，跳过预取
-        # 因为新浪/腾讯是单股票查询，不需要预取
-        priority_list = [s.strip() for s in priority.split(',')]
-        first_bulk_source_index = None
-        for i, source in enumerate(priority_list):
-            if source in bulk_sources:
-                first_bulk_source_index = i
-                break
-        
-        # 如果没有全量数据源，或者全量数据源排在第 3 位之后，跳过预取
-        if first_bulk_source_index is None or first_bulk_source_index >= 2:
-            logger.info(f"[预取] 当前优先级使用轻量级数据源(sina/tencent)，无需预取")
-            return 0
-        
-        # 如果股票数量少于 5 个，不进行批量预取（逐个查询更高效）
-        if len(stock_codes) < 5:
-            logger.info(f"[预取] 股票数量 {len(stock_codes)} < 5，跳过批量预取")
-            return 0
-        
-        logger.info(f"[预取] 开始批量预取实时行情，共 {len(stock_codes)} 只股票...")
-        
-        # 尝试通过 efinance 或 akshare 预取
-        # 只需要调用一次 get_realtime_quote，缓存机制会自动拉取全市场数据
-        try:
-            # 用第一只股票触发全量拉取
-            first_code = stock_codes[0]
-            quote = self.get_realtime_quote(first_code)
-            
-            if quote:
-                logger.info(f"[预取] 批量预取完成，缓存已填充")
-                return len(stock_codes)
-            else:
-                logger.warning(f"[预取] 批量预取失败，将使用逐个查询模式")
-                return 0
-                
-        except Exception as e:
-            logger.error(f"[预取] 批量预取异常: {e}")
-            return 0
-    
+
+        logger.debug("[预取] 已移除 A 股全市场预取，按标的独立拉取")
+        return 0
+
     def get_realtime_quote(self, stock_code: str, *, log_final_failure: bool = True):
         """
-        获取实时行情数据（自动故障切换）
-        
-        故障切换策略（按配置的优先级）：
-        1. 美股：使用 YfinanceFetcher.get_realtime_quote()
-        2. EfinanceFetcher.get_realtime_quote()
-        3. AkshareFetcher.get_realtime_quote(source="em")  - 东财
-        4. AkshareFetcher.get_realtime_quote(source="sina") - 新浪
-        5. AkshareFetcher.get_realtime_quote(source="tencent") - 腾讯
-        6. 返回 None（降级兜底）
-        
-        Args:
-            stock_code: 股票代码
-            log_final_failure: Whether to emit the final "all sources failed"
-                summary log when no realtime quote is available.
-            
-        Returns:
-            UnifiedRealtimeQuote 对象，所有数据源都失败则返回 None
+        获取实时行情：美股优先 Yahoo Finance / 长桥；其它标的同样仅走国际源；港股与 A 股链路已移除。
         """
-        raw_stock_code = (stock_code or "").strip()
         # Normalize code (strip SH/SZ prefix etc.)
         stock_code = normalize_stock_code(stock_code)
 
-        from .akshare_fetcher import _is_us_code
-        from .us_index_mapping import is_us_index_code
+        from .us_index_mapping import is_us_index_code, is_us_stock_code
         from src.config import get_config
 
         config = get_config()
 
-        # 如果实时行情功能被禁用，直接返回 None
         if not config.enable_realtime_quote:
             logger.debug(f"[实时行情] 功能已禁用，跳过 {stock_code}")
             return None
 
-        # ----------------------------------------------------------
-        # 美股 (指数 + 个股) / 港股 — 专用双源路由
-        #   配置长桥后: Longbridge 首选, YFinance/AkShare 补充
-        #   未配置长桥: YFinance/AkShare 首选, Longbridge 补充
-        #   美股指数:   始终 YFinance 首选（Longbridge 不提供指数行情）
-        # ----------------------------------------------------------
+        if _is_hk_market(stock_code):
+            logger.debug(f"[实时行情] 港股已移除支持，跳过 {stock_code}")
+            return None
+
         is_us_index = is_us_index_code(stock_code)
-        is_us = is_us_index or _is_us_code(stock_code)
-        is_hk = (not is_us) and _is_hk_market(stock_code)
+        is_us = is_us_index or is_us_stock_code(stock_code)
 
-        if is_us or is_hk:
+        if is_us:
             prefer_lb = self._longbridge_preferred() and not is_us_index
-            if is_us:
-                primary_src = "LongbridgeFetcher" if prefer_lb else "YfinanceFetcher"
-                secondary_src = "YfinanceFetcher" if prefer_lb else "LongbridgeFetcher"
-                market_label = "美股指数" if is_us_index else "美股"
-                primary_kw: dict = {}
-                secondary_kw: dict = {}
-            else:
-                primary_src = "LongbridgeFetcher" if prefer_lb else "AkshareFetcher"
-                secondary_src = "AkshareFetcher" if prefer_lb else "LongbridgeFetcher"
-                market_label = "港股"
-                primary_kw = {"source": "hk"} if primary_src == "AkshareFetcher" else {}
-                secondary_kw = {"source": "hk"} if secondary_src == "AkshareFetcher" else {}
-
-            primary_quote = self._try_fetcher_quote(stock_code, primary_src, **primary_kw)
+            primary_src = "LongbridgeFetcher" if prefer_lb else "YfinanceFetcher"
+            secondary_src = "YfinanceFetcher" if prefer_lb else "LongbridgeFetcher"
+            market_label = "美股指数" if is_us_index else "美股"
+            primary_quote = self._try_fetcher_quote(stock_code, primary_src)
             if primary_quote is not None:
                 logger.info(f"[实时行情] {market_label} {stock_code} 成功获取 (来源: {primary_src})")
-            primary_quote = self._supplement_quote(
-                stock_code, primary_quote, secondary_src, **secondary_kw,
-            )
+            primary_quote = self._supplement_quote(stock_code, primary_quote, secondary_src)
             if primary_quote is not None:
                 return primary_quote
             if log_final_failure:
                 logger.info(f"[实时行情] {market_label} {stock_code} 无可用数据源")
             return None
-        
-        # 获取配置的数据源优先级
-        source_priority = config.realtime_source_priority.split(',')
-        
-        errors = []
-        # primary_quote holds the first successful result; we may supplement
-        # missing fields (volume_ratio, turnover_rate, etc.) from later sources.
-        primary_quote = None
-        
-        for source in source_priority:
-            source = source.strip().lower()
-            
-            try:
-                quote = None
-                
-                if source == "efinance":
-                    # 尝试 EfinanceFetcher
-                    for fetcher in self._get_fetchers_snapshot():
-                        if fetcher.name == "EfinanceFetcher":
-                            if hasattr(fetcher, 'get_realtime_quote'):
-                                quote = self._call_fetcher_method(fetcher, 'get_realtime_quote', stock_code)
-                            break
-                
-                elif source == "akshare_em":
-                    # 尝试 AkshareFetcher 东财数据源
-                    for fetcher in self._get_fetchers_snapshot():
-                        if fetcher.name == "AkshareFetcher":
-                            if hasattr(fetcher, 'get_realtime_quote'):
-                                quote = self._call_fetcher_method(fetcher, 'get_realtime_quote', stock_code, source="em")
-                            break
-                
-                elif source == "akshare_sina":
-                    # 尝试 AkshareFetcher 新浪数据源
-                    for fetcher in self._get_fetchers_snapshot():
-                        if fetcher.name == "AkshareFetcher":
-                            if hasattr(fetcher, 'get_realtime_quote'):
-                                quote = self._call_fetcher_method(fetcher, 'get_realtime_quote', stock_code, source="sina")
-                            break
-                
-                elif source in ("tencent", "akshare_qq"):
-                    # 尝试 AkshareFetcher 腾讯数据源
-                    for fetcher in self._get_fetchers_snapshot():
-                        if fetcher.name == "AkshareFetcher":
-                            if hasattr(fetcher, 'get_realtime_quote'):
-                                quote = self._call_fetcher_method(fetcher, 'get_realtime_quote', stock_code, source="tencent")
-                            break
-                
-                elif source == "tushare":
-                    # 尝试 TushareFetcher（需要 Tushare Pro 积分）
-                    for fetcher in self._get_fetchers_snapshot():
-                        if fetcher.name == "TushareFetcher":
-                            if hasattr(fetcher, 'get_realtime_quote'):
-                                quote = self._call_fetcher_method(fetcher, 'get_realtime_quote', raw_stock_code or stock_code)
-                            break
-                
-                if quote is not None and quote.has_basic_data():
-                    if primary_quote is None:
-                        # First successful source becomes primary
-                        primary_quote = quote
-                        logger.info(f"[实时行情] {stock_code} 成功获取 (来源: {source})")
-                        # If all key supplementary fields are present, return early
-                        if not self._quote_needs_supplement(primary_quote):
-                            return primary_quote
-                        # Otherwise, continue to try later sources for missing fields
-                        logger.debug(f"[实时行情] {stock_code} 部分字段缺失，尝试从后续数据源补充")
-                        supplement_attempts = 0
-                    else:
-                        # Supplement missing fields from this source (limit attempts)
-                        supplement_attempts += 1
-                        if supplement_attempts > 1:
-                            logger.debug(f"[实时行情] {stock_code} 补充尝试已达上限，停止继续")
-                            break
-                        merged = self._merge_quote_fields(primary_quote, quote)
-                        if merged:
-                            logger.info(f"[实时行情] {stock_code} 从 {source} 补充了缺失字段: {merged}")
-                        # Stop supplementing once all key fields are filled
-                        if not self._quote_needs_supplement(primary_quote):
-                            break
-                    
-            except Exception as e:
-                error_msg = f"[{source}] 失败: {str(e)}"
-                logger.info(f"[实时行情] {stock_code} {error_msg}，继续尝试下一个数据源")
-                errors.append(error_msg)
-                continue
-        
-        # Return primary even if some fields are still missing
-        if primary_quote is not None:
-            return primary_quote
 
-        # 所有数据源都失败，返回 None（降级兜底）
+        order = (
+            ["LongbridgeFetcher", "YfinanceFetcher"]
+            if self._longbridge_preferred()
+            else ["YfinanceFetcher", "LongbridgeFetcher"]
+        )
+        quote = None
+        for name in order:
+            quote = self._try_fetcher_quote(stock_code, name)
+            if quote is not None:
+                logger.info(f"[实时行情] {stock_code} 成功获取 (来源: {name})")
+                return quote
         if log_final_failure:
-            if errors:
-                logger.info(f"[实时行情] {stock_code} 所有数据源均失败: {'; '.join(errors)}")
-            else:
-                logger.info(f"[实时行情] {stock_code} 无可用数据源")
-
+            logger.info(f"[实时行情] {stock_code} 无可用数据源")
         return None
 
     # Fields worth supplementing from secondary sources when the primary
@@ -1305,8 +1116,7 @@ class DataFetcherManager:
     def _longbridge_preferred(self) -> bool:
         """Return True when Longbridge keys are configured and available.
 
-        When True, non-A-share routing (US & HK) uses Longbridge as the
-        primary data source with Yfinance/AkShare as fallback.
+        When True, Longbridge is tried before Yahoo Finance where applicable.
         """
         for f in self._get_fetchers_snapshot():
             if f.name == "LongbridgeFetcher":
@@ -1461,8 +1271,9 @@ class DataFetcherManager:
             return self._cache_stock_name(stock_code, static_name) or static_name
 
         # 3. 依次尝试各个数据源
-        from .akshare_fetcher import _is_us_code
-        is_us = _is_us_code(stock_code)
+        from .us_index_mapping import is_us_stock_code
+
+        is_us = is_us_stock_code(stock_code)
         _US_CAPABLE_FETCHERS = {"YfinanceFetcher", "LongbridgeFetcher"}
         for fetcher in self._get_fetchers_snapshot():
             if not hasattr(fetcher, 'get_stock_name'):
@@ -1613,16 +1424,6 @@ class DataFetcherManager:
 
     def get_market_stats(self) -> Dict[str, Any]:
         """获取市场涨跌统计（自动切换数据源）"""
-        tickflow_fetcher = self._get_tickflow_fetcher()
-        if tickflow_fetcher is not None:
-            try:
-                data = tickflow_fetcher.get_market_stats()
-                if data:
-                    logger.info("[TickFlowFetcher] 获取市场统计成功")
-                    return data
-            except Exception as e:
-                logger.warning(f"[TickFlowFetcher] 获取市场统计失败: {e}")
-
         for fetcher in self._fetchers:
             try:
                 data = fetcher.get_market_stats()
@@ -1935,9 +1736,7 @@ class DataFetcherManager:
         stock_code: str,
         budget_seconds: Optional[float] = None
     ) -> Dict[str, Any]:
-        """
-        Aggregate fundamental blocks with fail-open semantics.
-        """
+        """基本面聚合：A 股 / 港股专用数据源已移除，统一返回 not_supported。"""
         from src.config import get_config
 
         config = get_config()
@@ -1949,520 +1748,41 @@ class DataFetcherManager:
 
         stock_code = normalize_stock_code(stock_code)
         market = _market_tag(stock_code)
-        is_etf = _is_etf_code(stock_code)
-        if market in {"us", "hk"}:
-            return self._build_market_not_supported(
-                market=market,
-                reason="market not supported",
-            )
-
-        stage_timeout = float(
-            budget_seconds if budget_seconds is not None else config.fundamental_stage_timeout_seconds
+        return self._build_market_not_supported(
+            market=market,
+            reason="A-share/HK fundamental sources removed",
         )
-        stage_timeout = max(0.0, stage_timeout)
-        fetch_timeout = float(config.fundamental_fetch_timeout_seconds)
-        fetch_timeout = max(0.0, fetch_timeout)
-
-        cache_ttl = int(config.fundamental_cache_ttl_seconds)
-        cache_max_entries = max(0, int(getattr(config, "fundamental_cache_max_entries", 256)))
-        cache_key = self._get_fundamental_cache_key(stock_code, stage_timeout)
-        if cache_ttl > 0:
-            self._prune_fundamental_cache(cache_ttl, cache_max_entries)
-            with self._fundamental_cache_lock:
-                cache_item = self._fundamental_cache.get(cache_key)
-                if cache_item:
-                    age = time.time() - float(cache_item.get("ts", 0))
-                    if age <= cache_ttl:
-                        return cache_item.get("context", {})
-
-        remaining_seconds = stage_timeout
-        result_ctx: Dict[str, Any] = {
-            "market": market,
-            "valuation": {},
-            "growth": {},
-            "earnings": {},
-            "institution": {},
-            "capital_flow": {},
-            "dragon_tiger": {},
-            "boards": {},
-            "coverage": {},
-            "source_chain": [],
-            "errors": [],
-        }
-
-        start_ts = time.time()
-
-        def _consume_budget(consumed_ms: int) -> None:
-            nonlocal remaining_seconds
-            remaining_seconds = max(0.0, remaining_seconds - consumed_ms / 1000.0)
-
-        valuation_timeout = min(fetch_timeout, remaining_seconds)
-        if valuation_timeout > 0:
-            quote_payload, valuation_err, valuation_ms = self._run_with_retry(
-                lambda: self.get_realtime_quote(stock_code),
-                valuation_timeout,
-                "fundamental_valuation",
-            )
-            _consume_budget(valuation_ms)
-        else:
-            quote_payload, valuation_err, valuation_ms = None, "fundamental stage timeout", 0
-
-        valuation_payload = {
-            "pe_ratio": getattr(quote_payload, "pe_ratio", None) if quote_payload else None,
-            "pb_ratio": getattr(quote_payload, "pb_ratio", None) if quote_payload else None,
-            "total_mv": getattr(quote_payload, "total_mv", None) if quote_payload else None,
-            "circ_mv": getattr(quote_payload, "circ_mv", None) if quote_payload else None,
-        }
-        valuation_status = self._infer_block_status(
-            valuation_payload,
-            "partial" if quote_payload is not None else "not_supported",
-        )
-        if valuation_status == "partial" and valuation_err and not self._has_meaningful_payload(valuation_payload):
-            valuation_status = "failed"
-        result_ctx["valuation"] = self._build_fundamental_block(
-            valuation_status,
-            valuation_payload,
-            self._normalize_source_chain(
-                [{"provider": "realtime_quote", "result": valuation_status, "duration_ms": valuation_ms}],
-                "realtime_quote",
-                valuation_status,
-                valuation_ms,
-            ),
-            [valuation_err] if valuation_err else [],
-        )
-
-        # growth / earnings / institution (one AkShare call)
-        if remaining_seconds <= 0:
-            bundle_status = "failed"
-            bundle_payload: Dict[str, Any] = {}
-            bundle_errors = ["fundamental stage timeout"]
-            bundle_ms = 0
-        else:
-            bundle_timeout = min(fetch_timeout, remaining_seconds)
-            bundle_payload, bundle_err_msg, bundle_ms = self._run_with_retry(
-                lambda: self._fundamental_adapter.get_fundamental_bundle(stock_code),
-                bundle_timeout,
-                "fundamental_bundle",
-            )
-            _consume_budget(bundle_ms)
-            if not isinstance(bundle_payload, dict):
-                bundle_status = "failed"
-                bundle_payload = {}
-                bundle_errors = ["fundamental_bundle failed"]
-                if bundle_err_msg:
-                    bundle_errors.append(bundle_err_msg)
-            else:
-                bundle_status = str(bundle_payload.get("status", "not_supported"))
-                bundle_errors = [bundle_err_msg] if bundle_err_msg else []
-
-        bundle_chain = self._normalize_source_chain(
-            bundle_payload.get("source_chain", []),
-            "fundamental_bundle",
-            bundle_status,
-            bundle_ms,
-        ) if isinstance(bundle_payload, dict) else self._normalize_source_chain(
-            None,
-            "fundamental_bundle",
-            bundle_status,
-            bundle_ms,
-        )
-        growth_payload = bundle_payload.get("growth", {}) if isinstance(bundle_payload, dict) else {}
-        earnings_payload = bundle_payload.get("earnings", {}) if isinstance(bundle_payload, dict) else {}
-        institution_payload = bundle_payload.get("institution", {}) if isinstance(bundle_payload, dict) else {}
-        if not isinstance(growth_payload, dict):
-            growth_payload = {}
-        else:
-            growth_payload = dict(growth_payload)
-        if not isinstance(earnings_payload, dict):
-            earnings_payload = {}
-        else:
-            earnings_payload = dict(earnings_payload)
-        if not isinstance(institution_payload, dict):
-            institution_payload = {}
-        else:
-            institution_payload = dict(institution_payload)
-
-        # Derive TTM dividend yield from already-fetched quote price; avoid extra quote calls.
-        earnings_extra_errors: List[str] = []
-        dividend_payload = earnings_payload.get("dividend")
-        if isinstance(dividend_payload, dict):
-            dividend_payload = dict(dividend_payload)
-            ttm_cash_raw = dividend_payload.get("ttm_cash_dividend_per_share")
-            ttm_cash = None
-            if ttm_cash_raw is not None:
-                try:
-                    ttm_cash = float(ttm_cash_raw)
-                except (TypeError, ValueError):
-                    earnings_extra_errors.append("invalid_ttm_cash_dividend_per_share")
-            if isinstance(quote_payload, dict):
-                latest_price_raw = quote_payload.get("price")
-            else:
-                latest_price_raw = getattr(quote_payload, "price", None) if quote_payload else None
-            latest_price = None
-            if latest_price_raw is not None:
-                try:
-                    latest_price = float(latest_price_raw)
-                except (TypeError, ValueError):
-                    latest_price = None
-            ttm_yield = None
-            if ttm_cash is not None:
-                if latest_price is not None and latest_price > 0:
-                    ttm_yield = round(ttm_cash / latest_price * 100.0, 4)
-                else:
-                    earnings_extra_errors.append("invalid_price_for_ttm_dividend_yield")
-
-            dividend_payload["ttm_dividend_yield_pct"] = ttm_yield
-            if ttm_yield is not None:
-                dividend_payload["yield_formula"] = "ttm_cash_dividend_per_share / latest_price * 100"
-            earnings_payload["dividend"] = dividend_payload
-
-        adapter_errors = list(bundle_payload.get("errors", [])) if isinstance(bundle_payload, dict) else []
-        adapter_errors.extend(bundle_errors)
-        growth_errors = list(adapter_errors)
-        earnings_errors = list(adapter_errors)
-        earnings_errors.extend(earnings_extra_errors)
-        institution_errors = list(adapter_errors)
-
-        growth_status = self._infer_block_status(growth_payload, bundle_status)
-        earnings_status = self._infer_block_status(earnings_payload, bundle_status)
-        institution_status = self._infer_block_status(institution_payload, bundle_status)
-
-        result_ctx["growth"] = self._build_fundamental_block(
-            growth_status,
-            growth_payload,
-            bundle_chain,
-            growth_errors,
-        )
-        result_ctx["earnings"] = self._build_fundamental_block(
-            earnings_status,
-            earnings_payload,
-            bundle_chain,
-            earnings_errors,
-        )
-        result_ctx["institution"] = self._build_fundamental_block(
-            institution_status,
-            institution_payload,
-            bundle_chain,
-            institution_errors,
-        )
-
-        # capital flow
-        if is_etf:
-            result_ctx["capital_flow"] = self._build_fundamental_block(
-                "not_supported",
-                {},
-                [{"provider": "fundamental_pipeline", "result": "not_supported", "duration_ms": 0}],
-                ["etf not fully supported"],
-            )
-            result_ctx["dragon_tiger"] = self._build_fundamental_block(
-                "not_supported",
-                {},
-                [{"provider": "fundamental_pipeline", "result": "not_supported", "duration_ms": 0}],
-                ["etf not fully supported"],
-            )
-            result_ctx["boards"] = self._build_fundamental_block(
-                "not_supported",
-                {},
-                [{"provider": "fundamental_pipeline", "result": "not_supported", "duration_ms": 0}],
-                ["etf not fully supported"],
-            )
-            result_ctx["status"] = "partial"
-        else:
-            capital_flow_budget = min(fetch_timeout, remaining_seconds)
-            capital_flow_start = time.time()
-            result_ctx["capital_flow"] = self.get_capital_flow_context(
-                stock_code,
-                budget_seconds=capital_flow_budget,
-            )
-            _consume_budget(int((time.time() - capital_flow_start) * 1000))
-
-            dragon_tiger_budget = min(fetch_timeout, remaining_seconds)
-            dragon_tiger_start = time.time()
-            result_ctx["dragon_tiger"] = self.get_dragon_tiger_context(
-                stock_code,
-                budget_seconds=dragon_tiger_budget,
-            )
-            _consume_budget(int((time.time() - dragon_tiger_start) * 1000))
-
-            result_ctx["boards"] = self.get_board_context(
-                stock_code,
-                budget_seconds=min(fetch_timeout, remaining_seconds),
-            )
-
-        block_statuses = {
-            "valuation": result_ctx["valuation"].get("status", "not_supported"),
-            "growth": result_ctx["growth"].get("status", "not_supported"),
-            "earnings": result_ctx["earnings"].get("status", "not_supported"),
-            "institution": result_ctx["institution"].get("status", "not_supported"),
-            "capital_flow": result_ctx["capital_flow"].get("status", "not_supported"),
-            "dragon_tiger": result_ctx["dragon_tiger"].get("status", "not_supported"),
-            "boards": result_ctx["boards"].get("status", "not_supported"),
-        }
-        result_ctx["coverage"] = block_statuses
-        for block in (
-            "valuation",
-            "growth",
-            "earnings",
-            "institution",
-            "capital_flow",
-            "dragon_tiger",
-            "boards",
-        ):
-            result_ctx["errors"].extend(result_ctx[block].get("errors", []))
-            result_ctx["source_chain"].extend(result_ctx[block].get("source_chain", []))
-
-        if is_etf:
-            # Keep ETF downgrade semantics for overall status even when valuation is available.
-            result_ctx["status"] = (
-                "not_supported" if all(value == "not_supported" for value in block_statuses.values()) else "partial"
-            )
-        elif all(value == "not_supported" for value in block_statuses.values()):
-            result_ctx["status"] = "not_supported"
-        elif "failed" in block_statuses.values() or "partial" in block_statuses.values():
-            result_ctx["status"] = "partial"
-        else:
-            result_ctx["status"] = "ok"
-
-        result_ctx["elapsed_ms"] = int((time.time() - start_ts) * 1000)
-        if cache_ttl > 0 and self._should_cache_fundamental_context(result_ctx):
-            with self._fundamental_cache_lock:
-                self._fundamental_cache[cache_key] = {
-                    "ts": time.time(),
-                    "context": result_ctx,
-                }
-            self._prune_fundamental_cache(cache_ttl, cache_max_entries)
-        return result_ctx
 
     def get_capital_flow_context(self, stock_code: str, budget_seconds: Optional[float] = None) -> Dict[str, Any]:
-        """资金流向块（fail-open）。"""
-        from src.config import get_config
-
-        config = get_config()
-        stock_code = normalize_stock_code(stock_code)
-        timeout = float(budget_seconds if budget_seconds is not None else config.fundamental_fetch_timeout_seconds)
-        if _market_tag(stock_code) != "cn" or _is_etf_code(stock_code):
-            return self._build_fundamental_block(
-                "not_supported",
-                {},
-                [{"provider": "fundamental_pipeline", "result": "not_supported", "duration_ms": 0}],
-                ["not supported"],
-            )
-
-        if timeout <= 0:
-            return self._build_fundamental_block(
-                "failed",
-                {},
-                [{"provider": "fundamental_pipeline", "result": "failed", "duration_ms": 0}],
-                ["fundamental stage timeout"],
-            )
-        payload, err, cost_ms = self._run_with_retry(
-            lambda: self._fundamental_adapter.get_capital_flow(stock_code),
-            timeout,
-            "capital_flow",
-        )
-        if not isinstance(payload, dict):
-            return self._build_fundamental_block(
-                "failed",
-                {},
-                [{"provider": "fundamental_pipeline", "result": "failed", "duration_ms": cost_ms}],
-                [err or "capital_flow failed"],
-            )
-
-        stock_flow = payload.get("stock_flow") or {}
-        sector_rankings = payload.get("sector_rankings") or {}
-        has_stock_flow = False
-        if isinstance(stock_flow, dict):
-            has_stock_flow = any(v is not None for v in stock_flow.values())
-        has_sector_rankings = bool(sector_rankings.get("top")) or bool(sector_rankings.get("bottom"))
-        adapter_status = str(payload.get("status", "not_supported"))
-        if has_stock_flow or has_sector_rankings:
-            capital_flow_status = "ok"
-        elif adapter_status == "not_supported":
-            capital_flow_status = "not_supported"
-        else:
-            capital_flow_status = "partial"
-
+        """资金流向块：A 股数据源已移除。"""
+        normalize_stock_code(stock_code)
         return self._build_fundamental_block(
-            capital_flow_status,
-            {
-                "stock_flow": payload.get("stock_flow", {}),
-                "sector_rankings": payload.get("sector_rankings", {}),
-            },
-            self._normalize_source_chain(
-                payload.get("source_chain", []),
-                "capital_flow",
-                capital_flow_status,
-                cost_ms,
-            ),
-            list(payload.get("errors", [])) + ([err] if err else []),
+            "not_supported",
+            {},
+            [{"provider": "fundamental_pipeline", "result": "not_supported", "duration_ms": 0}],
+            ["not supported"],
         )
 
     def get_dragon_tiger_context(self, stock_code: str, budget_seconds: Optional[float] = None) -> Dict[str, Any]:
-        """龙虎榜块（fail-open）。"""
-        from src.config import get_config
-
-        config = get_config()
-        stock_code = normalize_stock_code(stock_code)
-        timeout = float(budget_seconds if budget_seconds is not None else config.fundamental_fetch_timeout_seconds)
-        if _market_tag(stock_code) != "cn" or _is_etf_code(stock_code):
-            return self._build_fundamental_block(
-                "not_supported",
-                {},
-                [{"provider": "fundamental_pipeline", "result": "not_supported", "duration_ms": 0}],
-                ["not supported"],
-            )
-
-        if timeout <= 0:
-            return self._build_fundamental_block(
-                "failed",
-                {},
-                [{"provider": "fundamental_pipeline", "result": "failed", "duration_ms": 0}],
-                ["fundamental stage timeout"],
-            )
-        payload, err, cost_ms = self._run_with_retry(
-            lambda: self._fundamental_adapter.get_dragon_tiger_flag(stock_code),
-            timeout,
-            "dragon_tiger",
-        )
-        if not isinstance(payload, dict):
-            return self._build_fundamental_block(
-                "failed",
-                {},
-                [{"provider": "fundamental_pipeline", "result": "failed", "duration_ms": cost_ms}],
-                [err or "dragon_tiger failed"],
-            )
+        """龙虎榜块：A 股数据源已移除。"""
+        normalize_stock_code(stock_code)
         return self._build_fundamental_block(
-            (payload.get("status") if isinstance(payload.get("status"), str) else "partial"),
-            {
-                "is_on_list": bool(payload.get("is_on_list", False)),
-                "recent_count": int(payload.get("recent_count", 0)),
-                "latest_date": payload.get("latest_date"),
-            },
-            self._normalize_source_chain(
-                payload.get("source_chain", []),
-                "dragon_tiger",
-                str(payload.get("status", "ok")),
-                cost_ms,
-            ),
-            list(payload.get("errors", [])) + ([err] if err else []),
+            "not_supported",
+            {},
+            [{"provider": "fundamental_pipeline", "result": "not_supported", "duration_ms": 0}],
+            ["not supported"],
         )
 
     def get_board_context(self, stock_code: str, budget_seconds: Optional[float] = None) -> Dict[str, Any]:
-        """板块榜单块（fail-open）。"""
-        from src.config import get_config
-
-        config = get_config()
-        stock_code = normalize_stock_code(stock_code)
-        timeout = float(budget_seconds if budget_seconds is not None else config.fundamental_fetch_timeout_seconds)
-        if _market_tag(stock_code) != "cn" or _is_etf_code(stock_code):
-            return self._build_fundamental_block(
-                "not_supported",
-                {},
-                [{"provider": "fundamental_pipeline", "result": "not_supported", "duration_ms": 0}],
-                ["not supported"],
-            )
-
-        if timeout <= 0:
-            return self._build_fundamental_block(
-                "failed",
-                {},
-                [{"provider": "fundamental_pipeline", "result": "failed", "duration_ms": 0}],
-                ["fundamental stage timeout"],
-            )
-
-        def task() -> Tuple[List[Dict[str, Any]], List[Dict[str, Any]], List[Dict[str, Any]], str]:
-            return self._get_sector_rankings_with_meta(5)
-
-        rankings, err, cost_ms = self._run_with_retry(task, timeout, "boards")
-        if isinstance(rankings, tuple) and len(rankings) == 4:
-            top, bottom, chain, chain_error = rankings
-            if chain_error and not err:
-                err = chain_error
-            if not top and not bottom:
-                return self._build_fundamental_block(
-                    "failed",
-                    {},
-                    chain if chain else [{"provider": "sector_rankings", "result": "failed", "duration_ms": cost_ms}],
-                    [err or "boards empty from all sources"],
-                )
-            board_status = "ok" if top and bottom else "partial"
-            return self._build_fundamental_block(
-                board_status,
-                {"top": top or [], "bottom": bottom or []},
-                chain if chain else self._normalize_source_chain(
-                    ["sector_rankings"],
-                    "boards",
-                    board_status,
-                    cost_ms,
-                ),
-                [err] if err else [],
-            )
-
+        """板块榜单：A 股数据源已移除。"""
+        normalize_stock_code(stock_code)
         return self._build_fundamental_block(
-            "failed",
+            "not_supported",
             {},
-            [{"provider": "sector_rankings", "result": "failed", "duration_ms": cost_ms}],
-            [err or "boards failed"],
+            [{"provider": "fundamental_pipeline", "result": "not_supported", "duration_ms": 0}],
+            ["not supported"],
         )
 
-    def _get_sector_rankings_with_meta(
-            self,
-            n: int = 5,
-        ) -> Tuple[List[Dict], List[Dict], List[Dict[str, Any]], str]:
-            """Get sector rankings with ordered fallback chain metadata."""
-            source_chain: List[Dict[str, Any]] = []
-            last_error = ""
-
-            # 直接遍历管理器已经按 priority 排好序的数据源列表
-            for fetcher in self._fetchers:
-                if not hasattr(fetcher, 'get_sector_rankings'):
-                    continue
-
-                start = time.time()
-                try:
-                    data = fetcher.get_sector_rankings(n)
-                    duration_ms = int((time.time() - start) * 1000)
-                    if data and data[0] is not None and data[1] is not None:
-                        source_chain.append(
-                            {
-                                "provider": fetcher.name,
-                                "result": "ok",
-                                "duration_ms": duration_ms,
-                            }
-                        )
-                        logger.info(f"[{fetcher.name}] 获取板块排行成功")
-                        return data[0], data[1], source_chain, ""
-
-                    last_error = f"{fetcher.name}返回空结果"
-                    source_chain.append(
-                        {
-                            "provider": fetcher.name,
-                            "result": "empty",
-                            "duration_ms": duration_ms,
-                            "error": last_error,
-                        }
-                    )
-                except Exception as e:
-                    error_type, error_reason = summarize_exception(e)
-                    last_error = f"{fetcher.name} ({error_type}) {error_reason}"
-                    duration_ms = int((time.time() - start) * 1000)
-                    source_chain.append(
-                        {
-                            "provider": fetcher.name,
-                            "result": "failed",
-                            "duration_ms": duration_ms,
-                            "error": error_reason,
-                        }
-                    )
-                    logger.warning(f"[{fetcher.name}] 获取板块排行失败: {error_reason}")
-
-            return [], [], source_chain, last_error
-
     def get_sector_rankings(self, n: int = 5) -> Tuple[List[Dict], List[Dict]]:
-        """获取板块涨跌榜（自动切换数据源）"""
-        # 按需求固定回退顺序：Akshare(EM) -> Akshare(Sina) -> Tushare -> Efinance
-        top, bottom, _, last_error = self._get_sector_rankings_with_meta(n)
-        if top or bottom:
-            return top, bottom
-        logger.warning(f"[板块排行] 所有数据源均失败，最终错误: {last_error}")
+        """板块涨跌榜：已无实现各 fetcher；恒为空。"""
         return [], []

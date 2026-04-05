@@ -31,10 +31,10 @@ This document compiles common issues encountered by users and their solutions.
 **Cause**: Some default real-time quote sources (e.g., Sina interface) don't provide volume ratio field.
 
 **Solution**:
-1. Fixed in v2.3.0, Tencent interface now supports volume ratio parsing
+1. Current defaults prefer Yahoo Finance plus optional Longbridge for fields like volume ratio when available
 2. Recommended real-time quote source priority:
    ```bash
-   REALTIME_SOURCE_PRIORITY=tencent,akshare_sina,efinance,akshare_em
+   REALTIME_SOURCE_PRIORITY=yfinance,longbridge
    ```
 3. System has built-in 5-day average volume calculation as fallback
 

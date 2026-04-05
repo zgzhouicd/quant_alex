@@ -8,12 +8,14 @@ A股自选股智能分析系统 - 异步任务队列
 1. 管理异步分析任务的生命周期
 2. 防止相同股票代码重复提交
 3. 提供 SSE 事件广播机制
-4. 任务完成后持久化到数据库
+4. 任务元数据与去重在进程内内存维护；分析完成后的业务结果由 Pipeline/AnalysisService
+   等既有链路写库或返回客户端，并不代表 ``TaskInfo`` 本身持久化
 """
 
 from __future__ import annotations
 
 import asyncio
+import json
 import logging
 import threading
 import uuid
@@ -128,14 +130,15 @@ class DuplicateTaskError(Exception):
 class AnalysisTaskQueue:
     """
     异步分析任务队列
-    
-    单例模式，全局唯一实例
-    
+
+    单例模式，全局唯一实例（**仅当前进程**）。API/worker 重启后进行中任务的
+    ``task_id``、去重表与 SSE 订阅状态不可恢复；客户端可能看到任务丢失或需重新订阅。
+
     特性：
     1. 防止相同股票代码重复提交
     2. 线程池执行分析任务
     3. SSE 事件广播机制
-    4. 任务完成后自动持久化
+    4. ``TaskInfo`` / 去重状态仅驻内存；写库的是分析流水线产物，而非队列内任务对象
     """
     
     _instance: Optional['AnalysisTaskQueue'] = None
@@ -175,6 +178,17 @@ class AnalysisTaskQueue:
         self._max_history = 100
         
         self._initialized = True
+        try:
+            from src.storage import get_db
+
+            cleared = get_db().reconcile_async_analysis_tasks()
+            if cleared:
+                logger.info(
+                    "[TaskQueue] 已将 %s 条未完成任务标为失败（DB 重启恢复）",
+                    cleared,
+                )
+        except Exception as exc:
+            logger.warning("[TaskQueue] 异步任务 DB reconcile 跳过: %s", exc)
         logger.info(f"[TaskQueue] 初始化完成，最大并发: {max_workers}")
     
     @property
@@ -374,6 +388,15 @@ class AnalysisTaskQueue:
                     existing_task_id = self._analyzing_stocks[dedupe_key]
                     duplicates.append(DuplicateTaskError(stock_code, existing_task_id))
                     continue
+                try:
+                    from src.storage import get_db
+
+                    ext_id = get_db().find_active_async_task_id_by_dedupe(dedupe_key)
+                except Exception:
+                    ext_id = None
+                if ext_id:
+                    duplicates.append(DuplicateTaskError(stock_code, ext_id))
+                    continue
 
                 task_id = uuid.uuid4().hex
                 task_info = TaskInfo(
@@ -408,6 +431,7 @@ class AnalysisTaskQueue:
                 self._futures[task_id] = future
                 accepted.append(task_info)
                 created_task_ids.append(task_id)
+                self._persist_task_row(task_info, dedupe_key)
                 logger.info(f"[TaskQueue] 任务已提交: {stock_code} -> {task_id}")
 
             # Keep task_created ordered before worker-emitted task_started/task_completed.
@@ -430,6 +454,82 @@ class AnalysisTaskQueue:
                 dedupe_key = _dedupe_stock_code_key(task.stock_code)
                 if self._analyzing_stocks.get(dedupe_key) == task_id:
                     del self._analyzing_stocks[dedupe_key]
+            try:
+                from src.storage import get_db
+
+                get_db().delete_analysis_async_task(task_id)
+            except Exception as exc:
+                logger.debug("[TaskQueue] 删除 DB 任务行跳过: %s", exc)
+
+    def _persist_task_row(self, task: TaskInfo, dedupe_key: str) -> None:
+        """将当前任务快照写入 ``analysis_async_tasks``（失败不阻断主流程）。"""
+        try:
+            from src.storage import get_db
+
+            get_db().upsert_analysis_async_task(
+                task_id=task.task_id,
+                stock_code=task.stock_code,
+                dedupe_key=dedupe_key,
+                status=task.status.value,
+                report_type=task.report_type,
+                progress=task.progress,
+                message=task.message,
+                error=task.error,
+                result=task.result,
+                instrument=task.instrument,
+                stock_name=task.stock_name,
+                original_query=task.original_query,
+                selection_source=task.selection_source,
+                created_at=task.created_at,
+                started_at=task.started_at,
+                completed_at=task.completed_at,
+            )
+        except Exception as exc:
+            logger.warning("[TaskQueue] 持久化任务行失败（可忽略）: %s", exc)
+
+    def _hydrate_task_from_db(self, task_id: str) -> Optional[TaskInfo]:
+        try:
+            from src.storage import get_db
+
+            row = get_db().get_analysis_async_task_row(task_id)
+        except Exception:
+            return None
+        if not row:
+            return None
+        try:
+            status = TaskStatus(row["status"])
+        except ValueError:
+            status = TaskStatus.FAILED
+        result: Optional[Dict[str, Any]] = None
+        if row.get("result_json"):
+            try:
+                result = json.loads(row["result_json"])
+            except Exception:
+                result = None
+        instrument: Optional[Dict[str, Any]] = None
+        if row.get("instrument_json"):
+            try:
+                instrument = json.loads(row["instrument_json"])
+            except Exception:
+                instrument = None
+        created = row.get("created_at") or datetime.now()
+        return TaskInfo(
+            task_id=row["task_id"],
+            stock_code=row["stock_code"],
+            stock_name=row.get("stock_name"),
+            status=status,
+            progress=int(row.get("progress") or 0),
+            message=row.get("message"),
+            result=result,
+            error=row.get("error"),
+            report_type=row.get("report_type") or "detailed",
+            instrument=instrument,
+            created_at=created,
+            started_at=row.get("started_at"),
+            completed_at=row.get("completed_at"),
+            original_query=row.get("original_query"),
+            selection_source=row.get("selection_source"),
+        )
     
     def get_task(self, task_id: str) -> Optional[TaskInfo]:
         """
@@ -443,7 +543,14 @@ class AnalysisTaskQueue:
         """
         with self._data_lock:
             task = self._tasks.get(task_id)
-            return task.copy() if task else None
+            if task:
+                return task.copy()
+        hydrated = self._hydrate_task_from_db(task_id)
+        if hydrated:
+            with self._data_lock:
+                self._tasks[task_id] = hydrated
+            return hydrated.copy()
+        return None
     
     def list_pending_tasks(self) -> List[TaskInfo]:
         """
@@ -529,6 +636,10 @@ class AnalysisTaskQueue:
             task_snapshot = task.copy()
 
         self._broadcast_event(event_type, task_snapshot.to_dict())
+        self._persist_task_row(
+            task_snapshot,
+            _dedupe_stock_code_key(task_snapshot.stock_code),
+        )
         return task_snapshot
     
     # ========== 任务执行 ==========
@@ -554,6 +665,7 @@ class AnalysisTaskQueue:
         Returns:
             分析结果字典
         """
+        dedupe_key = _dedupe_stock_code_key(stock_code)
         # 更新状态为处理中
         with self._data_lock:
             task = self._tasks.get(task_id)
@@ -563,8 +675,10 @@ class AnalysisTaskQueue:
             task.started_at = datetime.now()
             task.message = "正在分析中..."
             task.progress = 10
-        
-        self._broadcast_event("task_started", task.to_dict())
+            started_snapshot = task.copy()
+
+        self._persist_task_row(started_snapshot, dedupe_key)
+        self._broadcast_event("task_started", started_snapshot.to_dict())
         
         try:
             # 导入分析服务（延迟导入避免循环依赖）
@@ -588,6 +702,7 @@ class AnalysisTaskQueue:
             
             if result:
                 # 更新任务状态为完成
+                done_snapshot: Optional[TaskInfo] = None
                 with self._data_lock:
                     task = self._tasks.get(task_id)
                     if task:
@@ -599,11 +714,13 @@ class AnalysisTaskQueue:
                         task.stock_name = result.get("stock_name", task.stock_name)
                         
                         # 从分析中集合移除
-                        dedupe_key = _dedupe_stock_code_key(task.stock_code)
                         if dedupe_key in self._analyzing_stocks:
                             del self._analyzing_stocks[dedupe_key]
-                
-                self._broadcast_event("task_completed", task.to_dict())
+                        done_snapshot = task.copy()
+
+                if done_snapshot:
+                    self._persist_task_row(done_snapshot, dedupe_key)
+                    self._broadcast_event("task_completed", done_snapshot.to_dict())
                 logger.info(f"[TaskQueue] 任务完成: {task_id} ({stock_code})")
                 
                 # 清理过期任务
@@ -618,6 +735,7 @@ class AnalysisTaskQueue:
             error_msg = str(e)
             logger.error(f"[TaskQueue] 任务失败: {task_id} ({stock_code}), 错误: {error_msg}")
             
+            fail_snapshot: Optional[TaskInfo] = None
             with self._data_lock:
                 task = self._tasks.get(task_id)
                 if task:
@@ -627,11 +745,17 @@ class AnalysisTaskQueue:
                     task.message = f"分析失败: {error_msg[:50]}"
                     
                     # 从分析中集合移除
-                    dedupe_key = _dedupe_stock_code_key(task.stock_code)
-                    if dedupe_key in self._analyzing_stocks:
-                        del self._analyzing_stocks[dedupe_key]
-            
-            self._broadcast_event("task_failed", task.to_dict())
+                    failed_dedupe = _dedupe_stock_code_key(task.stock_code)
+                    if failed_dedupe in self._analyzing_stocks:
+                        del self._analyzing_stocks[failed_dedupe]
+                    fail_snapshot = task.copy()
+
+            if fail_snapshot:
+                self._persist_task_row(
+                    fail_snapshot,
+                    _dedupe_stock_code_key(fail_snapshot.stock_code),
+                )
+                self._broadcast_event("task_failed", fail_snapshot.to_dict())
             
             # 清理过期任务
             self._cleanup_old_tasks()
@@ -662,10 +786,17 @@ class AnalysisTaskQueue:
             removed = 0
             
             for task in completed_tasks[:to_remove]:
-                del self._tasks[task.task_id]
-                if task.task_id in self._futures:
-                    del self._futures[task.task_id]
+                tid = task.task_id
+                del self._tasks[tid]
+                if tid in self._futures:
+                    del self._futures[tid]
                 removed += 1
+                try:
+                    from src.storage import get_db
+
+                    get_db().delete_analysis_async_task(tid)
+                except Exception:
+                    pass
             
             if removed > 0:
                 logger.debug(f"[TaskQueue] 清理了 {removed} 个过期任务")

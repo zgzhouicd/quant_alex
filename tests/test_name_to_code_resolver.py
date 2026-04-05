@@ -5,13 +5,11 @@ Covers:
 - Local mapping (STOCK_NAME_MAP reverse)
 - Code format boundary (_is_code_like, _normalize_code)
 - Pinyin match (when pypinyin available)
-- AkShare fallback (mocked)
-- Fuzzy match (difflib)
+- Fuzzy match (difflib, local map only)
 - Ambiguous names return None
 """
 
 import pytest
-from unittest.mock import patch
 
 from src.services.name_to_code_resolver import (
     resolve_name_to_code,
@@ -114,32 +112,15 @@ class TestResolveNameToCode:
         # "阿里巴巴" maps to both BABA and 09988 in STOCK_NAME_MAP
         assert resolve_name_to_code("阿里巴巴") is None
 
-    @patch("src.services.name_to_code_resolver._get_akshare_name_to_code")
-    def test_akshare_fallback_when_not_in_local(self, mock_akshare):
-        mock_akshare.return_value = {"平安银行": "000001"}
-        # 000001 is in local map as 平安银行, so we use a name that's only in akshare
-        # Actually local has 000001 -> 平安银行. So "平安银行" would hit local first.
-        # Use a name not in STOCK_NAME_MAP - e.g. some A-share only in AkShare
-        mock_akshare.return_value = {"浦发银行": "600000"}
-        result = resolve_name_to_code("浦发银行")
-        assert result == "600000"
-        mock_akshare.assert_called()
-
-    @patch("src.services.name_to_code_resolver._get_akshare_name_to_code")
-    def test_fuzzy_match_fallback(self, mock_akshare):
-        mock_akshare.return_value = {"贵州茅台": "600519"}
-        # Typo: 贵州茅苔 -> should fuzzy match 贵州茅台
+    def test_fuzzy_match_fallback_local_only(self):
+        # Typo: 贵州茅苔 -> fuzzy match 贵州茅台 in STOCK_NAME_MAP
         result = resolve_name_to_code("贵州茅苔")
         assert result == "600519"
 
-    @patch("src.services.name_to_code_resolver._get_akshare_name_to_code")
-    def test_returns_none_when_no_match(self, mock_akshare):
-        mock_akshare.return_value = {}
+    def test_returns_none_when_no_match(self):
         result = resolve_name_to_code("不存在的股票名称xyz")
         assert result is None
 
-    @patch("src.services.name_to_code_resolver._get_akshare_name_to_code")
-    def test_skips_akshare_for_non_cjk_garbage_input(self, mock_akshare):
+    def test_skips_fuzzy_for_non_cjk_garbage_input(self):
         result = resolve_name_to_code("aaaaaaa")
         assert result is None
-        mock_akshare.assert_not_called()

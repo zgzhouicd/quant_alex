@@ -1,5 +1,9 @@
-# feishu_doc.py
 # -*- coding: utf-8 -*-
+"""
+飞书云文档创建与写入（官方 lark-oapi SDK）。
+
+需在配置中提供 ``FEISHU_APP_ID`` / ``FEISHU_APP_SECRET`` / 云文档文件夹 token 等。
+"""
 import logging
 import json
 import lark_oapi as lark

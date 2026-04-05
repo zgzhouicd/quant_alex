@@ -1,14 +1,14 @@
 # -*- coding: utf-8 -*-
 """
 ===================================
-A股自选股智能分析系统 - 分析服务层
+股票智能分析系统 - 分析服务层
 ===================================
 
 职责：
-1. 封装核心分析逻辑，支持多调用方（CLI、WebUI、Bot）
-2. 提供清晰的API接口，不依赖于命令行参数
-3. 支持依赖注入，便于测试和扩展
-4. 统一管理分析流程和配置
+1. 封装核心分析逻辑，供 CLI、WebUI、Bot 等多入口复用
+2. 提供不依赖 ``argparse`` 的程序化 API
+3. 支持依赖注入，便于单测与扩展
+4. 统一走 ``StockAnalysisPipeline`` 与配置单例
 """
 
 import uuid
@@ -30,16 +30,16 @@ def analyze_stock(
     notifier: Optional[NotificationService] = None
 ) -> Optional[AnalysisResult]:
     """
-    分析单只股票
-    
-    Args:
-        stock_code: 股票代码
+    分析单只股票。
+
+    参数:
+        stock_code: 标的代码
         config: 配置对象（可选，默认使用单例）
         full_report: 是否生成完整报告
         notifier: 通知服务（可选）
-        
-    Returns:
-        分析结果对象
+
+    返回:
+        ``AnalysisResult`` 或失败时为 None
     """
     if config is None:
         config = get_config()
@@ -75,16 +75,16 @@ def analyze_stocks(
     notifier: Optional[NotificationService] = None
 ) -> List[AnalysisResult]:
     """
-    分析多只股票
-    
-    Args:
-        stock_codes: 股票代码列表
-        config: 配置对象（可选，默认使用单例）
-        full_report: 是否生成完整报告
+    分析多只标的。
+
+    参数:
+        stock_codes: 代码列表
+        config: 配置对象（可选，默认单例）
+        full_report: 是否完整报告
         notifier: 通知服务（可选）
-        
-    Returns:
-        分析结果列表
+
+    返回:
+        成功的 ``AnalysisResult`` 列表（无结果的标的不入表）
     """
     if config is None:
         config = get_config()
@@ -102,14 +102,14 @@ def perform_market_review(
     notifier: Optional[NotificationService] = None
 ) -> Optional[str]:
     """
-    执行大盘复盘
-    
-    Args:
-        config: 配置对象（可选，默认使用单例）
-        notifier: 通知服务（可选）
-        
-    Returns:
-        复盘报告内容
+    执行大盘复盘。
+
+    参数:
+        config: 配置对象（可选，默认单例）
+        notifier: 通知服务（可选，默认用 pipeline 内建）
+
+    返回:
+        复盘报告文本，失败时可为 None
     """
     if config is None:
         config = get_config()

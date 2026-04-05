@@ -168,5 +168,16 @@ class EffectiveTradingDateTestCase(unittest.TestCase):
         self.assertEqual(result, date(2026, 3, 28))
 
 
+class GetMarketForStockDerivativeTestCase(unittest.TestCase):
+    def test_future_maps_us(self):
+        self.assertEqual(trading_calendar.get_market_for_stock("ES=F"), "us")
+
+    def test_crypto_perpetual_fail_open(self):
+        self.assertIsNone(trading_calendar.get_market_for_stock("BTCUSDT"))
+
+    def test_cn_six_digit_not_misclassified(self):
+        self.assertEqual(trading_calendar.get_market_for_stock("600519"), "cn")
+
+
 if __name__ == "__main__":
     unittest.main()

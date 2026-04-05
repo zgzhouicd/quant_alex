@@ -102,11 +102,14 @@ class StockRepository:
     
     def has_today_data(self, code: str, target_date: Optional[date] = None) -> bool:
         """
-        检查是否有指定日期的数据
+        检查是否有指定日期的数据。
+
+        ``target_date`` 省略时由存储层按标的推断市场并取有效交易日（见 ``DatabaseManager.has_today_data``）；
+        传入日历日时会归一为该市场下的有效行情日关键字。
         
         Args:
             code: 股票代码
-            target_date: 目标日期（默认今天）
+            target_date: 目标日期（可选）
             
         Returns:
             是否存在数据

@@ -205,12 +205,12 @@ class StockTrendAnalyzer:
     def analyze(self, df: pd.DataFrame, code: str) -> TrendAnalysisResult:
         """
         分析股票趋势
-        
-        Args:
+
+        参数:
             df: 包含 OHLCV 数据的 DataFrame
             code: 股票代码
-            
-        Returns:
+
+        返回:
             TrendAnalysisResult 分析结果
         """
         result = TrendAnalysisResult(code=code)
@@ -747,10 +747,10 @@ class StockTrendAnalyzer:
         """
         格式化分析结果为文本
 
-        Args:
+        参数:
             result: 分析结果
 
-        Returns:
+        返回:
             格式化的分析文本
         """
         lines = [
@@ -804,12 +804,12 @@ class StockTrendAnalyzer:
 def analyze_stock(df: pd.DataFrame, code: str) -> TrendAnalysisResult:
     """
     便捷函数：分析单只股票
-    
-    Args:
+
+    参数:
         df: 包含 OHLCV 数据的 DataFrame
         code: 股票代码
-        
-    Returns:
+
+    返回:
         TrendAnalysisResult 分析结果
     """
     analyzer = StockTrendAnalyzer()

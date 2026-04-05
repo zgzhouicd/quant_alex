@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""Market strategy blueprint for US daily market recap (CN/HK removed)."""
+"""美股大盘复盘用的策略蓝图（已移除 CN/HK 分支）。"""
 
 from dataclasses import dataclass
 from typing import List
@@ -7,7 +7,7 @@ from typing import List
 
 @dataclass(frozen=True)
 class StrategyDimension:
-    """Single strategy dimension used by market recap prompts."""
+    """大盘复盘 Prompt 中使用的单一策略维度。"""
 
     name: str
     objective: str
@@ -16,7 +16,7 @@ class StrategyDimension:
 
 @dataclass(frozen=True)
 class MarketStrategyBlueprint:
-    """Region specific market strategy blueprint."""
+    """按市场区域划分的策略蓝图。"""
 
     region: str
     title: str

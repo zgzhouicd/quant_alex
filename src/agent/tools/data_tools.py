@@ -1,12 +1,12 @@
 # -*- coding: utf-8 -*-
 """
-Data tools — wraps DataFetcherManager methods as agent-callable tools.
+数据类工具：将 DataFetcherManager 等方法封装为 Agent 可调用的工具。
 
-Tools:
-- get_realtime_quote: real-time stock quote
-- get_daily_history: historical OHLCV data
-- get_chip_distribution: chip distribution analysis
-- get_analysis_context: historical analysis context from DB
+包含例如：
+- get_realtime_quote：实时行情
+- get_daily_history：历史 OHLCV
+- get_chip_distribution：筹码分布
+- get_analysis_context：自数据库读取的历史分析上下文
 """
 
 import logging

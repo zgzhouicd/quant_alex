@@ -1,8 +1,7 @@
 # -*- coding: utf-8 -*-
-"""Backtesting evaluation engine (pure logic).
+"""回测评估引擎（纯逻辑）。
 
-This module is intentionally DB-agnostic: it operates on plain values or
-objects that look like daily OHLC bars.
+有意与数据库解耦：只对普通数值或「长得像日 K OHLC」的对象做计算。
 """
 
 from __future__ import annotations
@@ -16,7 +15,7 @@ OVERALL_SENTINEL_CODE = "__overall__"
 
 
 class DailyBarLike(Protocol):
-    """Protocol for objects representing a daily OHLC bar."""
+    """表示一根日 K（OHLC）行数据的协议类型。"""
 
     date: date
     high: Optional[float]
@@ -25,7 +24,7 @@ class DailyBarLike(Protocol):
 
 
 class BacktestResultLike(Protocol):
-    """Protocol for objects that behave like a stored BacktestResult."""
+    """行为上与已持久化的 BacktestResult 一致的协议类型。"""
 
     eval_status: str
     position_recommendation: Optional[str]
@@ -48,9 +47,9 @@ class EvaluationConfig:
 
 
 class BacktestEngine:
-    """Long-only daily-bar backtesting engine."""
+    """仅做多、基于日 K 的回测引擎。"""
 
-    # Operation advice keywords (Chinese + English)
+    # 操作建议关键词（中英）
     _BULLISH_KEYWORDS = (
         "买入",
         "加仓",
@@ -80,9 +79,8 @@ class BacktestEngine:
         "wait",
     )
 
-    # Negation prefixes (trailing spaces stripped for suffix-matching against prefix text).
-    # English patterns include trailing space in their canonical form; rstrip is
-    # applied during matching so "do not" matches prefix "do not " or "do not".
+    # 否定前缀（对前缀文本做后缀匹配时会 rstrip 再比）。
+    # 英文模式在规范形式里可含尾部空格；匹配时对 prefix rstrip，使 "do not" 能对应 "do not " 等。
     _NEGATION_PATTERNS = (
         "not", "don't", "do not", "no", "never", "avoid",  # English
         "不要", "不", "别", "勿", "没有",  # Chinese
@@ -90,7 +88,7 @@ class BacktestEngine:
 
     @classmethod
     def infer_direction_expected(cls, operation_advice: Optional[str]) -> str:
-        """Infer expected direction: up/down/not_down/flat."""
+        """由操作建议推断期望方向：up / down / not_down / flat。"""
         text = cls._normalize_text(operation_advice)
         if cls._matches_intent(text, cls._BEARISH_KEYWORDS):
             return "down"
@@ -243,7 +241,7 @@ class BacktestEngine:
         eval_window_days: int,
         engine_version: str,
     ) -> Dict[str, Any]:
-        """Aggregate BacktestResult rows into summary metrics."""
+        """将多条 BacktestResult 聚合为汇总指标。"""
         results_list = list(results)
 
         total = len(results_list)
@@ -375,7 +373,7 @@ class BacktestEngine:
 
     @classmethod
     def _is_negated(cls, prefix: str) -> bool:
-        """Check if the prefix text ends with a negation pattern."""
+        """判断前缀文本是否以否定模式结尾。"""
         stripped = prefix.rstrip()
         return any(stripped.endswith(neg) for neg in cls._NEGATION_PATTERNS)
 

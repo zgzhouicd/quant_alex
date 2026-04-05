@@ -41,8 +41,7 @@ class TestSearchPerformance:
         assert avg_ms < 20, f"Fast-path resolution too slow: {avg_ms:.2f}ms"
 
     @pytest.mark.benchmark
-    @patch("src.services.name_to_code_resolver._get_akshare_name_to_code", return_value={})
-    def test_resolve_name_to_code_typo_fallback_budget(self, mock_akshare):
+    def test_resolve_name_to_code_typo_fallback_budget(self):
         """Benchmark typo/fuzzy fallback separately with a smaller iteration budget."""
         typo_inputs = [
             "贵州茅苔",
@@ -65,19 +64,21 @@ class TestSearchPerformance:
         assert avg_ms < 100, f"Typo fallback too slow: {avg_ms:.2f}ms"
 
     @pytest.mark.benchmark
-    @patch("src.services.name_to_code_resolver._get_akshare_name_to_code")
-    def test_fuzzy_match_performance_large_set(self, mock_akshare):
-        """Test difflib fuzzy matching performance with a 5000+ stock set."""
-        # Simulate 5000 stocks from AkShare
+    def test_fuzzy_match_performance_large_set(self):
+        """Test difflib fuzzy matching performance with a 5000+ local name pool."""
+        import src.services.name_to_code_resolver as ncr
+
         fake_market = {f"股票_{i}": f"{i:06d}" for i in range(5000)}
-        mock_akshare.return_value = fake_market
-        
-        query = "股票_4999" # Worst case or near worst case for fuzzy matching
-        
+        merged = dict(ncr._LOCAL_REVERSE_MAP)
+        merged.update(fake_market)
+
+        query = "股票_4999"
+
         start_time = time.time()
         iterations = 20
-        for _ in range(iterations):
-            resolve_name_to_code(query)
+        with patch.object(ncr, "_LOCAL_REVERSE_MAP", merged):
+            for _ in range(iterations):
+                resolve_name_to_code(query)
         
         duration = time.time() - start_time
         avg_ms = (duration / iterations) * 1000

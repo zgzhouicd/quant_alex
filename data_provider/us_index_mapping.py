@@ -94,6 +94,24 @@ def is_us_stock_code(code: str) -> bool:
     return bool(_US_STOCK_PATTERN.match(normalized))
 
 
+def is_hk_stock_code(code: str) -> bool:
+    """
+    判断是否港股代码（HK 前缀 / .HK / 5 位数字形态，且排除美股/美指）。
+    """
+    s = (code or "").strip().upper()
+    if not s or is_us_stock_code(s) or is_us_index_code(s):
+        return False
+    if s.endswith(".HK"):
+        base = s[:-3]
+        return base.isdigit() and 1 <= len(base) <= 5
+    if s.startswith("HK"):
+        digits = s[2:]
+        return digits.isdigit() and 1 <= len(digits) <= 5
+    if s.isdigit() and len(s) == 5:
+        return True
+    return False
+
+
 def get_us_index_yf_symbol(code: str) -> tuple:
     """
     获取美股指数的 Yahoo Finance 符号与中文名称。

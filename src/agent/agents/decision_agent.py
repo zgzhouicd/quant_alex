@@ -1,12 +1,11 @@
 # -*- coding: utf-8 -*-
 """
-DecisionAgent — final synthesis and decision-making specialist.
+DecisionAgent：最终综合与决策专家。
 
-Responsible for:
-- Aggregating opinions from technical + intel + risk + skill agents
-- Producing the final Decision Dashboard JSON
-- Generating directional trade recommendations (long/short/neutral) with
-  entry zone, stop-loss, targets, and leverage guidance
+职责包括：
+- 汇总技术面、情报、风险与各技能 Agent 的观点
+- 产出最终「决策仪表盘」JSON
+- 生成长/短/中等方向建议，含入场区、止损、目标与杠杆提示
 """
 
 from __future__ import annotations

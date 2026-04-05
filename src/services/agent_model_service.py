@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""Helpers for exposing configured Agent model deployments."""
+"""对外展示当前配置的 Agent 模型部署列表等辅助函数。"""
 
 from __future__ import annotations
 

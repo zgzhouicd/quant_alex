@@ -1,13 +1,13 @@
 # -*- coding: utf-8 -*-
 """
 ===================================
-A股自选股智能分析系统 - AI分析层
+股票智能分析系统 - AI 分析层（GeminiAnalyzer / LiteLLM）
 ===================================
 
 职责：
-1. 封装 LLM 调用逻辑（通过 LiteLLM 统一调用 Gemini/Anthropic/OpenAI 等）
-2. 结合技术面和消息面生成分析报告
-3. 解析 LLM 响应为结构化 AnalysisResult
+1. 封装 LLM 调用（经 LiteLLM 统一接入 Gemini / Anthropic / OpenAI 等）
+2. 结合技术面与消息面生成分析报告
+3. 将 LLM 输出解析为结构化 ``AnalysisResult``
 """
 
 import json
@@ -52,7 +52,7 @@ logger = logging.getLogger(__name__)
 
 
 class _LiteLLMStreamError(RuntimeError):
-    """Internal error wrapper that records whether any text was streamed."""
+    """内部流式错误包装：记录是否已收到过部分文本。"""
 
     def __init__(self, message: str, *, partial_received: bool = False):
         super().__init__(message)
@@ -61,8 +61,9 @@ class _LiteLLMStreamError(RuntimeError):
 
 def check_content_integrity(result: "AnalysisResult") -> Tuple[bool, List[str]]:
     """
-    Check mandatory fields for report content integrity.
-    Returns (pass, missing_fields). Module-level for use by pipeline (agent weak mode).
+    检查报告内容完整性必填字段。
+
+    返回 (是否通过, 缺失字段路径列表)。模块级函数，供管线 / Agent 弱模式等调用。
     """
     missing: List[str] = []
     if result.sentiment_score is None:
@@ -94,7 +95,7 @@ def check_content_integrity(result: "AnalysisResult") -> Tuple[bool, List[str]]:
 
 
 def apply_placeholder_fill(result: "AnalysisResult", missing_fields: List[str]) -> None:
-    """Fill missing mandatory fields with placeholders (in-place). Module-level for pipeline."""
+    """用占位符就地补齐缺失的必填字段（供管线调用）。"""
     placeholder = get_placeholder_text(getattr(result, "report_language", "zh"))
     for field in missing_fields:
         if field == "sentiment_score":
@@ -285,12 +286,12 @@ def get_stock_name_multi_source(
     3. 从 DataFetcherManager 获取（各数据源）
     4. 返回默认名称（股票+代码）
 
-    Args:
+    参数:
         stock_code: 股票代码
         context: 分析上下文（可选）
         data_manager: DataFetcherManager 实例（可选）
 
-    Returns:
+    返回:
         股票中文名称
     """
     # 1. 从上下文获取（实时行情数据）
@@ -848,7 +849,7 @@ class GeminiAnalyzer:
     ):
         """Initialize LLM Analyzer via LiteLLM.
 
-        Args:
+        参数:
             api_key: Ignored (kept for backward compatibility). Keys are loaded from config.
         """
         self._config_override = config
@@ -1159,11 +1160,11 @@ class GeminiAnalyzer:
         In legacy mode, the primary model may use the Router while fallback
         models fall back to direct litellm.completion().
 
-        Args:
+        参数:
             prompt: User prompt text.
             generation_config: Dict with optional keys: temperature, max_output_tokens, max_tokens.
 
-        Returns:
+        返回:
             Tuple of (response text, model_used, usage). On success model_used is the full model
             name and usage is a dict with prompt_tokens, completion_tokens, total_tokens.
         """
@@ -1267,12 +1268,12 @@ class GeminiAnalyzer:
         calling _call_litellm() directly or accessing private attributes such as
         _litellm_available, _router, _model, _use_openai, or _use_anthropic.
 
-        Args:
+        参数:
             prompt:      Text prompt to send to the LLM.
             max_tokens:  Maximum tokens in the response (default 2048).
             temperature: Sampling temperature (default 0.7).
 
-        Returns:
+        返回:
             Response text, or None if the LLM call fails (error is logged).
         """
         try:
@@ -1305,11 +1306,11 @@ class GeminiAnalyzer:
         3. 解析 JSON 响应
         4. 返回结构化结果
         
-        Args:
+        参数:
             context: 从 storage.get_analysis_context() 获取的上下文数据
             news_context: 预先搜索的新闻内容（可选）
             
-        Returns:
+        返回:
             AnalysisResult 对象
         """
         def _emit_progress(progress: int, message: str) -> None:
@@ -1488,7 +1489,7 @@ class GeminiAnalyzer:
         
         包含：技术指标、实时行情（量比/换手率）、筹码分布、趋势分析、新闻
         
-        Args:
+        参数:
             context: 技术面数据上下文（包含增强数据）
             name: 股票名称（默认值，可能被上下文覆盖）
             news_context: 预先搜索的新闻内容
@@ -2199,11 +2200,11 @@ class GeminiAnalyzer:
         
         注意：为避免 API 速率限制，每次分析之间会有延迟
         
-        Args:
+        参数:
             contexts: 上下文数据列表
             delay_between: 每次分析之间的延迟（秒）
             
-        Returns:
+        返回:
             AnalysisResult 列表
         """
         results = []

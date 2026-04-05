@@ -91,20 +91,20 @@ def _make_pipeline(enable_realtime_quote: bool, realtime_quote=None) -> StockAna
 def test_manager_does_not_warn_when_fallback_source_succeeds(mock_get_config, caplog):
     mock_get_config.return_value = SimpleNamespace(
         enable_realtime_quote=True,
-        realtime_source_priority="efinance,akshare_em",
+        realtime_source_priority="yfinance,longbridge",
     )
     manager = DataFetcherManager(
         fetchers=[
-            _DummyFetcher("EfinanceFetcher", 0, error=RuntimeError("efinance timeout")),
-            _DummyFetcher("AkshareFetcher", 1, result=_make_quote()),
+            _DummyFetcher("YfinanceFetcher", 0, error=RuntimeError("yfinance timeout")),
+            _DummyFetcher("LongbridgeFetcher", 1, result=_make_quote(code="AAPL", name="Apple")),
         ]
     )
 
     with caplog.at_level(logging.INFO):
-        quote = manager.get_realtime_quote("600519")
+        quote = manager.get_realtime_quote("AAPL")
 
     assert quote is not None
-    assert quote.name == "贵州茅台"
+    assert quote.name == "Apple"
     assert not [record for record in caplog.records if record.levelno >= logging.WARNING]
     assert "所有数据源均不可用" not in caplog.text
 
@@ -132,15 +132,16 @@ def test_event_monitor_keeps_manager_failure_summary_for_direct_quote_call(mock_
 
     mock_get_config.return_value = SimpleNamespace(
         enable_realtime_quote=True,
-        realtime_source_priority="efinance",
+        realtime_source_priority="yfinance,longbridge",
     )
     manager = DataFetcherManager(
         fetchers=[
-            _DummyFetcher("EfinanceFetcher", 0, error=RuntimeError("efinance timeout")),
+            _DummyFetcher("YfinanceFetcher", 0, error=RuntimeError("yfinance timeout")),
+            _DummyFetcher("LongbridgeFetcher", 1, error=RuntimeError("longbridge timeout")),
         ]
     )
     monitor = EventMonitor()
-    rule = PriceAlert(stock_code="600519", direction="above", price=1800.0)
+    rule = PriceAlert(stock_code="AAPL", direction="above", price=1800.0)
 
     async def _run_inline(func, *args, **kwargs):
         return func(*args, **kwargs)
@@ -151,7 +152,7 @@ def test_event_monitor_keeps_manager_failure_summary_for_direct_quote_call(mock_
         result = asyncio.run(monitor._check_price(rule))
 
     assert result is None
-    assert "[实时行情] 600519 所有数据源均失败: [efinance] 失败: efinance timeout" in caplog.text
+    assert "AAPL 无可用数据源" in caplog.text
 
 
 def test_pipeline_logs_disabled_realtime_once_without_fetching_quote(caplog):

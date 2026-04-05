@@ -1,10 +1,9 @@
 # -*- coding: utf-8 -*-
 """
-Shared protocols — common data structures for multi-agent communication.
+多 Agent 通信共用的协议与数据结构。
 
-Provides the foundational types that all agents, runners, and orchestrators
-share.  These are intentionally plain dataclasses (no ORM dependency) so
-they can be serialised, logged, and passed across process boundaries.
+为各 Agent、runner、orchestrator 提供基础类型；刻意使用朴素 dataclass（无 ORM），
+便于序列化、日志与跨进程传递。
 """
 
 from __future__ import annotations
@@ -16,11 +15,11 @@ from typing import Any, Dict, List, Optional
 
 
 # ============================================================
-# Enums
+# 枚举
 # ============================================================
 
 class Signal(str, Enum):
-    """Standardised trading signal labels."""
+    """规范化的交易信号标签。"""
     STRONG_BUY = "strong_buy"
     BUY = "buy"
     HOLD = "hold"
@@ -38,7 +37,7 @@ _CANONICAL_DECISION_SIGNAL_MAP: Dict[str, str] = {
 
 
 def normalize_decision_signal(signal: Any, default: str = "hold") -> str:
-    """Map model-facing signal labels to the dashboard's stable enum."""
+    """将模型侧信号名映射为仪表盘使用的稳定枚举值。"""
     if not isinstance(signal, str):
         return default
     normalized = signal.strip().lower()
@@ -46,7 +45,7 @@ def normalize_decision_signal(signal: Any, default: str = "hold") -> str:
 
 
 class StageStatus(str, Enum):
-    """Lifecycle status of a pipeline stage."""
+    """流水线单阶段的生命周期状态。"""
     PENDING = "pending"
     RUNNING = "running"
     COMPLETED = "completed"
@@ -55,50 +54,48 @@ class StageStatus(str, Enum):
 
 
 # ============================================================
-# AgentContext — shared state bag for a single analysis run
+# AgentContext — 单次分析 run 的共享状态容器
 # ============================================================
 
 @dataclass
 class AgentContext:
-    """Shared context carried across all agents in a single run.
+    """单次运行中在各 Agent 之间传递的共享上下文。
 
-    Any agent can read from / write to this context.  The orchestrator
-    is responsible for seeding the initial fields and collecting
-    final results.
+    任意 Agent 可读可写；orchestrator 负责填充初始字段并汇总最终结果。
     """
 
-    # --- identity ---
+    # --- 标识 ---
     query: str = ""
     stock_code: str = ""
     stock_name: str = ""
     instrument: Dict[str, Any] = field(default_factory=dict)
     session_id: str = ""
 
-    # --- collected data (populated by data-fetching stages) ---
+    # --- 取数阶段填充的聚合数据 ---
     data: Dict[str, Any] = field(default_factory=dict)
-    # Typical keys: "realtime_quote", "daily_history", "trend_result",
-    #               "chip_distribution", "news_context",
-    #               "fundamental_context", "derivatives_snapshot", "session_state"
+    # 常见键："realtime_quote", "daily_history", "trend_result",
+    #        "chip_distribution", "news_context",
+    #        "fundamental_context", "derivatives_snapshot", "session_state"
 
-    # --- opinions from individual agents ---
+    # --- 各 Agent 输出的观点 ---
     opinions: List["AgentOpinion"] = field(default_factory=list)
 
-    # --- risk flags raised by RiskAgent ---
+    # --- RiskAgent 产生的风险标记 ---
     risk_flags: List[Dict[str, Any]] = field(default_factory=list)
 
-    # --- arbitrary metadata ---
+    # --- 任意扩展元数据 ---
     meta: Dict[str, Any] = field(default_factory=dict)
-    # e.g. {"skills_requested": [...], "user_platform": "feishu"}
+    # 例：{"skills_requested": [...], "user_platform": "feishu"}
 
-    # --- timing ---
+    # --- 时间 ---
     created_at: float = field(default_factory=time.time)
 
     # -----------------------------------------------------------------
-    # Convenience helpers
+    # 便捷方法
     # -----------------------------------------------------------------
 
     def add_opinion(self, opinion: "AgentOpinion") -> None:
-        """Append an opinion and auto-set the timestamp if missing."""
+        """追加一条观点；若未写 timestamp 则自动填当前时间。"""
         if opinion.timestamp == 0:
             opinion.timestamp = time.time()
         self.opinions.append(opinion)
@@ -123,34 +120,33 @@ class AgentContext:
 
 
 # ============================================================
-# AgentOpinion — structured output from any single agent
+# AgentOpinion — 单个 Agent 的结构化输出
 # ============================================================
 
 @dataclass
 class AgentOpinion:
-    """One agent's analysis opinion on a stock.
+    """某一 Agent 对标的的分析观点。
 
-    Every agent that participates in a multi-agent flow is expected
-    to produce one ``AgentOpinion`` appended to ``AgentContext.opinions``.
+    参与多 Agent 流水线的每个 Agent 应产出一条 ``AgentOpinion``，追加到 ``AgentContext.opinions``。
     """
 
     agent_name: str = ""
-    signal: str = ""  # free-form or Signal enum value
+    signal: str = ""  # 自由文本或 Signal 枚举取值
     confidence: float = 0.0  # 0.0 – 1.0
     reasoning: str = ""
     key_levels: Dict[str, float] = field(default_factory=dict)
-    # e.g. {"support": 1800.0, "resistance": 1950.0, "stop_loss": 1760.0}
+    # 例：{"support": 1800.0, "resistance": 1950.0, "stop_loss": 1760.0}
     raw_data: Dict[str, Any] = field(default_factory=dict)
-    # Any extra payload the agent wants to pass downstream
+    # Agent 希望向下游传递的额外载荷
     timestamp: float = 0.0
 
     def __post_init__(self) -> None:
-        """Clamp confidence to [0.0, 1.0]."""
+        """将 confidence 限制在 [0.0, 1.0]。"""
         self.confidence = max(0.0, min(1.0, float(self.confidence)))
 
     @property
     def signal_enum(self) -> Optional[Signal]:
-        """Try to parse ``signal`` into a ``Signal`` enum; None if unknown."""
+        """尝试把 ``signal`` 解析为 ``Signal``；无法识别则 None。"""
         try:
             return Signal(self.signal)
         except ValueError:
@@ -158,15 +154,14 @@ class AgentOpinion:
 
 
 # ============================================================
-# StageResult — return type from a single pipeline stage
+# StageResult — 单个流水线阶段的返回类型
 # ============================================================
 
 @dataclass
 class StageResult:
-    """Outcome of one pipeline stage (agent execution).
+    """某一阶段（一次 Agent 执行）的结果。
 
-    Used by the orchestrator to decide whether to continue,
-    retry, or abort.
+    orchestrator 据此决定继续、重试或中止。
     """
 
     stage_name: str = ""
@@ -184,15 +179,14 @@ class StageResult:
 
 
 # ============================================================
-# AgentRunStats — aggregate statistics for an entire run
+# AgentRunStats — 整次运行的汇总统计
 # ============================================================
 
 @dataclass
 class AgentRunStats:
-    """Aggregate run statistics across all agents in a pipeline.
+    """流水线内所有 Agent 的汇总统计。
 
-    Collected by the orchestrator and surfaced in logs, API responses,
-    and progress callbacks.
+    由 orchestrator 收集，用于日志、API 与进度回调展示。
     """
 
     total_stages: int = 0
@@ -206,10 +200,9 @@ class AgentRunStats:
     stage_results: List[StageResult] = field(default_factory=list)
 
     def record_stage(self, result: StageResult) -> None:
-        """Record a stage result and update counters.
+        """记录阶段结果并更新计数。
 
-        Handles all ``StageStatus`` values including RUNNING/PENDING
-        (counted but not classified as completed/failed/skipped).
+        覆盖所有 ``StageStatus``（含 RUNNING/PENDING：计入总数但不归入完成/失败/跳过）。
         """
         self.stage_results.append(result)
         self.total_stages += 1
@@ -223,7 +216,7 @@ class AgentRunStats:
             self.failed_stages += 1
         elif result.status == StageStatus.SKIPPED:
             self.skipped_stages += 1
-        # RUNNING / PENDING are counted in total_stages but not in any sub-counter
+        # RUNNING / PENDING 计入 total_stages，但不计入各子计数器
 
     def to_dict(self) -> Dict[str, Any]:
         return {

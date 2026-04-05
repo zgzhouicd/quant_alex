@@ -1,8 +1,5 @@
 # -*- coding: utf-8 -*-
-"""Backtest repository.
-
-Provides database access helpers for backtest tables.
-"""
+"""回测相关表的仓库层（数据库访问封装）。"""
 
 from __future__ import annotations
 
@@ -19,7 +16,7 @@ logger = logging.getLogger(__name__)
 
 
 class BacktestRepository:
-    """DB access layer for backtesting."""
+    """回测持久化访问。"""
 
     def __init__(self, db_manager: Optional[DatabaseManager] = None):
         self.db = db_manager or DatabaseManager.get_instance()
@@ -34,7 +31,7 @@ class BacktestRepository:
         engine_version: str,
         force: bool,
     ) -> List[AnalysisHistory]:
-        """Return AnalysisHistory rows eligible for backtest."""
+        """返回符合回测条件的 AnalysisHistory 行。"""
         cutoff_dt = datetime.now() - timedelta(days=min_age_days)
 
         with self.db.get_session() as session:
@@ -147,7 +144,7 @@ class BacktestRepository:
         analysis_date_to: Optional[date] = None,
         days: Optional[int] = None,
     ) -> int:
-        """Return the number of matching BacktestResult rows without loading them."""
+        """返回匹配的 BacktestResult 行数（不加载全部行）。"""
         with self.db.get_session() as session:
             conditions = self._build_result_conditions(
                 code=code,
@@ -197,7 +194,7 @@ class BacktestRepository:
             return list(rows)
 
     def upsert_summary(self, summary: BacktestSummary) -> None:
-        """Insert or replace summary row by unique key."""
+        """按唯一键插入或替换汇总行。"""
         with self.db.get_session() as session:
             existing = session.execute(
                 select(BacktestSummary)
@@ -301,7 +298,7 @@ class BacktestRepository:
         analysis_date_from: Optional[date] = None,
         analysis_date_to: Optional[date] = None,
     ) -> List[int]:
-        """Return sorted distinct eval_window_days for matching results."""
+        """返回匹配结果中去重、排序后的 eval_window_days 列表。"""
         with self.db.get_session() as session:
             conditions = self._build_result_conditions(
                 code=code,

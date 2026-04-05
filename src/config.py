@@ -1,13 +1,13 @@
 # -*- coding: utf-8 -*-
 """
 ===================================
-A股自选股智能分析系统 - 配置管理模块
+股票智能分析系统 - 配置管理模块
 ===================================
 
 职责：
-1. 使用单例模式管理全局配置
-2. 从 .env 文件加载敏感配置
-3. 提供类型安全的配置访问接口
+1. 单例 ``Config`` 管理全局运行时配置
+2. 从 ``.env`` 与环境变量加载敏感项
+3. 提供解析、校验与结构化告警（``ConfigIssue``）等接口
 """
 
 import json
@@ -30,13 +30,12 @@ logger = logging.getLogger(__name__)
 
 @dataclass
 class ConfigIssue:
-    """Structured configuration validation issue with a severity level.
+    """带严重级别的配置校验问题（结构化）。
 
-    Attributes:
-        severity: One of "error", "warning", or "info".
-        message:  Human-readable description of the issue.
-        field:    The environment variable / config field name most relevant to
-                  this issue (empty string when not applicable).
+    字段:
+        severity: ``error`` / ``warning`` / ``info`` 之一。
+        message:  给人读的问题描述。
+        field:    最相关的环境变量或配置项名（无可填项时为空串）。
     """
 
     severity: Literal["error", "warning", "info"]
@@ -59,7 +58,7 @@ NEWS_STRATEGY_WINDOWS: Dict[str, int] = {
 
 
 def parse_env_bool(value: Optional[str], default: bool = False) -> bool:
-    """Parse common truthy/falsey environment-style values."""
+    """解析常见真假风格的环境变量字符串（0/false/no/off 为假）。"""
     if value is None:
         return default
     normalized = value.strip().lower()
@@ -76,7 +75,7 @@ def parse_env_int(
     minimum: Optional[int] = None,
     maximum: Optional[int] = None,
 ) -> int:
-    """Parse an integer env value with warning + fallback semantics."""
+    """解析整型环境变量；非法时打日志并回退到 default。"""
     raw_value = value
     if raw_value is None or not str(raw_value).strip():
         parsed = int(default)
@@ -400,7 +399,7 @@ def setup_env(override: bool = False):
     """
     Initialize environment variables from .env file.
 
-    Args:
+    参数:
         override: If True, overwrite existing environment variables with values
                   from .env file. Set to True when reloading config after updates.
                   Default is False to preserve behavior on initial load where
@@ -627,11 +626,13 @@ class Config:
     markdown_to_image_max_chars: int = 15000  # 超过此长度不转换，避免超大图片
     md2img_engine: str = "wkhtmltoimage"  # wkhtmltoimage | markdown-to-file (Issue #455, better emoji support)
 
-    # 实时行情预取（Issue #455）：设为 false 可禁用，避免 efinance/akshare_em 全市场拉取
+    # 实时行情预取：A 股全市场预取已移除；仅保留开关供兼容
     prefetch_realtime_quotes: bool = True
 
     # === 数据库配置 ===
     database_path: str = "./data/stock_analysis.db"
+    # 若设置（如 postgresql+psycopg://...），则覆盖 sqlite 文件路径（见 get_db_url）
+    database_url: Optional[str] = None
     sqlite_wal_enabled: bool = True
     sqlite_busy_timeout_ms: int = 5000
     sqlite_write_retry_max: int = 3
@@ -653,6 +654,8 @@ class Config:
     
     # === 系统配置 ===
     max_workers: int = 3  # 低并发防封禁
+    # DataFetcherManager.get_daily_data 同时在飞上限；0 表示不额外限流（仅 max_workers 等）
+    data_fetch_max_in_flight: int = 0
     debug: bool = False
     http_proxy: Optional[str] = None  # HTTP 代理 (例如: http://127.0.0.1:10809)
     https_proxy: Optional[str] = None # HTTPS 代理
@@ -675,15 +678,8 @@ class Config:
     enable_realtime_technical_indicators: bool = True
     # 筹码分布开关（该接口不稳定，云端部署建议关闭）
     enable_chip_distribution: bool = True
-    # 东财接口补丁开关
-    enable_eastmoney_patch: bool = False
-    # 实时行情数据源优先级（逗号分隔）
-    # 推荐顺序：tencent > akshare_sina > efinance > akshare_em > tushare
-    # - tencent: 腾讯财经，有量比/换手率/市盈率等，单股查询稳定（推荐）
-    # - akshare_sina: 新浪财经，基本行情稳定，但无量比
-    # - efinance/akshare_em: 东财全量接口，数据最全但容易被封
-    # - tushare: Tushare Pro，需要2000积分，数据全面（付费用户可优先使用）
-    realtime_source_priority: str = "tencent,akshare_sina,efinance,akshare_em"
+    # 实时行情数据源优先级（逗号分隔；当前实现以 Yahoo / 长桥为主，此项多为兼容遗留）
+    realtime_source_priority: str = "yfinance,longbridge"
     # 实时行情缓存时间（秒）
     realtime_cache_ttl: int = 600
     # 熔断器冷却时间（秒）
@@ -712,16 +708,8 @@ class Config:
     portfolio_fx_update_enabled: bool = True
 
     # Discord 机器人状态
-    discord_bot_status: str = "A股智能分析 | /help"
+    discord_bot_status: str = "US markets analysis | /help"
 
-    # === 流控配置（防封禁关键参数）===
-    # Akshare 请求间隔范围（秒）
-    akshare_sleep_min: float = 2.0
-    akshare_sleep_max: float = 5.0
-    
-    # Tushare 每分钟最大请求数（免费配额）
-    tushare_rate_limit_per_minute: int = 80
-    
     # 重试配置
     max_retries: int = 3
     retry_base_delay: float = 1.0
@@ -845,7 +833,7 @@ class Config:
         if http_proxy:
             # 国内金融数据源域名列表
             domestic_domains = [
-                'eastmoney.com',   # 东方财富 (Efinance/Akshare)
+                'eastmoney.com',   # 东方财富（历史脚本/可选工具可能访问）
                 'sina.com.cn',     # 新浪财经 (Akshare)
                 '163.com',         # 网易财经 (Akshare)
                 'tushare.pro',     # Tushare
@@ -1271,6 +1259,7 @@ class Config:
             md2img_engine=cls._parse_md2img_engine(os.getenv('MD2IMG_ENGINE', 'wkhtmltoimage')),
             prefetch_realtime_quotes=os.getenv('PREFETCH_REALTIME_QUOTES', 'true').lower() == 'true',
             database_path=os.getenv('DATABASE_PATH', './data/stock_analysis.db'),
+            database_url=(os.getenv("DATABASE_URL") or "").strip() or None,
             sqlite_wal_enabled=os.getenv('SQLITE_WAL_ENABLED', 'true').lower() == 'true',
             sqlite_busy_timeout_ms=parse_env_int(
                 os.getenv('SQLITE_BUSY_TIMEOUT_MS'),
@@ -1304,6 +1293,12 @@ class Config:
             log_dir=os.getenv('LOG_DIR', './logs'),
             log_level=os.getenv('LOG_LEVEL', 'INFO'),
             max_workers=parse_env_int(os.getenv('MAX_WORKERS'), 3, field_name='MAX_WORKERS', minimum=1),
+            data_fetch_max_in_flight=parse_env_int(
+                os.getenv('DATA_FETCH_MAX_IN_FLIGHT'),
+                0,
+                field_name='DATA_FETCH_MAX_IN_FLIGHT',
+                minimum=0,
+            ),
             debug=os.getenv('DEBUG', 'false').lower() == 'true',
             config_validate_mode=os.getenv('CONFIG_VALIDATE_MODE', 'warn').lower(),
             http_proxy=os.getenv('HTTP_PROXY'),
@@ -1353,13 +1348,7 @@ class Config:
                 'ENABLE_REALTIME_TECHNICAL_INDICATORS', 'true'
             ).lower() == 'true',
             enable_chip_distribution=os.getenv('ENABLE_CHIP_DISTRIBUTION', 'true').lower() == 'true',
-            # 东财接口补丁开关
-            enable_eastmoney_patch=os.getenv('ENABLE_EASTMONEY_PATCH', 'false').lower() == 'true',
-            # 实时行情数据源优先级：
-            # - tencent: 腾讯财经，有量比/换手率/PE/PB等，单股查询稳定（推荐）
-            # - akshare_sina: 新浪财经，基本行情稳定，但无量比
-            # - efinance/akshare_em: 东财全量接口，数据最全但容易被封
-            # - tushare: Tushare Pro，需要2000积分，数据全面
+            # 实时行情数据源优先级（逗号分隔；默认 yfinance,longbridge）
             realtime_source_priority=cls._resolve_realtime_source_priority(),
             realtime_cache_ttl=parse_env_int(os.getenv('REALTIME_CACHE_TTL'), 600, field_name='REALTIME_CACHE_TTL', minimum=0),
             circuit_breaker_cooldown=parse_env_int(os.getenv('CIRCUIT_BREAKER_COOLDOWN'), 300, field_name='CIRCUIT_BREAKER_COOLDOWN', minimum=0),
@@ -1865,32 +1854,11 @@ class Config:
 
     @classmethod
     def _resolve_realtime_source_priority(cls) -> str:
-        """
-        Resolve realtime source priority with automatic tushare injection.
-
-        When TUSHARE_TOKEN is configured but REALTIME_SOURCE_PRIORITY is not
-        explicitly set, automatically prepend 'tushare' to the default priority
-        so that the paid data source is utilized for realtime quotes as well.
-        """
+        """Return REALTIME_SOURCE_PRIORITY env or default (Yahoo / Longbridge)."""
         explicit = os.getenv('REALTIME_SOURCE_PRIORITY')
-        default_priority = 'tencent,akshare_sina,efinance,akshare_em'
-
+        default_priority = 'yfinance,longbridge'
         if explicit:
-            # User explicitly set priority, respect it
             return explicit
-
-        tushare_token = os.getenv('TUSHARE_TOKEN', '').strip()
-        if tushare_token:
-            # Token configured but no explicit priority override
-            # Prepend tushare so the paid source is tried first
-            import logging
-            logger = logging.getLogger(__name__)
-            resolved = f'tushare,{default_priority}'
-            logger.info(
-                f"TUSHARE_TOKEN detected, auto-injecting tushare into realtime priority: {resolved}"
-            )
-            return resolved
-
         return default_priority
 
     @classmethod
@@ -1981,7 +1949,7 @@ class Config:
         - LLM_CHANNELS (env)
         - Legacy per-provider keys
 
-        Returns:
+        返回:
             List of ConfigIssue objects, each carrying a severity
             ("error" | "warning" | "info"), a human-readable message, and the
             primary environment variable / field name it relates to.
@@ -2273,7 +2241,7 @@ class Config:
         Internally delegates to validate_structured().  Callers that only need
         the human-readable strings can continue to use this method unchanged.
 
-        Returns:
+        返回:
             List of message strings, one per ConfigIssue.
         """
         return [issue.message for issue in self.validate_structured()]
@@ -2281,9 +2249,13 @@ class Config:
     def get_db_url(self) -> str:
         """
         获取 SQLAlchemy 数据库连接 URL
-        
-        自动创建数据库目录（如果不存在）
+
+        若配置了 ``database_url``（环境变量 ``DATABASE_URL``），直接使用；
+        否则使用 SQLite 文件路径并自动创建父目录。
         """
+        explicit = (self.database_url or "").strip()
+        if explicit:
+            return explicit
         db_path = Path(self.database_path)
         db_path.parent.mkdir(parents=True, exist_ok=True)
         return f"sqlite:///{db_path.absolute()}"

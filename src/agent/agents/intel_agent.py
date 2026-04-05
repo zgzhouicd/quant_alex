@@ -1,11 +1,11 @@
 # -*- coding: utf-8 -*-
 """
-IntelAgent — market intelligence & sentiment gathering specialist.
+IntelAgent：市场情报与舆情聚合专家。
 
-Responsible for:
-- Searching latest news, announcements, and macro events for the target instrument
-- Detecting risk signals (regulatory, liquidity, earnings, funding, liquidation)
-- Summarising sentiment and catalysts for US equities, futures, and perpetuals
+职责包括：
+- 检索标的最新新闻、公告与宏观事件
+- 识别监管、流动性、财报、资金与清算等风险信号
+- 归纳情绪与催化剂（面向美股、期货与永续等）
 """
 
 from __future__ import annotations

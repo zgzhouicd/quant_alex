@@ -1,16 +1,16 @@
 # -*- coding: utf-8 -*-
 """
-RiskAgent — dedicated risk screening specialist.
+RiskAgent：专项风险筛查专家。
 
-Responsible for:
-- Scanning for insider sell-downs, earnings warnings, regulatory actions
-- Checking valuation anomalies (PE/PB extremes)
-- Evaluating lock-up expiration risks
-- Producing risk flags that can override or downgrade signals from other agents
+职责包括：
+- 扫描高管减持、财报预警、监管动作等
+- 检查估值异常（PE/PB 极端）
+- 评估限售解禁等风险
+- 产出可降级或否决其他 Agent 信号的风险标记
 
-Risk flags use a two-level severity system:
-- **soft**: downgrades the signal and adds a visible warning
-- **hard**: vetoes buy signals entirely when risk override is enabled
+风险标记分两档严重程度：
+- **soft**：降级信号并展示可见警告
+- **hard**：在启用风险覆盖时可直接否决买入类信号
 """
 
 from __future__ import annotations

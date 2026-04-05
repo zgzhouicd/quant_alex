@@ -1,20 +1,26 @@
 # -*- coding: utf-8 -*-
 """
 ===================================
-美股 / 美期货 / 加密货币合约 — 主调度程序（CLI）
+主调度程序（CLI）
 ===================================
 
 职责：
-1. 协调各模块完成行情分析流程（默认产品范围见 ``STOCK_LIST`` / --stocks）
+1. 协调各模块完成行情分析流程（默认标的见 ``STOCK_LIST`` / ``--stocks``）
 2. 线程池调度与全局异常隔离
-3. 提供命令行入口
+3. 提供命令行入口；可选启动 FastAPI（``--serve`` / ``--serve-only``）
+
+产品范围（CLI）：
+    本入口仅接受美股、美期货、加密货币合约等代码；不接受 A 股 / 港股 / 北交所
+    旧式代码（校验见 ``is_legacy_cn_hk_symbol``）。多市场（A/港/美）分析请使用
+    Web 工作台或 HTTP API（``api/v1``），其行为与 CLI 不一致是有意为之。
 
 使用方式：
     python main.py              # 正常运行
-    python main.py --debug       # 调试模式
-    python main.py --dry-run     # 仅获取数据不分析
+    python main.py --debug      # 调试模式
+    python main.py --dry-run    # 仅获取数据不分析
 
-CLI 不接收 A股/港股/北交所代码；API 侧对标的有单独校验逻辑。
+``run_full_analysis`` 在正常完成时返回 ``True``，捕获到未处理异常时返回 ``False``；
+``main()`` 在后者情况下以退出码 1 结束，便于 cron / CI 判断成败。
 """
 import os
 from pathlib import Path
@@ -68,7 +74,7 @@ def _read_active_env_values() -> Optional[Dict[str, str]]:
 
     try:
         values = dotenv_values(env_path)
-    except Exception as exc:  # pragma: no cover - defensive branch
+    except Exception as exc:  # pragma: no cover - 防御性分支
         logger.warning("读取配置文件 %s 失败，继续沿用当前环境变量: %s", env_path, exc)
         return None
 
@@ -85,15 +91,14 @@ _RUNTIME_ENV_FILE_KEYS = {
     if key not in _INITIAL_PROCESS_ENV
 }
 
-# setup_env() already ran at import time above.
+# 上文 import 阶段已执行过 setup_env()。
 _env_bootstrapped = True
 
 
 def _bootstrap_environment() -> None:
-    """Load .env and apply optional local proxy settings.
+    """加载 .env 并按需应用本地代理环境变量。
 
-    Guarded to be idempotent so it can safely be called from lazy-import
-    paths used by API / bot consumers.
+    幂等保护：可从 API / Bot 等延迟 import 路径安全多次调用。
     """
     global _env_bootstrapped
     if _env_bootstrapped:
@@ -114,11 +119,10 @@ def _bootstrap_environment() -> None:
 
 
 def _setup_bootstrap_logging(debug: bool = False) -> None:
-    """Initialize stderr-only logging before config is loaded.
+    """在配置尚未加载时，仅向 stderr 初始化日志。
 
-    File handlers are deferred until ``config.log_dir`` is known (via the
-    subsequent ``setup_logging()`` call) so that healthy runs never create
-    log files in a hard-coded directory.
+    文件 Handler 推迟到已知 ``config.log_dir`` 后由 ``setup_logging()`` 再挂，
+    避免正常跑批在被写死的目录里落日志文件。
     """
     level = logging.DEBUG if debug else logging.INFO
     root = logging.getLogger()
@@ -136,10 +140,9 @@ def _setup_bootstrap_logging(debug: bool = False) -> None:
 
 
 def _get_stock_analysis_pipeline():
-    """Lazily import StockAnalysisPipeline for external consumers.
+    """为外部调用方延迟导入 StockAnalysisPipeline。
 
-    Also ensures env/proxy bootstrap has run so that API / bot consumers
-    that never call ``main()`` still get ``USE_PROXY`` applied.
+    同时确保已做过环境/代理 bootstrap，使未执行 ``main()`` 的 API / Bot 仍应用 ``USE_PROXY``。
     """
     _bootstrap_environment()
     from src.core.pipeline import StockAnalysisPipeline as _Pipeline
@@ -148,7 +151,7 @@ def _get_stock_analysis_pipeline():
 
 
 class _LazyPipelineDescriptor:
-    """Descriptor that resolves StockAnalysisPipeline on first attribute access."""
+    """描述符：首次访问模块属性时再解析出 StockAnalysisPipeline 类。"""
 
     _resolved = None
 
@@ -175,7 +178,7 @@ def __getattr__(name: str):
 
 
 def _reload_env_file_values_preserving_overrides() -> None:
-    """Refresh `.env`-managed env vars without clobbering process env overrides."""
+    """刷新由 `.env` 管理的变量，且不覆盖进程启动时已显式覆盖的环境变量。"""
     global _RUNTIME_ENV_FILE_KEYS
 
     latest_values = _read_active_env_values()
@@ -361,13 +364,13 @@ def _compute_trading_day_filter(
     stock_codes: List[str],
 ) -> Tuple[List[str], Optional[str], bool]:
     """
-    Compute filtered stock list and effective market review region (Issue #373).
+    计算交易日过滤后的标的列表与大盘复盘有效区域（Issue #373）。
 
-    Returns:
+    返回:
         (filtered_codes, effective_region, should_skip_all)
-        - effective_region None = use config default (check disabled)
-        - effective_region '' = all relevant markets closed, skip market review
-        - should_skip_all: skip entire run when no stocks and no market review to run
+        - effective_region 为 None：使用配置默认（等价于关闭本段检查逻辑中的区域推导）
+        - effective_region 为 ''：相关市场均休市，跳过大盘复盘
+        - should_skip_all：无个股可跑且无大盘复盘时应整批跳过
     """
     force_run = getattr(args, 'force_run', False)
     if force_run or not getattr(config, 'trading_day_check_enabled', True):
@@ -400,20 +403,23 @@ def _compute_trading_day_filter(
 def run_full_analysis(
     config: Config,
     args: argparse.Namespace,
-    stock_codes: Optional[List[str]] = None
-):
+    stock_codes: Optional[List[str]] = None,
+) -> bool:
     """
     执行完整的分析流程（个股 + 大盘复盘）
 
-    这是定时任务调用的主函数
+    这是定时任务调用的主函数。
+
+    返回:
+        True：流程按预期结束（含「非交易日整批跳过」等无需分析的情形）。
+        False：发生未捕获异常（已打日志）；调用方应使用非零退出码或报警。
     """
-    # Import pipeline modules outside the broad try/except so that import-time
-    # failures propagate to the caller instead of being silently swallowed.
+    # 将 pipeline 相关 import 放在大卡口 try/except 之外，避免 import 阶段失败被吞掉。
     from src.core.market_review import run_market_review
     from src.core.pipeline import StockAnalysisPipeline
     from src.services.instrument_resolver import is_legacy_cn_hk_symbol
 
-    # Issue #529: Hot-reload STOCK_LIST from .env on each scheduled run
+    # Issue #529：定时每次运行前从 .env 热读最新 STOCK_LIST
     if stock_codes is None:
         config.refresh_stock_list()
 
@@ -426,7 +432,7 @@ def run_full_analysis(
         )
 
     try:
-        # Issue #373: Trading day filter (per-stock, per-market)
+        # Issue #373：按标的、按市场做交易日过滤
         filtered_codes, effective_region, should_skip = _compute_trading_day_filter(
             config, args, effective_codes
         )
@@ -434,7 +440,7 @@ def run_full_analysis(
             logger.info(
                 "今日所有相关市场均为非交易日，跳过执行。可使用 --force-run 强制执行。"
             )
-            return
+            return True
         if set(filtered_codes) != set(effective_codes):
             skipped = set(effective_codes) - set(filtered_codes)
             logger.info("今日休市股票已跳过: %s", skipped)
@@ -593,15 +599,18 @@ def run_full_analysis(
         except Exception as e:
             logger.warning(f"自动回测失败（已忽略）: {e}")
 
+        return True
+
     except Exception as e:
         logger.exception(f"分析流程执行失败: {e}")
+        return False
 
 
 def start_api_server(host: str, port: int, config: Config) -> None:
     """
     在后台线程启动 FastAPI 服务
 
-    Args:
+    参数:
         host: 监听地址
         port: 监听端口
         config: 配置对象
@@ -625,13 +634,13 @@ def start_api_server(host: str, port: int, config: Config) -> None:
 
 
 def _is_truthy_env(var_name: str, default: str = "true") -> bool:
-    """Parse common truthy / falsy environment values."""
+    """解析常见真假环境变量取值（0/false/no/off 视为假）。"""
     value = os.getenv(var_name, default).strip().lower()
     return value not in {"0", "false", "no", "off"}
 
 
 def start_bot_stream_clients(config: Config) -> None:
-    """Start bot stream clients when enabled in config."""
+    """若配置启用，则在后台启动各 Bot Stream 客户端（钉钉/飞书等）。"""
     # 启动钉钉 Stream 客户端
     if config.dingtalk_stream_enabled:
         try:
@@ -664,7 +673,7 @@ def start_bot_stream_clients(config: Config) -> None:
 
 
 def _resolve_scheduled_stock_codes(stock_codes: Optional[List[str]]) -> Optional[List[str]]:
-    """Scheduled runs should always read the latest persisted watchlist."""
+    """定时任务应始终从持久化配置读取最新自选股，而非使用启动时快照。"""
     if stock_codes is not None:
         logger.warning(
             "定时模式下检测到 --stocks 参数；计划执行将忽略启动时股票快照，并在每次运行前重新读取最新的 STOCK_LIST。"
@@ -673,20 +682,19 @@ def _resolve_scheduled_stock_codes(stock_codes: Optional[List[str]]) -> Optional
 
 
 def _reload_runtime_config() -> Config:
-    """Reload config from the latest persisted `.env` values for scheduled runs."""
+    """定时触发前：按最新 `.env` 重载配置单例。"""
     _reload_env_file_values_preserving_overrides()
     Config.reset_instance()
     return get_config()
 
 
 def _build_schedule_time_provider(default_schedule_time: str):
-    """Read the latest schedule time directly from the active config file.
+    """从当前生效的配置来源读取最新定时时刻。
 
-    Fallback order:
-    1. Process-level env override (set before launch) → honour it.
-    2. Persisted config file value (written by WebUI) → use it.
-    3. Documented system default ``"18:00"`` → always fall back here so
-       that clearing SCHEDULE_TIME in WebUI correctly resets the schedule.
+    回退顺序：
+    1. 进程启动前已设置的进程级环境变量 → 优先尊重。
+    2. WebUI 等方式写入持久化配置文件的值 → 采用。
+    3. 系统文档约定默认 ``"18:00"`` → WebUI 清空 SCHEDULE_TIME 时应回到该默认。
     """
     from src.core.config_manager import ConfigManager
 
@@ -710,8 +718,8 @@ def main() -> int:
     """
     主入口函数
 
-    Returns:
-        退出码（0 表示成功）
+    返回:
+        进程退出码（0 表示成功）
     """
     # 解析命令行参数
     args = parse_arguments()
@@ -829,10 +837,9 @@ def main() -> int:
             from src.notification import NotificationService
             from src.search_service import SearchService
 
-            # Issue #373: Trading day check for market-review-only mode.
-            # Do NOT use _compute_trading_day_filter here: that helper checks
-            # config.market_review_enabled, which would wrongly block an
-            # explicit --market-review invocation when the flag is disabled.
+            # Issue #373：仅大盘复盘模式下的交易日判断。
+            # 勿在此调用 _compute_trading_day_filter：该函数依赖 config.market_review_enabled，
+            # 会在用户显式 --market-review 但配置关闭复盘时错误地拦截。
             effective_region = None
             if not getattr(args, 'force_run', False) and getattr(config, 'trading_day_check_enabled', True):
                 from src.core.trading_calendar import get_open_markets_today, compute_effective_region as _compute_region
@@ -886,9 +893,8 @@ def main() -> int:
             logger.info("模式: 定时任务")
             logger.info(f"每日执行时间: {config.schedule_time}")
 
-            # Determine whether to run immediately:
-            # Command line arg --no-run-immediately overrides config if present.
-            # Otherwise use config (defaults to True).
+            # 是否在启动时立即跑一轮：命令行 --no-run-immediately 优先于配置；
+            # 否则用配置（默认可为 True）。
             should_run_immediately = config.schedule_run_immediately
             if getattr(args, 'no_run_immediately', False):
                 should_run_immediately = False
@@ -901,7 +907,10 @@ def main() -> int:
 
             def scheduled_task():
                 runtime_config = _reload_runtime_config()
-                run_full_analysis(runtime_config, args, scheduled_stock_codes)
+                if not run_full_analysis(runtime_config, args, scheduled_stock_codes):
+                    logger.error(
+                        "定时分析任务未成功完成（run_full_analysis 返回失败，见上文异常日志）"
+                    )
 
             background_tasks = []
             if getattr(config, 'agent_event_monitor_enabled', False):
@@ -936,7 +945,8 @@ def main() -> int:
 
         # 模式3: 正常单次运行
         if config.run_immediately:
-            run_full_analysis(config, args, stock_codes)
+            if not run_full_analysis(config, args, stock_codes):
+                return 1
         else:
             logger.info("配置为不立即运行分析 (RUN_IMMEDIATELY=false)")
 

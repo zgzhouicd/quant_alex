@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""Portfolio risk service for concentration, drawdown and stop-loss proximity."""
+"""组合风险：集中度、回撤与止损距离等计算服务。"""
 
 from __future__ import annotations
 
@@ -12,7 +12,7 @@ from src.services.portfolio_service import PortfolioService
 
 
 class PortfolioRiskService:
-    """Compute portfolio risk blocks on top of replayed snapshot data."""
+    """在重放快照数据之上计算组合风险块。"""
 
     def __init__(
         self,

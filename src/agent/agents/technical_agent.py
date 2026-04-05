@@ -1,11 +1,11 @@
 # -*- coding: utf-8 -*-
 """
-TechnicalAgent — technical & price analysis specialist.
+TechnicalAgent：技术与价格分析专家。
 
-Responsible for:
-- Fetching realtime quotes and historical K-line data
-- Running technical indicators (trend, MA, volume, pattern)
-- Producing a structured opinion on trend/momentum/support-resistance
+职责包括：
+- 拉取实时行情与历史 K 线
+- 计算趋势、均线、量能、形态等指标
+- 输出结构化的趋势/动能/支撑阻力观点
 """
 
 from __future__ import annotations

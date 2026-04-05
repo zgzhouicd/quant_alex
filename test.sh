@@ -71,8 +71,7 @@ check_python() {
 # 检查依赖
 check_deps() {
     info "检查依赖..."
-    python3 -c "import yfinance" 2>/dev/null || { warn "yfinance 未安装，美股测试可能失败"; }
-    python3 -c "import akshare" 2>/dev/null || { warn "akshare 未安装，A股/港股测试可能失败"; }
+    python3 -c "import yfinance" 2>/dev/null || { warn "yfinance 未安装，行情测试可能失败"; }
     success "依赖检查完成"
 }
 
@@ -164,7 +163,7 @@ test_code_recognition() {
     python3 << 'PYTEST'
 import sys
 sys.path.insert(0, '.')
-from data_provider.akshare_fetcher import _is_hk_code, _is_us_code
+from data_provider.us_index_mapping import is_hk_stock_code, is_us_stock_code
 
 test_cases = [
     # (代码, 预期HK, 预期US, 描述)
@@ -181,8 +180,8 @@ print("\n股票代码识别测试:")
 print("-" * 60)
 all_pass = True
 for code, exp_hk, exp_us, desc in test_cases:
-    is_hk = _is_hk_code(code)
-    is_us = _is_us_code(code)
+    is_hk = is_hk_stock_code(code)
+    is_us = is_us_stock_code(code)
     hk_ok = is_hk == exp_hk
     us_ok = is_us == exp_us
     status = "✅" if (hk_ok and us_ok) else "❌"
@@ -243,7 +242,6 @@ test_syntax() {
     info "检查所有Python文件语法..."
 
     python3 -m py_compile main.py src/config.py src/notification.py \
-        data_provider/akshare_fetcher.py \
         data_provider/yfinance_fetcher.py \
         bot/commands/analyze.py
 

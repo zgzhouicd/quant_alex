@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """
 ===================================
-A股自选股智能分析系统 - 存储层
+股票智能分析系统 - 存储层（SQLite / PostgreSQL 等）
 ===================================
 
 职责：
@@ -42,6 +42,7 @@ from sqlalchemy import (
     desc,
     event,
     func,
+    update,
 )
 from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 from sqlalchemy.orm import (
@@ -101,7 +102,7 @@ class StockDaily(Base):
     volume_ratio = Column(Float)  # 量比
     
     # 数据来源
-    data_source = Column(String(50))  # 记录数据来源（如 AkshareFetcher）
+    data_source = Column(String(50))  # 记录数据来源（如 YfinanceFetcher / LongbridgeFetcher）
     
     # 更新时间
     created_at = Column(DateTime, default=datetime.now)
@@ -271,6 +272,33 @@ class AnalysisHistory(Base):
             'take_profit': self.take_profit,
             'created_at': self.created_at.isoformat() if self.created_at else None,
         }
+
+
+class AnalysisAsyncTask(Base):
+    """异步分析任务（API 队列）持久化行，用于跨重启查询与去重辅助。"""
+
+    __tablename__ = "analysis_async_tasks"
+
+    task_id = Column(String(64), primary_key=True)
+    stock_code = Column(String(32), nullable=False, index=True)
+    dedupe_key = Column(String(64), nullable=False, index=True)
+    status = Column(String(16), nullable=False, index=True)
+    report_type = Column(String(16), nullable=False, default="detailed")
+    progress = Column(Integer, nullable=False, default=0)
+    message = Column(Text)
+    error = Column(Text)
+    result_json = Column(Text)
+    instrument_json = Column(Text)
+    stock_name = Column(String(128))
+    original_query = Column(Text)
+    selection_source = Column(String(64))
+    created_at = Column(DateTime, default=datetime.now, index=True)
+    started_at = Column(DateTime)
+    completed_at = Column(DateTime)
+
+    __table_args__ = (
+        Index("ix_async_tasks_dedupe_status", "dedupe_key", "status"),
+    )
 
 
 class BacktestResult(Base):
@@ -648,7 +676,7 @@ class DatabaseManager:
         """
         初始化数据库管理器
         
-        Args:
+        参数:
             db_url: 数据库连接 URL（可选，默认从配置读取）
         """
         if getattr(self, '_initialized', False):
@@ -721,7 +749,7 @@ class DatabaseManager:
 
         确保程序退出时关闭所有数据库连接，避免 ResourceWarning
 
-        Args:
+        参数:
             engine: SQLAlchemy 引擎对象
         """
         try:
@@ -823,8 +851,12 @@ class DatabaseManager:
     
     def get_session(self) -> Session:
         """
-        获取数据库 Session
-        
+        获取数据库 Session。
+
+        .. note::
+            新代码优先使用 :meth:`session_scope`，以便统一 commit/rollback；
+            ``get_session`` 仍保留供存量调用与 SQLAlchemy 会话协议兼容。
+
         使用示例:
             with db.get_session() as session:
                 # 执行查询
@@ -857,23 +889,34 @@ class DatabaseManager:
     
     def has_today_data(self, code: str, target_date: Optional[date] = None) -> bool:
         """
-        检查是否已有指定日期的数据
-        
-        用于断点续传逻辑：如果已有数据则跳过网络请求
-        
-        Args:
+        检查是否已有指定日期的日线数据。
+
+        用于断点续传：在库中已存在对应 ``target_date`` 行情行时可跳过拉取。
+
+        参数:
             code: 股票代码
-            target_date: 目标日期（默认今天）
-            
-        Returns:
-            是否存在数据
+            target_date: 目标日期；若省略，则按代码推断市场并使用
+                ``get_effective_trading_date``（与 pipeline 断点续传语义对齐），
+                而非简单 ``date.today()``，避免周末/节假日误判为「无数据」。
+                若传入日历日，将经 ``normalize_checkpoint_date_for_stock`` 归一化为
+                该市场下的有效行情日关键字（与无参路径一致）。
+
+        返回:
+            是否存在该日期的 ``stock_daily`` 行
         """
         if target_date is None:
-            target_date = date.today()
-        # 注意：这里的 target_date 语义是“自然日”，而不是“最新交易日”。
-        # 在周末/节假日/非交易日运行时，即使数据库已有最新交易日数据，这里也会返回 False。
-        # 该行为目前保留（按需求不改逻辑）。
-        
+            from src.core.trading_calendar import (
+                get_effective_trading_date,
+                get_market_for_stock,
+            )
+
+            market = get_market_for_stock((code or "").strip())
+            target_date = get_effective_trading_date(market, current_time=None)
+        else:
+            from src.core.trading_calendar import normalize_checkpoint_date_for_stock
+
+            target_date = normalize_checkpoint_date_for_stock(code, target_date)
+
         with self.get_session() as session:
             result = session.execute(
                 select(StockDaily).where(
@@ -885,6 +928,137 @@ class DatabaseManager:
             ).scalar_one_or_none()
             
             return result is not None
+
+    def reconcile_async_analysis_tasks(self) -> int:
+        """
+        将仍为 pending/processing 的异步分析任务标为失败（API 进程重启后调用）。
+
+        返回:
+            更新的行数
+        """
+        now = datetime.now()
+        with self.get_session() as session:
+            stmt = (
+                update(AnalysisAsyncTask)
+                .where(AnalysisAsyncTask.status.in_(("pending", "processing")))
+                .values(
+                    status="failed",
+                    completed_at=now,
+                    error="interrupted_by_restart",
+                    message="interrupted_by_restart",
+                )
+            )
+            res = session.execute(stmt)
+            session.commit()
+            try:
+                return int(res.rowcount or 0)
+            except Exception:
+                return 0
+
+    def upsert_analysis_async_task(
+        self,
+        *,
+        task_id: str,
+        stock_code: str,
+        dedupe_key: str,
+        status: str,
+        report_type: str = "detailed",
+        progress: int = 0,
+        message: Optional[str] = None,
+        error: Optional[str] = None,
+        result: Optional[Dict[str, Any]] = None,
+        instrument: Optional[Dict[str, Any]] = None,
+        stock_name: Optional[str] = None,
+        original_query: Optional[str] = None,
+        selection_source: Optional[str] = None,
+        created_at: Optional[datetime] = None,
+        started_at: Optional[datetime] = None,
+        completed_at: Optional[datetime] = None,
+    ) -> None:
+        """插入或更新 API 异步任务行（与 :class:`AnalysisAsyncTask` 对齐）。"""
+        with self.get_session() as session:
+            row = session.get(AnalysisAsyncTask, task_id)
+            if row is None:
+                row = AnalysisAsyncTask(
+                    task_id=task_id,
+                    stock_code=stock_code,
+                    dedupe_key=dedupe_key,
+                    status=status,
+                    report_type=report_type,
+                    progress=progress,
+                    created_at=created_at or datetime.now(),
+                )
+                session.add(row)
+            row.stock_code = stock_code
+            row.dedupe_key = dedupe_key
+            row.status = status
+            row.report_type = report_type
+            row.progress = progress
+            row.message = message
+            row.error = error
+            row.result_json = (
+                json.dumps(result, ensure_ascii=False) if result is not None else None
+            )
+            row.instrument_json = (
+                json.dumps(instrument, ensure_ascii=False)
+                if instrument is not None
+                else None
+            )
+            row.stock_name = stock_name
+            row.original_query = original_query
+            row.selection_source = selection_source
+            if started_at is not None:
+                row.started_at = started_at
+            if completed_at is not None:
+                row.completed_at = completed_at
+            elif status in ("completed", "failed") and row.completed_at is None:
+                row.completed_at = datetime.now()
+            session.commit()
+
+    def get_analysis_async_task_row(self, task_id: str) -> Optional[Dict[str, Any]]:
+        """返回持久化的异步任务字段字典，供队列 hydrate 使用。"""
+        with self.get_session() as session:
+            row = session.get(AnalysisAsyncTask, task_id)
+            if row is None:
+                return None
+            return {
+                "task_id": row.task_id,
+                "stock_code": row.stock_code,
+                "dedupe_key": row.dedupe_key,
+                "status": row.status,
+                "report_type": row.report_type,
+                "progress": row.progress,
+                "message": row.message,
+                "error": row.error,
+                "result_json": row.result_json,
+                "instrument_json": row.instrument_json,
+                "stock_name": row.stock_name,
+                "original_query": row.original_query,
+                "selection_source": row.selection_source,
+                "created_at": row.created_at,
+                "started_at": row.started_at,
+                "completed_at": row.completed_at,
+            }
+
+    def find_active_async_task_id_by_dedupe(self, dedupe_key: str) -> Optional[str]:
+        """若存在 pending/processing 的任务则返回其 task_id。"""
+        with self.get_session() as session:
+            return session.execute(
+                select(AnalysisAsyncTask.task_id).where(
+                    and_(
+                        AnalysisAsyncTask.dedupe_key == dedupe_key,
+                        AnalysisAsyncTask.status.in_(("pending", "processing")),
+                    )
+                ).limit(1)
+            ).scalar_one_or_none()
+
+    def delete_analysis_async_task(self, task_id: str) -> None:
+        """删除异步任务行（提交回滚等场景）。"""
+        with self.get_session() as session:
+            row = session.get(AnalysisAsyncTask, task_id)
+            if row is not None:
+                session.delete(row)
+            session.commit()
     
     def get_latest_data(
         self, 
@@ -896,11 +1070,11 @@ class DatabaseManager:
         
         用于计算"相比昨日"的变化
         
-        Args:
+        参数:
             code: 股票代码
             days: 获取天数
             
-        Returns:
+        返回:
             StockDaily 对象列表（按日期降序）
         """
         with self.get_session() as session:
@@ -1149,11 +1323,11 @@ class DatabaseManager:
         """
         根据 query_id 获取新闻情报列表
 
-        Args:
+        参数:
             query_id: 分析记录唯一标识
             limit: 返回数量限制
 
-        Returns:
+        返回:
             NewsIntel 列表（按发布时间或抓取时间倒序）
         """
         from sqlalchemy import func
@@ -1276,14 +1450,14 @@ class DatabaseManager:
         """
         分页查询分析历史记录（带总数）
         
-        Args:
+        参数:
             code: 股票代码筛选
             start_date: 开始日期（含）
             end_date: 结束日期（含）
             offset: 偏移量（跳过前 N 条）
             limit: 每页数量
             
-        Returns:
+        返回:
             Tuple[List[AnalysisHistory], int]: (记录列表, 总数)
         """
         from sqlalchemy import func
@@ -1326,10 +1500,10 @@ class DatabaseManager:
         由于 query_id 可能重复（批量分析时多条记录共享同一 query_id），
         使用主键 ID 确保精确查询唯一记录。
         
-        Args:
+        参数:
             record_id: 分析历史记录的主键 ID
             
-        Returns:
+        返回:
             AnalysisHistory 对象，不存在返回 None
         """
         with self.get_session() as session:
@@ -1344,23 +1518,24 @@ class DatabaseManager:
 
         同时清理依赖这些历史记录的回测结果，避免外键约束失败。
 
-        Args:
+        参数:
             record_ids: 要删除的历史记录主键 ID 列表
 
-        Returns:
+        返回:
             实际删除的历史记录数量
         """
         ids = sorted({int(record_id) for record_id in record_ids if record_id is not None})
         if not ids:
             return 0
 
-        with self.session_scope() as session:
+        with self.get_session() as session:
             session.execute(
                 delete(BacktestResult).where(BacktestResult.analysis_history_id.in_(ids))
             )
             result = session.execute(
                 delete(AnalysisHistory).where(AnalysisHistory.id.in_(ids))
             )
+            session.commit()
             return result.rowcount or 0
 
     def get_latest_analysis_by_query_id(self, query_id: str) -> Optional[AnalysisHistory]:
@@ -1369,10 +1544,10 @@ class DatabaseManager:
 
         query_id 在批量分析时可能重复，故返回最近创建的一条。
 
-        Args:
+        参数:
             query_id: 分析记录关联的 query_id
 
-        Returns:
+        返回:
             AnalysisHistory 对象，不存在返回 None
         """
         with self.get_session() as session:
@@ -1393,12 +1568,12 @@ class DatabaseManager:
         """
         获取指定日期范围的数据
         
-        Args:
+        参数:
             code: 股票代码
             start_date: 开始日期
             end_date: 结束日期
             
-        Returns:
+        返回:
             StockDaily 对象列表
         """
         with self.get_session() as session:
@@ -1430,12 +1605,12 @@ class DatabaseManager:
         - 同一批次内若存在重复日期，以最后一条记录为准
         - SQLite 分支按 chunk 写入以避免绑定参数上限
         
-        Args:
+        参数:
             df: 包含日线数据的 DataFrame
             code: 股票代码
             data_source: 数据来源名称
             
-        Returns:
+        返回:
             本次实际新增的记录数（不含更新）
         """
         if df is None or df.empty:
@@ -1578,11 +1753,11 @@ class DatabaseManager:
         
         返回今日数据 + 昨日数据的对比信息
         
-        Args:
+        参数:
             code: 股票代码
             target_date: 目标日期（默认今天）
             
-        Returns:
+        返回:
             包含今日数据、昨日对比等信息的字典
         """
         if target_date is None:
@@ -1819,40 +1994,30 @@ class DatabaseManager:
             "take_profit": self._parse_sniper_value(raw_points.get("take_profit")),
         }
 
-    @staticmethod
-    def _find_sniper_in_dashboard(d: dict) -> Optional[Dict[str, Any]]:
+    _SNIPER_DASHBOARD_KEYS = ("ideal_buy", "secondary_buy", "stop_loss", "take_profit")
+
+    @classmethod
+    def _find_sniper_in_dashboard(
+        cls,
+        d: dict,
+        _depth: int = 0,
+    ) -> Optional[Dict[str, Any]]:
         """
-        Recursively search for sniper_points in a dashboard dict.
-        Handles various nesting: dashboard.battle_plan.sniper_points,
-        dashboard.dashboard.battle_plan.sniper_points, etc.
+        Recursively search for a dict that carries sniper / battle-plan price keys.
+
+        Depth is capped to avoid pathological LLM output trees.
         """
-        if not isinstance(d, dict):
+        if not isinstance(d, dict) or _depth > 8:
             return None
 
-        # Direct: d has sniper_points keys at top level
-        if "ideal_buy" in d:
+        if any(k in d for k in cls._SNIPER_DASHBOARD_KEYS):
             return d
 
-        # d.sniper_points
-        sp = d.get("sniper_points")
-        if isinstance(sp, dict) and sp:
-            return sp
-
-        # d.battle_plan.sniper_points
-        bp = d.get("battle_plan")
-        if isinstance(bp, dict):
-            sp = bp.get("sniper_points")
-            if isinstance(sp, dict) and sp:
-                return sp
-
-        # d.dashboard.battle_plan.sniper_points (double-nested)
-        inner = d.get("dashboard")
-        if isinstance(inner, dict):
-            bp = inner.get("battle_plan")
-            if isinstance(bp, dict):
-                sp = bp.get("sniper_points")
-                if isinstance(sp, dict) and sp:
-                    return sp
+        for value in d.values():
+            if isinstance(value, dict):
+                found = cls._find_sniper_in_dashboard(value, _depth + 1)
+                if found is not None:
+                    return found
 
         return None
 
@@ -1875,19 +2040,20 @@ class DatabaseManager:
         """
         保存 Agent 对话消息
         """
-        with self.session_scope() as session:
+        with self.get_session() as session:
             msg = ConversationMessage(
                 session_id=session_id,
                 role=role,
                 content=content
             )
             session.add(msg)
+            session.commit()
 
     def get_conversation_history(self, session_id: str, limit: int = 20) -> List[Dict[str, Any]]:
         """
         获取 Agent 对话历史
         """
-        with self.session_scope() as session:
+        with self.get_session() as session:
             stmt = select(ConversationMessage).filter(
                 ConversationMessage.session_id == session_id
             ).order_by(ConversationMessage.created_at.desc()).limit(limit)
@@ -1898,7 +2064,7 @@ class DatabaseManager:
 
     def conversation_session_exists(self, session_id: str) -> bool:
         """Return True when at least one message exists for the given session."""
-        with self.session_scope() as session:
+        with self.get_session() as session:
             stmt = (
                 select(ConversationMessage.id)
                 .where(ConversationMessage.session_id == session_id)
@@ -1915,7 +2081,7 @@ class DatabaseManager:
         """
         获取聊天会话列表（从 conversation_messages 聚合）
 
-        Args:
+        参数:
             limit: Maximum number of sessions to return.
             session_prefix: If provided, only return sessions whose session_id
                 starts with this prefix.  Used for per-user isolation (e.g.
@@ -1923,12 +2089,12 @@ class DatabaseManager:
             extra_session_ids: Optional exact session ids to include in
                 addition to the scoped prefix.
 
-        Returns:
+        返回:
             按最近活跃时间倒序的会话列表，每条包含 session_id, title, message_count, last_active
         """
         from sqlalchemy import func
 
-        with self.session_scope() as session:
+        with self.get_session() as session:
             normalized_prefix = None
             if session_prefix:
                 normalized_prefix = session_prefix if session_prefix.endswith(":") else f"{session_prefix}:"
@@ -1988,7 +2154,7 @@ class DatabaseManager:
         """
         获取单个会话的完整消息列表（用于前端恢复历史）
         """
-        with self.session_scope() as session:
+        with self.get_session() as session:
             stmt = (
                 select(ConversationMessage)
                 .where(ConversationMessage.session_id == session_id)
@@ -2010,15 +2176,16 @@ class DatabaseManager:
         """
         删除指定会话的所有消息
 
-        Returns:
+        返回:
             删除的消息数
         """
-        with self.session_scope() as session:
+        with self.get_session() as session:
             result = session.execute(
                 delete(ConversationMessage).where(
                     ConversationMessage.session_id == session_id
                 )
             )
+            session.commit()
             return result.rowcount
 
     # ------------------------------------------------------------------
@@ -2043,8 +2210,9 @@ class DatabaseManager:
             completion_tokens=completion_tokens,
             total_tokens=total_tokens,
         )
-        with self.session_scope() as session:
+        with self.get_session() as session:
             session.add(row)
+            session.commit()
 
     def get_llm_usage_summary(
         self,
@@ -2058,7 +2226,7 @@ class DatabaseManager:
           by_call_type: list of {call_type, calls, total_tokens},
           by_model:     list of {model, calls, total_tokens}
         """
-        with self.session_scope() as session:
+        with self.get_session() as session:
             base_filter = and_(
                 LLMUsage.called_at >= from_dt,
                 LLMUsage.called_at <= to_dt,

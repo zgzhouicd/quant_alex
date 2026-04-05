@@ -127,7 +127,7 @@ export interface ValidateSystemConfigResponse {
   issues: ConfigValidationIssue[];
 }
 
-export interface TestLLMChannelRequest {
+export interface LLMChannelProbeRequest {
   name: string;
   protocol: string;
   baseUrl?: string;
@@ -137,7 +137,7 @@ export interface TestLLMChannelRequest {
   timeoutSeconds?: number;
 }
 
-export interface TestLLMChannelResponse {
+export interface LLMChannelProbeResponse {
   success: boolean;
   message: string;
   error?: string | null;

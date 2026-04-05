@@ -98,9 +98,9 @@ class MarketAnalyzer:
         """
         初始化大盘分析器
 
-        Args:
+        参数:
             search_service: 搜索服务实例
-            analyzer: AI分析器实例（用于调用LLM）
+            analyzer: AI 分析器实例（用于调用 LLM）
             region: 固定为美股指数复盘（cn/hk 已移除，传入其它值亦按 us）
         """
         self.config = get_config()
@@ -114,8 +114,8 @@ class MarketAnalyzer:
     def get_market_overview(self) -> MarketOverview:
         """
         获取市场概览数据
-        
-        Returns:
+
+        返回:
             MarketOverview: 市场概览数据对象
         """
         today = datetime.now().strftime('%Y-%m-%d')
@@ -239,8 +239,8 @@ class MarketAnalyzer:
     def search_market_news(self) -> List[Dict]:
         """
         搜索市场新闻
-        
-        Returns:
+
+        返回:
             新闻列表
         """
         if not self.search_service:
@@ -278,12 +278,12 @@ class MarketAnalyzer:
     def generate_market_review(self, overview: MarketOverview, news: List) -> str:
         """
         使用大模型生成大盘复盘报告
-        
-        Args:
+
+        参数:
             overview: 市场概览数据
-            news: 市场新闻列表 (SearchResult 对象列表)
-            
-        Returns:
+            news: 市场新闻列表（SearchResult 对象列表）
+
+        返回:
             大盘复盘报告文本
         """
         if not self.analyzer or not self.analyzer.is_available():
@@ -306,7 +306,7 @@ class MarketAnalyzer:
             return self._generate_template_review(overview, news)
     
     def _inject_data_into_review(self, review: str, overview: MarketOverview) -> str:
-        """Inject structured data tables into the corresponding LLM prose sections."""
+        """将结构化数据表插入到模型正文对应标题段之后。"""
         import re
 
         # Build data blocks
@@ -330,7 +330,7 @@ class MarketAnalyzer:
 
     @staticmethod
     def _insert_after_section(text: str, heading_pattern: str, block: str) -> str:
-        """Insert a data block at the end of a markdown section (before the next ### heading)."""
+        """在 Markdown 小节末尾（下一级 ### 标题之前）插入数据块。"""
         import re
         # Find the heading
         match = re.search(heading_pattern, text)
@@ -348,7 +348,7 @@ class MarketAnalyzer:
         return text[:insert_pos].rstrip() + '\n\n' + block + '\n\n' + text[insert_pos:].lstrip('\n')
 
     def _build_stats_block(self, overview: MarketOverview) -> str:
-        """Build market statistics block."""
+        """组装涨跌统计等市场概况行（引用块）。"""
         has_stats = overview.up_count or overview.down_count or overview.total_amount
         if not has_stats:
             return ""
@@ -381,7 +381,7 @@ class MarketAnalyzer:
         return "\n".join(lines)
 
     def _build_sector_block(self, overview: MarketOverview) -> str:
-        """Build sector ranking block."""
+        """组装领涨/领跌板块引用块。"""
         if not overview.top_sectors and not overview.bottom_sectors:
             return ""
         lines = []
@@ -673,8 +673,8 @@ Output the report content directly, no extra commentary.
     def run_daily_review(self) -> str:
         """
         执行每日大盘复盘流程
-        
-        Returns:
+
+        返回:
             复盘报告文本
         """
         logger.info("========== 开始大盘复盘分析 ==========")
