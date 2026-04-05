@@ -374,7 +374,7 @@ def run_agent_loop(
     Both the legacy ``AgentExecutor`` and any future multi-agent runner
     should delegate here.
 
-    Args:
+    参数:
         messages: The initial message list (system + user + optional history).
                   **Mutated in-place** — tool results are appended.
         tool_registry: Registry of callable tools.
@@ -385,7 +385,7 @@ def run_agent_loop(
         max_wall_clock_seconds: Optional overall timeout budget for the loop.
         tool_call_timeout_seconds: Optional timeout for one parallel tool batch.
 
-    Returns:
+    返回:
         A :class:`RunLoopResult` with the final content, stats, and the
         (mutated) messages list.
     """

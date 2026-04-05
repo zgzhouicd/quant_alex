@@ -139,13 +139,13 @@ def load_skill_from_yaml(filepath: Union[str, Path]) -> Skill:
     The YAML file must contain at minimum: ``name``, ``display_name``,
     ``description``, and ``instructions``. All values are natural language text.
 
-    Args:
+    参数:
         filepath: Path to the ``.yaml`` file.
 
-    Returns:
+    返回:
         A ``Skill`` instance with ``enabled=False``.
 
-    Raises:
+    抛出:
         ValueError: If required fields are missing or the file is invalid.
         FileNotFoundError: If the file does not exist.
     """
@@ -274,10 +274,10 @@ def load_skills_from_directory(directory: Union[str, Path]) -> List[Skill]:
     nested ``SKILL.md`` bundles, sorted alphabetically.
     Skips files that fail to parse (logs a warning).
 
-    Args:
+    参数:
         directory: Path to the directory containing skill definitions.
 
-    Returns:
+    返回:
         List of ``Skill`` instances (all disabled by default).
     """
     directory = Path(directory)
@@ -340,7 +340,7 @@ class SkillManager:
     def load_builtin_skills(self) -> int:
         """Load all built-in skills from the compatibility `strategies/` directory.
 
-        Returns:
+        返回:
             Number of skills loaded.
         """
         skills_dir = _BUILTIN_SKILLS_DIR
@@ -361,11 +361,11 @@ class SkillManager:
 
         Custom skills override built-in ones if names conflict.
 
-        Args:
+        参数:
             directory: Path to the custom skill directory.
                        If None or empty, does nothing.
 
-        Returns:
+        返回:
             Number of skills loaded.
         """
         if not directory:
@@ -410,7 +410,7 @@ class SkillManager:
     def activate(self, skill_names: List[str]) -> None:
         """Activate specific skills by name. Deactivate all others.
 
-        Args:
+        参数:
             skill_names: List of skill names to activate.
                          If ["all"], activate everything.
         """

@@ -22,11 +22,11 @@ logger = logging.getLogger(__name__)
 
 
 class DecisionAgent(BaseAgent):
-    """Synthesise prior agent opinions into the final dashboard."""
+    """将前置各 Agent 观点汇总为最终决策仪表盘（或对话答复）。"""
 
     agent_name = "decision"
-    max_steps = 3  # pure synthesis, should not need many tool calls
-    tool_names: Optional[List[str]] = []  # no tool access — works from context only
+    max_steps = 3  # 纯综合阶段，通常不需要多轮工具调用
+    tool_names: Optional[List[str]] = []  # 禁用工具，仅依赖上下文与观点
 
     @staticmethod
     def _is_chat_mode(ctx: AgentContext) -> bool:
@@ -57,7 +57,7 @@ Requirements:
         if self.skill_instructions:
             skills = f"\n## Active Trading Skills\n\n{self.skill_instructions}\n"
 
-        # Read instrument context for asset-class-aware prompt injection
+        # 读取标的上下文，按资产类别注入提示片段
         instrument = ctx.get_data("instrument") or {}
         asset_class = str(instrument.get("asset_class") or "us_equity").strip().lower()
         session_state = ctx.get_data("session_state") or {}
@@ -181,7 +181,7 @@ Rules:
                 "",
             ]
 
-        # Feed prior opinions
+        # 注入前置 Agent 观点
         if ctx.opinions:
             parts.append("## Agent Opinions")
             for op in ctx.opinions:
@@ -197,14 +197,14 @@ Rules:
                         parts.append(f"Extra data: {json.dumps(extra_keys, ensure_ascii=False, default=str)}")
                 parts.append("")
 
-        # Feed risk flags
+        # 注入风险标记
         if ctx.risk_flags:
             parts.append("## Risk Flags")
             for rf in ctx.risk_flags:
                 parts.append(f"- [{rf.get('severity', 'medium')}] {rf.get('category', '')}: {rf.get('description', '')}")
             parts.append("")
 
-        # Skill meta
+        # 技能 / 策略元信息
         requested_skills = ctx.meta.get("skills_requested") or ctx.meta.get("strategies_requested")
         if requested_skills:
             parts.append(f"## Skills: {', '.join(requested_skills)}")
@@ -220,7 +220,7 @@ Rules:
         return "\n".join(parts)
 
     def post_process(self, ctx: AgentContext, raw_text: str) -> Optional[AgentOpinion]:
-        """Store the parsed dashboard in ctx.meta; also return an opinion."""
+        """解析仪表盘 JSON 写入上下文，并返回对应的 :class:`AgentOpinion`。"""
         if self._is_chat_mode(ctx):
             text = (raw_text or "").strip()
             if not text:
@@ -244,16 +244,16 @@ Rules:
 
         dashboard = parse_dashboard_json(raw_text)
         if dashboard:
-            # Normalize direction (primary field from new prompt)
+            # 规范化 direction（新提示词下的主字段）
             raw_direction = str(dashboard.get("direction") or "").strip().lower()
             if raw_direction in {"long", "short", "neutral"}:
                 dashboard["direction"] = raw_direction
-                # Derive decision_type from direction for backward compat
+                # 由 direction 推导 decision_type，兼容旧字段
                 dashboard["decision_type"] = normalize_decision_signal(
                     infer_decision_type_from_direction(raw_direction, default="hold")
                 )
             else:
-                # Fallback: normalize whatever decision_type the model emitted
+                # 回退：仅规范化模型输出的 decision_type
                 dashboard["decision_type"] = normalize_decision_signal(
                     dashboard.get("decision_type", "hold")
                 )
@@ -275,7 +275,7 @@ Rules:
                 raw_data=dashboard,
             )
         else:
-            # Even if JSON parsing fails, store the raw text for downstream use
+            # JSON 解析失败时也保留原文，供下游兜底
             ctx.set_data("final_dashboard_raw", raw_text)
             logger.warning("[DecisionAgent] failed to parse dashboard JSON")
             return None

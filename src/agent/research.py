@@ -76,14 +76,14 @@ class ResearchAgent:
     ) -> ResearchResult:
         """Execute a deep research task.
 
-        Args:
+        参数:
             query: The research question or topic.
             context: Optional context (stock_code, stock_name, etc.).
             progress_callback: Optional progress updates.
             timeout_seconds: Optional overall time budget for the whole
                 research task.
 
-        Returns:
+        返回:
             A :class:`ResearchResult` containing the report and metadata.
         """
         started_at = time.monotonic()

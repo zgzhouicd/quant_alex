@@ -453,11 +453,11 @@ class AgentExecutor:
     def run(self, task: str, context: Optional[Dict[str, Any]] = None) -> AgentResult:
         """Execute the agent loop for a given task.
 
-        Args:
+        参数:
             task: The user task / analysis request.
             context: Optional context dict (e.g., {"stock_code": "600519"}).
 
-        Returns:
+        返回:
             AgentResult with parsed dashboard or error.
         """
         # Build system prompt with skills
@@ -498,13 +498,13 @@ class AgentExecutor:
     def chat(self, message: str, session_id: str, progress_callback: Optional[Callable] = None, context: Optional[Dict[str, Any]] = None) -> AgentResult:
         """Execute the agent loop for a free-form chat message.
 
-        Args:
+        参数:
             message: The user's chat message.
             session_id: The conversation session ID.
             progress_callback: Optional callback for streaming progress events.
             context: Optional context dict from previous analysis for data reuse.
 
-        Returns:
+        返回:
             AgentResult with the text response.
         """
         from src.agent.conversation import conversation_manager

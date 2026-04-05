@@ -146,7 +146,7 @@ class EventMonitor:
     def remove_expired(self) -> int:
         """Remove alerts that have expired based on TTL.
 
-        Returns:
+        返回:
             Number of expired alerts removed.
         """
         now = time.time()
@@ -168,7 +168,7 @@ class EventMonitor:
     async def check_all(self) -> List[TriggeredAlert]:
         """Check all active rules against current market data.
 
-        Returns:
+        返回:
             List of triggered alerts.
         """
         self.remove_expired()

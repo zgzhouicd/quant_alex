@@ -1,11 +1,9 @@
 # -*- coding: utf-8 -*-
 """
-BaseAgent — abstract base for all specialised agents.
+BaseAgent — 所有专职 Agent 的抽象基类。
 
-Every agent in the multi-agent pipeline inherits from this class and
-implements :meth:`run`.  The base class provides shared utilities:
-tool-subset selection, prompt assembly, LLM invocation via the shared
-runner, and structured opinion output.
+多 Agent 流水线中的每个 Agent 均继承本类并实现 :meth:`run`。
+基类提供：工具子集选择、提示词拼装、经共享 runner 调用 LLM、结构化观点输出等通用能力。
 """
 
 from __future__ import annotations
@@ -26,22 +24,22 @@ logger = logging.getLogger(__name__)
 
 
 class BaseAgent(ABC):
-    """Abstract base for all specialised agents.
+    """专职 Agent 的抽象基类。
 
-    Subclasses **must** implement:
-    - :pyattr:`agent_name` — unique agent identifier
-    - :meth:`system_prompt` — return the LLM system prompt
-    - :meth:`build_user_message` — construct the user message for the LLM
+    子类**必须**实现:
+    - :pyattr:`agent_name` — 唯一标识
+    - :meth:`system_prompt` — 返回 LLM 系统提示
+    - :meth:`build_user_message` — 构造发给 LLM 的用户消息
 
-    Subclasses **may** override:
-    - :pyattr:`tool_names` — restrict which tools the agent can access
-    - :pyattr:`max_steps` — per-agent step limit  (default 6)
-    - :meth:`post_process` — transform the raw LLM text into an :class:`AgentOpinion`
+    子类**可选**覆盖:
+    - :pyattr:`tool_names` — 限制可调用工具（None 表示全套）
+    - :pyattr:`max_steps` — 单 Agent 最大步数（默认 6）
+    - :meth:`post_process` — 将原始 LLM 文本转为 :class:`AgentOpinion`
     """
 
-    # Subclass overrides
+    # 子类覆盖项
     agent_name: str = "base"
-    tool_names: Optional[List[str]] = None  # None → all tools available
+    tool_names: Optional[List[str]] = None  # None → 使用全部工具
     max_steps: int = 6
 
     def __init__(
@@ -58,32 +56,31 @@ class BaseAgent(ABC):
         self.memory = AgentMemory.from_config()
 
     # -----------------------------------------------------------------
-    # Abstract interface
+    # 抽象接口
     # -----------------------------------------------------------------
 
     @abstractmethod
     def system_prompt(self, ctx: AgentContext) -> str:
-        """Build the system prompt for this agent."""
+        """构造本 Agent 的系统提示。"""
 
     @abstractmethod
     def build_user_message(self, ctx: AgentContext) -> str:
-        """Build the user message sent to the LLM."""
+        """构造发给 LLM 的用户消息。"""
 
     # -----------------------------------------------------------------
-    # Default hook for structured output
+    # 结构化输出的默认钩子
     # -----------------------------------------------------------------
 
     def post_process(self, ctx: AgentContext, raw_text: str) -> Optional[AgentOpinion]:
-        """Extract a structured :class:`AgentOpinion` from the raw LLM text.
+        """从原始 LLM 文本提取 :class:`AgentOpinion`。
 
-        Default: returns ``None`` (the raw text is still stored in
-        ``StageResult.meta["raw_text"]``).  Subclasses that produce
-        analysis opinions should override this.
+        默认返回 ``None``（原文仍保存在 ``StageResult.meta["raw_text"]``）。
+        产出分析观点的子类应覆盖本方法。
         """
         return None
 
     # -----------------------------------------------------------------
-    # Execution
+    # 执行
     # -----------------------------------------------------------------
 
     def run(
@@ -92,14 +89,14 @@ class BaseAgent(ABC):
         progress_callback: Optional[Callable[[Dict[str, Any]], None]] = None,
         timeout_seconds: Optional[float] = None,
     ) -> StageResult:
-        """Execute this agent and return a :class:`StageResult`.
+        """执行本 Agent，返回 :class:`StageResult`。
 
-        Steps:
-        1. Build system + user messages.
-        2. Optionally inject pre-fetched data from ``ctx.data``.
-        3. Delegate to :func:`run_agent_loop`.
-        4. Call :meth:`post_process` to produce an opinion.
-        5. Append the opinion to ``ctx.opinions``.
+        步骤:
+        1. 组装 system + user 消息。
+        2. 可选注入 ``ctx.data`` 中已预取的数据。
+        3. 委托 :func:`run_agent_loop`。
+        4. :meth:`post_process` 生成观点。
+        5. 将观点追加到 ``ctx.opinions``。
         """
         t0 = time.time()
         result = StageResult(stage_name=self.agent_name, status=StageStatus.RUNNING)
@@ -107,7 +104,7 @@ class BaseAgent(ABC):
         try:
             messages = self._build_messages(ctx)
 
-            # Restrict tools if the agent declares a subset
+            # 若声明了工具子集则限制注册表
             registry = self._filtered_registry()
 
             loop_result: RunLoopResult = run_agent_loop(
@@ -127,10 +124,10 @@ class BaseAgent(ABC):
 
             if not loop_result.success:
                 result.status = StageStatus.FAILED
-                result.error = loop_result.error or "Agent loop did not produce a final answer"
+                result.error = loop_result.error or "Agent 循环未产生最终答复"
                 return result
 
-            # Post-process into structured opinion
+            # 后处理为结构化观点
             opinion = self.post_process(ctx, loop_result.content)
             if opinion is not None:
                 opinion.agent_name = self.agent_name
@@ -150,11 +147,11 @@ class BaseAgent(ABC):
         return result
 
     # -----------------------------------------------------------------
-    # Internal helpers
+    # 内部辅助
     # -----------------------------------------------------------------
 
     def _build_messages(self, ctx: AgentContext) -> List[Dict[str, Any]]:
-        """Assemble the initial messages list for the LLM."""
+        """组装发给 LLM 的初始 messages 列表。"""
         messages: List[Dict[str, Any]] = [
             {"role": "system", "content": self.system_prompt(ctx)},
         ]
@@ -169,20 +166,19 @@ class BaseAgent(ABC):
                 if role in {"user", "assistant", "system"} and isinstance(content, str) and content:
                     messages.append({"role": role, "content": content})
 
-        # Inject pre-fetched data as a synthetic assistant context
+        # 将预取数据注入为合成对话，减少重复工具调用
         cached_data = self._inject_cached_data(ctx)
         if cached_data:
             messages.append({"role": "user", "content": cached_data})
-            messages.append({"role": "assistant", "content": "Understood, I have the pre-fetched data. Proceeding with analysis."})
+            messages.append({"role": "assistant", "content": "已收到预取数据，将继续分析。"})
 
         messages.append({"role": "user", "content": self.build_user_message(ctx)})
         return messages
 
     def _inject_cached_data(self, ctx: AgentContext) -> str:
-        """Build a context string from already-fetched data in ``ctx.data``.
+        """根据 ``ctx.data`` 中已有数据构造上下文字符串。
 
-        This avoids redundant tool calls when earlier stages have already
-        fetched the data this agent needs.
+        当前序阶段已拉取本 Agent 所需数据时，可避免再次调用工具。
         """
         import json
         parts: List[str] = []
@@ -192,19 +188,19 @@ class BaseAgent(ABC):
                     serialised = json.dumps(value, ensure_ascii=False, default=str)
                 except (TypeError, ValueError):
                     serialised = str(value)
-                # Cap per-field size to avoid overwhelming the context window
+                # 单字段长度上限，避免撑爆上下文
                 if len(serialised) > 8000:
                     serialised = serialised[:8000] + "...(truncated)"
-                parts.append(f"[Pre-fetched: {key}]\n{serialised}")
+                parts.append(f"[预取: {key}]\n{serialised}")
         memory_context = self._build_memory_context(ctx)
         if memory_context:
             parts.append(memory_context)
         return "\n\n".join(parts) if parts else ""
 
     def _filtered_registry(self) -> ToolRegistry:
-        """Return a ToolRegistry restricted to ``self.tool_names``.
+        """返回仅包含 ``self.tool_names`` 的工具注册表。
 
-        If ``tool_names`` is None (default), the full registry is returned.
+        ``tool_names`` 为 None 时返回完整注册表。
         """
         if self.tool_names is None:
             return self.tool_registry
@@ -220,7 +216,7 @@ class BaseAgent(ABC):
         return filtered
 
     def _build_memory_context(self, ctx: AgentContext) -> str:
-        """Summarise recent analysis history for prompt injection."""
+        """摘要近期分析历史，供提示词注入。"""
         if not self.memory.enabled or not ctx.stock_code:
             return ""
 
@@ -228,10 +224,10 @@ class BaseAgent(ABC):
         if not entries:
             return ""
 
-        lines = ["[Memory: recent analysis history]"]
+        lines = ["[记忆: 近期分析历史]"]
         for entry in entries:
             parts = [
-                entry.date or "unknown_date",
+                entry.date or "未知日期",
                 f"signal={entry.signal or 'unknown'}",
                 f"sentiment={entry.sentiment_score}",
             ]
@@ -244,11 +240,11 @@ class BaseAgent(ABC):
             if entry.was_correct is not None:
                 parts.append(f"was_correct={entry.was_correct}")
             lines.append("- " + ", ".join(parts))
-        lines.append("Use this memory as context only; do not copy it verbatim into the final answer.")
+        lines.append("仅以记忆作为背景参考，勿逐字抄入最终答复。")
         return "\n".join(lines)
 
     def _apply_memory_calibration(self, ctx: AgentContext, opinion: AgentOpinion, result: StageResult) -> None:
-        """Adjust confidence using historical calibration when enabled."""
+        """在启用时按历史校准调整 confidence。"""
         if not self.memory.enabled:
             return
 

@@ -1280,7 +1280,7 @@ class TestBaseAgentMemoryIntegration(unittest.TestCase):
         ctx = AgentContext(query="test", stock_code="600519")
         injected = agent._inject_cached_data(ctx)
 
-        self.assertIn("Memory: recent analysis history", injected)
+        self.assertIn("[记忆: 近期分析历史]", injected)
         self.assertIn("signal=buy", injected)
 
     def test_memory_calibration_updates_confidence(self):

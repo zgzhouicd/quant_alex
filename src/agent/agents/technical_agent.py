@@ -94,7 +94,7 @@ Return **only** a JSON object (no markdown fences):
         return "\n".join(parts)
 
     def post_process(self, ctx: AgentContext, raw_text: str) -> Optional[AgentOpinion]:
-        """Parse the JSON opinion from the LLM response."""
+        """从 LLM 回复中解析 JSON 并构造 :class:`AgentOpinion`。"""
         parsed = try_parse_json(raw_text)
         if parsed is None:
             logger.warning("[TechnicalAgent] failed to parse opinion JSON")

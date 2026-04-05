@@ -1,19 +1,17 @@
 # -*- coding: utf-8 -*-
 """
-PortfolioAgent — analyses a *set* of stocks as a whole portfolio,
-rather than one-by-one.
+PortfolioAgent — 以**多标的组合**为单位分析，而非单票逐一输出。
 
-Responsibilities:
-- Position sizing suggestions (equal-weight / volatility-adjusted)
-- Correlation & sector concentration warnings
-- Portfolio-level risk metrics (beta, drawdown, sector exposure)
-- Cross-market linkage (A-share ↔ HK ↔ US spillover)
+职责概览：
+- 仓位与权重建议（等权为基线，可按信念度与波动调整）
+- 相关性及行业集中度预警
+- 组合层面风险度量（beta、回撤、行业暴露等）
+- 跨市场联动（A 股 ↔ 港股 ↔ 美股外溢）
 
-The PortfolioAgent consumes pre-computed per-stock opinions
-(from the normal orchestrator pipeline) and overlays portfolio
-analytics.
+本 Agent 消费编排器流水线中已算好的各票观点，
+在其上叠加组合分析。
 
-Typical usage::
+典型用法::
 
     from src.agent.agents.portfolio_agent import PortfolioAgent
     agent = PortfolioAgent(model=model, registry=registry)
@@ -33,16 +31,14 @@ logger = logging.getLogger(__name__)
 
 
 class PortfolioAgent(BaseAgent):
-    """Portfolio-level analysis agent.
+    """组合层面分析 Agent。
 
-    This agent operates *after* per-stock analysis is already done.
-    It reads per-stock opinions from ``ctx.data["stock_opinions"]``
-    (a dict of stock_code → opinion) and produces a portfolio-level
-    assessment.
+    在单票分析完成之后运行；从 ``ctx.data["stock_opinions"]``
+    （股票代码 → 观点）读取各票结论并产出组合级评估。
     """
 
     agent_name = "portfolio"
-    description = "Portfolio-level risk and allocation analysis"
+    description = "组合层面的风险与配置分析"
 
     tool_names = [
         "get_realtime_quote",
@@ -50,7 +46,7 @@ class PortfolioAgent(BaseAgent):
     ]
 
     # ------------------------------------------------------------------
-    # Prompt construction
+    # 提示词构造
     # ------------------------------------------------------------------
 
     def system_prompt(self, ctx: AgentContext) -> str:
@@ -87,7 +83,7 @@ class PortfolioAgent(BaseAgent):
         )
 
     def build_user_message(self, ctx: AgentContext) -> str:
-        # Gather per-stock opinions from context
+        # 从上下文收集各票观点
         stock_opinions = ctx.data.get("stock_opinions", {})
         stock_list = ctx.data.get("stock_list", [])
 
@@ -111,7 +107,7 @@ class PortfolioAgent(BaseAgent):
             for code in stock_list:
                 parts.append(f"- {code}")
 
-        # Include risk flags if any
+        # 附带单票分析阶段产生的风险标记
         if ctx.risk_flags:
             parts.append("\n### Risk Flags from Individual Analysis:")
             for flag in ctx.risk_flags:
@@ -123,7 +119,7 @@ class PortfolioAgent(BaseAgent):
         return "\n".join(parts)
 
     def post_process(self, ctx: AgentContext, raw_response: str) -> Optional[AgentOpinion]:
-        """Extract portfolio assessment and store in context."""
+        """解析组合评估 JSON 并写入 ``ctx.data``。"""
         data = try_parse_json(raw_response)
         if data is None:
             logger.debug("[PortfolioAgent] post_process: failed to parse JSON")
@@ -135,7 +131,6 @@ class PortfolioAgent(BaseAgent):
                 raw_data={"raw": raw_response[:1000]},
             )
 
-        # Store portfolio assessment in context
         ctx.data["portfolio_assessment"] = data
 
         risk_score = data.get("portfolio_risk_score", 5)

@@ -256,13 +256,13 @@ class LLMToolAdapter:
     ) -> LLMResponse:
         """Send messages + tool declarations to LLM, return normalized response.
 
-        Args:
+        参数:
             messages: Conversation history in provider-neutral format:
                       [{"role": "system"/"user"/"assistant"/"tool", "content": ...}, ...]
             tools: OpenAI-format tool declarations; litellm converts to each provider's format.
             provider: Ignored (kept for backward compatibility).
 
-        Returns:
+        返回:
             LLMResponse with either content (final answer) or tool_calls.
         """
         return self.call_completion(messages, tools=tools, provider=provider, timeout=timeout)

@@ -246,7 +246,7 @@ class AgentMemory:
         Skills with higher historical performance get higher weights.
         Skills with insufficient samples get neutral weight (1.0).
 
-        Returns:
+        返回:
             Dict mapping skill_id → weight (normalized so mean ≈ 1.0)
         """
         if not self.enabled or not use_backtest:

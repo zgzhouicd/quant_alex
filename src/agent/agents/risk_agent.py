@@ -102,7 +102,7 @@ for derivatives risk checks.
         if ctx.instrument:
             parts.append(f"\n[Instrument]\n{json.dumps(ctx.instrument, ensure_ascii=False, default=str)}")
 
-        # Feed any existing intel data so the risk agent doesn't redo searches
+        # 注入已有情报数据，避免风险 Agent 重复搜索
         if ctx.get_data("intel_opinion"):
             parts.append(f"\n[Existing intel data]\n{json.dumps(ctx.get_data('intel_opinion'), ensure_ascii=False, default=str)}")
         if ctx.get_data("derivatives_snapshot"):
@@ -123,7 +123,7 @@ for derivatives risk checks.
             logger.warning("[RiskAgent] failed to parse risk JSON")
             return None
 
-        # Propagate structured risk flags to context
+        # 将结构化风险标记写入上下文
         for flag in parsed.get("flags", []):
             if isinstance(flag, dict):
                 ctx.add_risk_flag(
@@ -142,7 +142,7 @@ for derivatives risk checks.
 
 
 def _risk_to_signal(risk_level: str) -> str:
-    """Map risk level to a trading signal (inverted)."""
+    """将风险等级映射为交易信号（风险越高信号越偏空）。"""
     mapping = {
         "none": "buy",
         "low": "hold",

@@ -276,14 +276,14 @@ def build_agent_executor(config=None, skills: Optional[List[str]] = None):
     multiple specialised agents. Otherwise it returns the legacy single-agent
     executor.
 
-    Args:
+    参数:
         config: Application config object.  When *None*, ``get_config()`` is
                 called automatically.
         skills: Skill ids to activate.  When *None* falls back to
                 ``config.agent_skills``; if that is also empty falls back to
                 the central default skill set.
 
-    Returns:
+    返回:
         A ready-to-call :class:`src.agent.executor.AgentExecutor` instance.
     """
     if config is None:

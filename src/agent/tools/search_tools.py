@@ -1,14 +1,13 @@
 # -*- coding: utf-8 -*-
 """
-Search tools — wraps SearchService methods as agent-callable tools.
+搜索类工具：将 SearchService 封装为 Agent 可调工具。
 
-Tools:
-- search_stock_news: search latest stock news
-- search_comprehensive_intel: multi-dimensional intelligence search
+工具:
+- search_stock_news: 检索个股最新新闻
+- search_comprehensive_intel: 多维度情报检索
 """
 
 import logging
-from typing import Optional
 
 from src.agent.tools.registry import ToolParameter, ToolDefinition
 
@@ -16,17 +15,17 @@ logger = logging.getLogger(__name__)
 
 
 def _get_search_service():
-    """Return shared SearchService singleton."""
+    """返回进程内共享的 SearchService 单例。"""
     from src.search_service import get_search_service
     return get_search_service()
 
 
 def _handle_search_stock_news(stock_code: str, stock_name: str) -> dict:
-    """Search latest news for a stock."""
+    """检索与个股相关的最新新闻。"""
     service = _get_search_service()
 
     if not service.is_available:
-        return {"error": "No search engine available (no API keys configured)"}
+        return {"error": "未配置搜索引擎 API，无法搜索"}
 
     response = service.search_stock_news(stock_code, stock_name, max_results=5)
 
@@ -57,19 +56,17 @@ def _handle_search_stock_news(stock_code: str, stock_name: str) -> dict:
 
 search_stock_news_tool = ToolDefinition(
     name="search_stock_news",
-    description="Search for the latest news articles about a specific stock. "
-                "Requires both stock_code and stock_name for accurate search. "
-                "Returns news titles, snippets, sources, and URLs.",
+    description="按股票代码与名称搜索最新相关新闻，返回标题、摘要、来源与链接。",
     parameters=[
         ToolParameter(
             name="stock_code",
             type="string",
-            description="Stock code, e.g., '600519'",
+            description="股票代码，如 '600519'",
         ),
         ToolParameter(
             name="stock_name",
             type="string",
-            description="Stock name in Chinese, e.g., '贵州茅台'",
+            description="股票中文名称，如 '贵州茅台'",
         ),
     ],
     handler=_handle_search_stock_news,
@@ -82,11 +79,11 @@ search_stock_news_tool = ToolDefinition(
 # ============================================================
 
 def _handle_search_comprehensive_intel(stock_code: str, stock_name: str) -> dict:
-    """Multi-dimensional intelligence search."""
+    """多维度情报聚合搜索。"""
     service = _get_search_service()
 
     if not service.is_available:
-        return {"error": "No search engine available (no API keys configured)"}
+        return {"error": "未配置搜索引擎 API，无法搜索"}
 
     intel_results = service.search_comprehensive_intel(
         stock_code=stock_code,
@@ -95,12 +92,12 @@ def _handle_search_comprehensive_intel(stock_code: str, stock_name: str) -> dict
     )
 
     if not intel_results:
-        return {"error": "Comprehensive intel search returned no results"}
+        return {"error": "综合情报搜索无结果"}
 
-    # Format into readable report
+    # 格式化为可读报告
     report = service.format_intel_report(intel_results, stock_name)
 
-    # Also return structured data
+    # 同时返回结构化维度数据
     dimensions = {}
     for dim_name, response in intel_results.items():
         if response and response.success:
@@ -113,7 +110,7 @@ def _handle_search_comprehensive_intel(stock_code: str, stock_name: str) -> dict
                         "snippet": r.snippet,
                         "source": r.source,
                     }
-                    for r in response.results[:3]  # limit to 3 per dimension to save tokens
+                    for r in response.results[:3]  # 每维最多 3 条以省 token
                 ],
             }
 
@@ -125,19 +122,17 @@ def _handle_search_comprehensive_intel(stock_code: str, stock_name: str) -> dict
 
 search_comprehensive_intel_tool = ToolDefinition(
     name="search_comprehensive_intel",
-    description="Multi-dimensional intelligence search: latest news, market analysis, "
-                "risk checking, earnings outlook, and industry trends for a stock. "
-                "Returns a formatted report and structured results.",
+    description="多维度情报：新闻、市场解读、风险、业绩预期、行业趋势等，返回格式化报告与分维度结果。",
     parameters=[
         ToolParameter(
             name="stock_code",
             type="string",
-            description="Stock code, e.g., '600519'",
+            description="股票代码，如 '600519'",
         ),
         ToolParameter(
             name="stock_name",
             type="string",
-            description="Stock name in Chinese, e.g., '贵州茅台'",
+            description="股票中文名称，如 '贵州茅台'",
         ),
     ],
     handler=_handle_search_comprehensive_intel,

@@ -148,11 +148,10 @@ Return **only** a valid JSON object:
             logger.warning("[IntelAgent] failed to parse opinion JSON")
             return None
 
-        # Cache parsed intel so downstream agents (especially RiskAgent) can
-        # reuse it instead of re-searching the same evidence.
+        # 缓存情报解析结果，供下游（尤其 RiskAgent）复用，避免重复检索
         ctx.set_data("intel_opinion", parsed)
 
-        # Propagate risk alerts to context
+        # 将风险告警同步到上下文的 risk_flags
         for alert in parsed.get("risk_alerts", []):
             if isinstance(alert, str) and alert:
                 ctx.add_risk_flag(category="intel", description=alert)
