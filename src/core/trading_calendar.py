@@ -22,7 +22,7 @@ from zoneinfo import ZoneInfo
 
 logger = logging.getLogger(__name__)
 
-# Exchange-calendars availability
+# exchange-calendars 是否已安装
 _XCALS_AVAILABLE = False
 try:
     import exchange_calendars as xcals
@@ -33,10 +33,10 @@ except ImportError:
         "Run: pip install exchange-calendars"
     )
 
-# Market -> exchange code (exchange-calendars)
+# 市场 -> exchange-calendars 交易所代码
 MARKET_EXCHANGE = {"cn": "XSHG", "hk": "XHKG", "us": "XNYS"}
 
-# Market -> IANA timezone for "today"
+# 市场 -> 判断「今日」用的 IANA 时区名
 MARKET_TIMEZONE = {
     "cn": "Asia/Shanghai",
     "hk": "Asia/Hong_Kong",
@@ -52,10 +52,10 @@ SESSION_MODE_TIMEZONE = {
 
 def get_market_for_stock(code: str) -> Optional[str]:
     """
-    Infer market region for a stock code.
+    由股票/标的代码推断市场区域。
 
-    Returns:
-        'cn' | 'hk' | 'us' | None (None = unrecognized, fail-open: treat as open)
+    返回:
+        'cn' | 'hk' | 'us' | None（None 表示未识别；fail-open：视为可交易）
     """
     if not code or not isinstance(code, str):
         return None
@@ -67,7 +67,7 @@ def get_market_for_stock(code: str) -> Optional[str]:
         return "us"
     if is_hk_stock_code(code):
         return "hk"
-    # A-share: 6-digit numeric
+    # A 股：6 位纯数字
     if code.isdigit() and len(code) == 6:
         return "cn"
 
@@ -84,16 +84,16 @@ def get_market_for_stock(code: str) -> Optional[str]:
 
 def is_market_open(market: str, check_date: date) -> bool:
     """
-    Check if the given market is open on the given date.
+    判断指定市场在指定日期是否为交易日。
 
-    Fail-open: returns True if exchange-calendars unavailable or date out of range.
+    fail-open：未安装 exchange-calendars 或日期越界等情况返回 True。
 
-    Args:
+    参数:
         market: 'cn' | 'hk' | 'us'
-        check_date: Date to check
+        check_date: 待判断日期
 
-    Returns:
-        True if trading day (or fail-open), False otherwise
+    返回:
+        交易日为 True（含 fail-open）；否则 False
     """
     if not _XCALS_AVAILABLE:
         return True
@@ -113,10 +113,10 @@ def get_market_now(
     market: Optional[str], current_time: Optional[datetime] = None
 ) -> datetime:
     """
-    Return current time in the market's local timezone.
+    返回该市场本地时区的当前时间。
 
-    If current_time is naive, treat it as already expressed in the market timezone.
-    Unknown markets fall back to the given datetime (or local system time).
+    若 current_time 为 naive，则视为已是该市场时区下的本地时间。
+    未知市场则回退为传入时间（未传则系统本地时间）。
     """
     tz_name = MARKET_TIMEZONE.get(market or "")
 
@@ -138,13 +138,13 @@ def get_effective_trading_date(
     market: Optional[str], current_time: Optional[datetime] = None
 ) -> date:
     """
-    Resolve the latest reusable daily-bar date for checkpoint/resume logic.
+    解析可用于 checkpoint / 续跑逻辑的「日 K 所用交易日」。
 
-    Rules:
-    - Non-trading day / holiday: previous trading session
-    - Trading day before market close: previous completed trading session
-    - Trading day after market close: current trading session
-    - Calendar lookup failure: fail-open to market-local natural date
+    规则概要:
+    - 非交易日 / 节假日：取上一交易日
+    - 交易盘中（未收盘）：上一完整交易日
+    - 收盘后：当前交易日
+    - 日历查询失败：fail-open，使用该市场自然日
     """
     market_now = get_market_now(market, current_time=current_time)
     fallback_date = market_now.date()
@@ -184,11 +184,10 @@ def get_effective_trading_date(
 
 def normalize_checkpoint_date_for_stock(code: str, target_date: date) -> date:
     """
-    Align an explicit calendar date with the daily-bar session date used for resume.
+    将公历日对齐到续跑所用的日 K 会话日。
 
-    Anchors at end of that calendar day in the stock's market timezone so
-    weekends/holidays map to the effective session (same family of rules as
-    :func:`get_effective_trading_date`).
+    在该标的所在市场时区取当日 23:59 为锚点，使周末/节假日映射到有效会话日
+    （与 :func:`get_effective_trading_date` 同一套规则）。
     """
     market = get_market_for_stock((code or "").strip())
     tz_name = MARKET_TIMEZONE.get(market or "")
@@ -203,10 +202,10 @@ def normalize_checkpoint_date_for_stock(code: str, target_date: date) -> date:
 
 def get_open_markets_today() -> Set[str]:
     """
-    Get markets that are open today (by each market's local timezone).
+    按各市场本地时区，返回「今日开市」的市场集合。
 
-    Returns:
-        Set of market keys ('cn', 'hk', 'us') that are trading today
+    返回:
+        今日交易中的市场键集合（'cn' | 'hk' | 'us'）
     """
     if not _XCALS_AVAILABLE:
         return {"cn", "hk", "us"}
@@ -242,7 +241,7 @@ def compute_effective_region(
 
 @dataclass
 class SessionState:
-    """Resolved market session state for a single instrument."""
+    """单个标的解析后的交易时段状态。"""
 
     session_mode: str
     is_open: bool
@@ -289,12 +288,12 @@ def resolve_session_state(
     fallback_market: Optional[str] = None,
 ) -> SessionState:
     """
-    Resolve market session state for instrument-aware scheduling.
+    按标的解析交易时段状态（供编排与调度使用）。
 
-    Supported modes:
-    - us_equity_session: pre/regular/post/closed
-    - futures_session: day/night/daily_break/weekend
-    - always_open_24x7: continuous
+    支持的模式:
+    - us_equity_session：盘前 / 常规 / 盘后 / 关闭
+    - futures_session：日盘 / 夜盘 / 日盘间歇 / 周末
+    - always_open_24x7：连续交易
     """
     session_mode = _resolve_session_mode(instrument, fallback_market=fallback_market)
     now_local = _get_session_now(session_mode, current_time=current_time)
@@ -337,11 +336,11 @@ def resolve_session_state(
             effective_date=effective_date,
         )
 
-    # futures_session
+    # 期货会话（futures_session）
     local_time = now_local.time()
-    weekday = now_local.weekday()  # Monday=0 ... Sunday=6
+    weekday = now_local.weekday()  # 周一=0 … 周日=6
 
-    # Weekend close: Fri 17:00 -> Sun 18:00 (ET approximation)
+    # 周末休市：约周五 17:00 -> 周日 18:00（美东粗略近似）
     if (weekday == 4 and local_time >= dt_time(17, 0)) or weekday == 5 or (
         weekday == 6 and local_time < dt_time(18, 0)
     ):
@@ -379,7 +378,7 @@ def resolve_effective_date_by_instrument(
     current_time: Optional[datetime] = None,
     fallback_market: Optional[str] = None,
 ) -> date:
-    """Resolve checkpoint target date from instrument session model."""
+    """由标的的会话模型解析 checkpoint 目标日期。"""
     state = resolve_session_state(
         instrument,
         current_time=current_time,

@@ -13,9 +13,11 @@ class TestIsCodeLike:
     # --- Plain digit codes ---
     def test_plain_6_digit(self):
         assert is_code_like("600519") is True
+        assert is_code_like("300750") is True
 
     def test_plain_5_digit(self):
         assert is_code_like("00700") is True
+        assert is_code_like("60051") is True  # 5 位数字均视为代码形态（与港股码同宽）
 
     def test_4_digit_rejected(self):
         assert is_code_like("6001") is False
@@ -75,12 +77,24 @@ class TestIsCodeLike:
     def test_us_ticker_with_exchange(self):
         assert is_code_like("TSLA.O") is True
 
+    def test_us_ticker_class_b_share(self):
+        assert is_code_like("BRK.B") is True
+
     # --- Negative cases ---
     def test_plain_text(self):
         assert is_code_like("贵州茅台") is False
 
     def test_empty(self):
         assert is_code_like("") is False
+
+    def test_whitespace_only(self):
+        assert is_code_like("   ") is False
+
+    def test_four_digit_rejected(self):
+        assert is_code_like("1234") is False
+
+    def test_seven_digit_rejected(self):
+        assert is_code_like("1234567") is False
 
     def test_mixed_invalid(self):
         assert is_code_like("abc123") is False
@@ -147,6 +161,9 @@ class TestNormalizeCode:
     # --- US tickers ---
     def test_us_ticker(self):
         assert normalize_code("AAPL") == "AAPL"
+
+    def test_us_class_b_normalized_uppercase(self):
+        assert normalize_code("brk.b") == "BRK.B"
 
     # --- Invalid inputs ---
     def test_empty_returns_none(self):

@@ -490,13 +490,12 @@ def infer_decision_type_from_advice(value: Any, default: str = "hold") -> str:
 
 
 def infer_direction_from_decision_type(value: Any, default: str = "neutral") -> str:
-    """Infer long/short/neutral from decision_type-like labels.
+    """由 decision_type 类标签推断 long / short / neutral。
 
-    Also passes through values that are already direction labels so that
-    callers need not pre-check the input format.
+    若入参本身已是方向标签则原样通过，调用方无需再预判格式。
     """
     normalized = str(value or "").strip().lower()
-    # Pass-through: value is already a direction label (e.g. from new Agent output)
+    # 原样通过：已是方向标签（如新版 Agent 输出）
     if normalized in {"long", "short", "neutral"}:
         return normalized
     if normalized in {"buy", "strong_buy"}:
@@ -509,7 +508,7 @@ def infer_direction_from_decision_type(value: Any, default: str = "neutral") -> 
 
 
 def infer_decision_type_from_direction(value: Any, default: str = "hold") -> str:
-    """Infer buy/hold/sell from direction labels."""
+    """由方向标签推断 buy / hold / sell。"""
     normalized = str(value or "").strip().lower()
     if normalized == "long":
         return "buy"

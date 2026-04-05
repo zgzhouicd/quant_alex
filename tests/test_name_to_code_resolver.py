@@ -3,76 +3,21 @@
 
 Covers:
 - Local mapping (STOCK_NAME_MAP reverse)
-- Code format boundary (_is_code_like, _normalize_code)
 - Pinyin match (when pypinyin available)
 - Fuzzy match (difflib, local map only)
 - Ambiguous names return None
+
+Code-shape checks live in tests/test_stock_code_utils.py (_is_code_like / _normalize_code
+are thin wrappers around stock_code_utils).
 """
 
 import pytest
 
 from src.services.name_to_code_resolver import (
     resolve_name_to_code,
-    _is_code_like,
-    _normalize_code,
     _build_reverse_map_no_duplicates,
 )
 
-
-# ---------------------------------------------------------------------------
-# _is_code_like
-# ---------------------------------------------------------------------------
-
-class TestIsCodeLike:
-    def test_a_share_5_digits(self):
-        assert _is_code_like("60051") is True
-        assert _is_code_like("600519") is True
-
-    def test_a_share_6_digits(self):
-        assert _is_code_like("300750") is True
-
-    def test_hk_5_digits(self):
-        assert _is_code_like("00700") is True
-
-    def test_us_stock_letters(self):
-        assert _is_code_like("AAPL") is True
-        assert _is_code_like("TSLA") is True
-        assert _is_code_like("BRK.B") is True
-
-    def test_rejects_non_code(self):
-        assert _is_code_like("贵州茅台") is False
-        assert _is_code_like("1234") is False  # too short
-        assert _is_code_like("1234567") is False  # too long
-        assert _is_code_like("") is False
-        assert _is_code_like("   ") is False
-
-
-# ---------------------------------------------------------------------------
-# _normalize_code
-# ---------------------------------------------------------------------------
-
-class TestNormalizeCode:
-    def test_preserves_valid_a_share(self):
-        assert _normalize_code("600519") == "600519"
-        assert _normalize_code("  600519  ") == "600519"
-
-    def test_strips_suffix(self):
-        assert _normalize_code("600519.SH") == "600519"
-        assert _normalize_code("000001.SZ") == "000001"
-
-    def test_preserves_us_stock(self):
-        assert _normalize_code("AAPL") == "AAPL"
-        assert _normalize_code("brk.b") == "BRK.B"
-
-    def test_returns_none_for_invalid(self):
-        assert _normalize_code("") is None
-        assert _normalize_code("1234") is None
-        assert _normalize_code("贵州茅台") is None
-
-
-# ---------------------------------------------------------------------------
-# _build_reverse_map_no_duplicates
-# ---------------------------------------------------------------------------
 
 class TestBuildReverseMapNoDuplicates:
     def test_excludes_ambiguous_names(self):
