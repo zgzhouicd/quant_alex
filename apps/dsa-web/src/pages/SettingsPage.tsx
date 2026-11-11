@@ -16,6 +16,7 @@ import {
   SettingsSectionCard,
 } from '../components/settings';
 import { WEB_BUILD_INFO } from '../utils/constants';
+import { WEB_HIDDEN_SETTINGS_CATEGORIES } from '../constants/settingsCategories';
 import { getCategoryDescriptionZh } from '../utils/systemConfigI18n';
 import type { SystemConfigCategory } from '../types/systemConfig';
 
@@ -76,6 +77,12 @@ const SettingsPage: React.FC = () => {
   useEffect(() => {
     void load();
   }, [load]);
+
+  useEffect(() => {
+    if (WEB_HIDDEN_SETTINGS_CATEGORIES.has(activeCategory)) {
+      setActiveCategory('base');
+    }
+  }, [activeCategory, categories, setActiveCategory]);
 
   useEffect(() => {
     if (!toast) {
@@ -224,7 +231,7 @@ const SettingsPage: React.FC = () => {
           <div>
             <h1 className="text-xl font-semibold tracking-tight text-foreground">系统设置</h1>
             <p className="text-xs leading-6 text-muted-text">
-              统一管理模型、数据源、通知、安全认证与导入能力。
+              统一管理模型、数据源、安全认证与导入能力（通知渠道请在 .env 中配置，不在此页维护）。
             </p>
           </div>
 

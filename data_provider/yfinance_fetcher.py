@@ -317,10 +317,15 @@ class YfinanceFetcher(BaseFetcher):
         interval: str = "1m",
         lookback_minutes: int = 390,
     ) -> pd.DataFrame:
-        """使用 yfinance 获取分钟级 OHLCV 数据。"""
+        """使用 yfinance 获取 OHLCV 数据；`1d` 返回日线 bar 结构。"""
         import yfinance as yf
 
         interval_norm = (interval or "1m").strip().lower()
+        if interval_norm in {"1d", "d", "day", "daily"}:
+            days = max(30, int((lookback_minutes or 390) / 1440) or 1)
+            daily_df = self.get_daily_data(stock_code, days=days)
+            return self._daily_to_intraday_bar_frame(daily_df)
+
         if interval_norm not in {"1m", "2m", "5m", "15m", "30m", "60m", "90m"}:
             raise DataFetchError(f"Unsupported yfinance intraday interval: {interval_norm}")
 
@@ -382,11 +387,29 @@ class YfinanceFetcher(BaseFetcher):
         df = df[[col for col in keep_cols if col in df.columns]].copy()
         df = df.dropna(subset=["timestamp", "open", "high", "low", "close"]).reset_index(drop=True)
 
-        cutoff = pd.Timestamp.utcnow() - pd.Timedelta(minutes=max(int(lookback_minutes or 390), 1))
+        # 回看窗口锚定在「下载结果中最新的 K 线时间」，而非 utcnow。
+        # 休市或盘外时 Yahoo 仅返回上一交易日数据，若用 utcnow 剪裁会在「最新柱远早于 now」时整表被裁空。
+        lookback = max(int(lookback_minutes or 390), 1)
+        anchor = df["timestamp"].max()
+        cutoff = anchor - pd.Timedelta(minutes=lookback)
         df = df[df["timestamp"] >= cutoff].reset_index(drop=True)
         if df.empty:
             raise DataFetchError(f"Yahoo Finance 分钟数据窗口为空: {stock_code}")
         return df
+
+    @staticmethod
+    def _daily_to_intraday_bar_frame(df: pd.DataFrame) -> pd.DataFrame:
+        """将日线数据映射为现有 bar 存储所需字段。"""
+        frame = df.copy()
+        if "timestamp" not in frame.columns:
+            frame["timestamp"] = frame.get("date")
+        frame["timestamp"] = pd.to_datetime(frame["timestamp"], utc=True)
+        frame["interval"] = "1d"
+        keep_cols = [
+            "timestamp", "open", "high", "low", "close", "volume", "amount", "pct_chg", "interval"
+        ]
+        frame = frame[[col for col in keep_cols if col in frame.columns]].copy()
+        return frame.dropna(subset=["timestamp", "open", "high", "low", "close"]).reset_index(drop=True)
 
     @staticmethod
     def _resolve_intraday_period(interval: str, lookback_minutes: int) -> str:

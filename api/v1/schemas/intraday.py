@@ -1,4 +1,4 @@
-"""Intraday API schemas."""
+"""Signal API schemas for daily bars with intraday route compatibility."""
 
 from __future__ import annotations
 
@@ -45,17 +45,19 @@ class IntradaySignalBatchResponse(BaseModel):
 
 class IntradaySchedulerStartRequest(BaseModel):
     symbols: List[str] = Field(default_factory=list)
-    intervals: List[str] = Field(default_factory=lambda: ["1m"])
-    lookback_minutes: int = Field(390, ge=30, le=10080)
-    poll_seconds: int = Field(60, ge=5, le=3600)
+    intervals: List[str] = Field(default_factory=lambda: ["1d"])
+    lookback_days: int = Field(120, ge=30, le=2000)
+    lookback_minutes: Optional[int] = Field(None, ge=30, le=10080)
+    poll_seconds: int = Field(3600, ge=5, le=86400)
     paper_account_ids: List[int] = Field(default_factory=list)
     order_quantity: float = Field(1.0, gt=0)
 
 
 class IntradaySchedulerRunOnceRequest(BaseModel):
     symbols: List[str] = Field(default_factory=list)
-    intervals: List[str] = Field(default_factory=lambda: ["1m"])
-    lookback_minutes: int = Field(390, ge=30, le=10080)
+    intervals: List[str] = Field(default_factory=lambda: ["1d"])
+    lookback_days: int = Field(120, ge=30, le=2000)
+    lookback_minutes: Optional[int] = Field(None, ge=30, le=10080)
     paper_account_ids: List[int] = Field(default_factory=list)
     order_quantity: float = Field(1.0, gt=0)
 

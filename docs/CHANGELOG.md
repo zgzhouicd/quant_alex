@@ -11,6 +11,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 <!-- 新条目格式：- [类型] 描述（类型取值：新功能/改进/修复/文档/测试/chore）-->
 <!-- 每条独立一行追加到本段末尾，无需分类标题，合并时冲突最小 -->
+- [新功能] Web **决策台**（`/decision`）：观察名单批量扫描日线信号、居中大字结论与页面内「提醒流」，借鉴 trade_agent 核验台布局；`/intraday` 重定向至此。
+- [改进] 设置页隐藏 **通知渠道** 分类（`WEB_HIDDEN_SETTINGS_CATEGORIES`）；通知相关项改由 `.env` 维护，降低 Web 配置复杂度。
+- [chore] Web 精简：移除 **IntradayPage**、**paperTrading** 前端封装与侧栏「日线」；问股/首页去掉外部推送 UI；删除 `POST /api/v1/agent/chat/send`；分析请求 `notify` 默认 **false**。
+- [测试] 补充 `/api/v1/intraday/signal` **默认 1d** + mock `get_daily_data` 冒烟；`IntradaySignalEngine` 日线 `payload.signal_timeframe` 单测。
+- [改进] `api/v1/intraday` OpenAPI **summary** 与 Web 调度说明对齐「默认日线、低频轮询」语义。
+- [文档] `docs/intraday-refactor-plan.md`：正文改为 **日线级信号重构（Daily Signal Refactor）** 方案与文件对照表；原「分钟级日内」分阶段草案移入附录，避免与当前默认 `1d` 语义混淆。
+- [文档] `docs/api-v1-surface.md`：Intraday 节补充默认 `1d`、`lookback_days` 与 `lookback_minutes` 兼容说明。
+- [chore] **移除组合账本**：删除 `/api/v1/portfolio/*`、`PortfolioService` / import / risk 服务与 `portfolio_repo`；ORM 表 `portfolio_accounts` 等与 `PortfolioIntradaySnapshot` 无关的日级账本模型；Web `PortfolioPage` / `src/api/portfolio.ts`；Agent 数据工具 `get_portfolio_snapshot`；相关测试与 `Config` / 环境变量 `PORTFOLIO_*`。保留 `PortfolioAgent`（多标的组合分析）与 paper 用 `portfolio_intraday_snapshots` 表名。README / 架构文档 / `docs/api-v1-surface.md` 已同步。
+- [文档] 新增 `scripts/list_openapi_paths.py` 与 `docs/api-v1-surface.md`：汇总 OpenAPI `/api/v1` 路径并与 `dsa-web` 的 `src/api/*.ts` 封装对照。
+- [改进] `api/v1` 路由挂载 health，提供 `GET /api/v1/health`（与根应用 `GET /api/health` 并存）。
+- [测试] 新增 `tests/test_api_v1_smoke_matrix.py`：主要 v1 路由离线冒烟（auth 形态、agent/models、空库回测表现 `not_found`、intraday `data_fetch_error` 等）。
+- [改进] `dsa-web` `parseApiError`：识别后端 **502** `data_fetch_error`，单独分类与文案（分钟线/行情拉取失败）；补充 Vitest `src/api/__tests__/error.test.ts`。
+- [修复] `main.py`：`--intraday` 路径日志使用 `json.dumps` 时补齐 `import json`（修复 flake8 F821 / 潜在 NameError）。
+- [改进] Web 持仓页：无快照时的金额/计价币种兜底由 CNY 改为 **USD**；创建账户成功后表单重置为美股/USD；页眉展示 **Web UI 构建标识** 便于确认静态资源是否已更新；手工录入代码占位示例含 AAPL。
+- [改进] 组合 **快照 / 风险** 合并展示币种由硬编码 **CNY** 改为默认 **USD**：`Config.portfolio_aggregate_currency`（环境变量 `PORTFOLIO_AGGREGATE_CURRENCY`，默认 `USD`）；`get_portfolio_snapshot` 顶层 `currency` 与各账户折算目标、集中度/行业集中度/回撤序列换算与之一致。
+- [改进] `api/app`：对 `index.html`（根路径与 SPA 回退）增加 `Cache-Control: no-cache, no-store, must-revalidate`，减轻浏览器长期缓存旧入口导致的一直加载旧前端资源。
+- [改进] Web 持仓页「新建账户」表单默认市场由 A 股 / CNY 改为 **美股 / USD**，与当前产品主路径一致（仍可选 cn/hk 与自定义基准币）。
+- [新功能] 加密货币分钟线优先走 **Binance 现货公共** `GET /api/v3/klines`（无需 Key）：`DataFetcherManager.get_intraday_data` 对 `BTCUSDT` / `BTC-USD` 等符号先试 `BinancePublicFetcher`，失败再回退 Yahoo/Longbridge；可选环境变量 `BINANCE_PUBLIC_PRIORITY`（默认 3）、`BINANCE_SPOT_API_BASE`（默认官方 spot 根 URL）。
+- [修复] Yfinance 分钟线：回看窗口改为以返回数据中的最新时间戳为锚做剪裁，避免休市/盘外时相对 `utcnow` 裁切把上一交易日数据全部丢掉并误报「分钟数据窗口为空」。
+- [改进] 全局异常：`DataFetchError` 注册独立 handler 返回 **502** `data_fetch_error`，避免被通用 `Exception` 兜底成 `internal_error`（与 Intraday 路由内转换互为备份）。
+- [改进] Intraday API：`/signal`、`/signals/batch`、`/bars`（refresh=true）对 `DataFetchError` 返回 **502** 与数据源错误摘要，对无分钟线 `ValueError` 返回 **400** 与可读说明，避免笼统 500。
+- [改进] Web 工作台新增 **`/intraday`** 页面：对接分钟信号、Paper 账户/快照/订单/成交与实验性调度器控制；侧边栏「日内」入口；`dsa-web` 新增 `intraday` / `paperTrading` API 模块与类型。
+- [文档] README、`docs/README_EN.md`、`docs/architecture-detailed-guide.md`、`docs/project-architecture-analysis.md`：明确「辅助交易系统」定位与不进行真实报单；实盘在他端完成；paper trading 为本地模拟。
 - [新功能] 新增分钟级 intraday / paper trading 主链路：`stock_intraday_bar`、`intraday_signal_record`、paper account/order/fill/intraday snapshot 模型，`IntradaySignalEngine`（VWAP/EMA/MACD/RSI/量价/开盘区间）、`IntradaySignalService`、`IntradaySchedulerService`、`PaperTradingService`，以及 `/api/v1/intraday/*`、`/api/v1/paper-trading/*` API 与 `main.py --intraday` CLI 入口。
 - [测试] 新增 `tests/test_intraday_signal_engine.py`、`tests/test_intraday_repository.py`、`tests/test_intraday_api.py`，覆盖分钟级信号引擎、分钟线/信号仓储与 intraday + paper trading API 闭环。
 - [文档] 新增 `docs/intraday-refactor-plan.md` 固化分钟级日内交易重构方案；README / `docs/README_EN.md` 补充分钟级信号、paper trading API 与 `--intraday` CLI 实验入口说明，明确当前阶段以 yfinance 的美股 / 美期货 / 加密分钟线为主路径、暂不接真实下单。

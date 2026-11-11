@@ -41,8 +41,6 @@ const HomePage: React.FC = () => {
     toggleSelectAllVisible,
     deleteSelectedHistory,
     submitAnalysis,
-    notify,
-    setNotify,
     syncTaskCreated,
     syncTaskUpdated,
     syncTaskFailed,
@@ -170,15 +168,6 @@ const HomePage: React.FC = () => {
                 className={inputError ? 'border-danger/50' : undefined}
               />
             </div>
-            <label className="flex h-10 flex-shrink-0 cursor-pointer items-center gap-1.5 rounded-xl border border-subtle bg-surface/60 px-3 text-xs text-secondary-text select-none transition-colors hover:border-subtle-hover hover:text-foreground">
-              <input
-                type="checkbox"
-                checked={notify}
-                onChange={(e) => setNotify(e.target.checked)}
-                className="h-3.5 w-3.5 rounded border-border accent-primary"
-              />
-              推送通知
-            </label>
             <button
               type="button"
               onClick={() => handleSubmitAnalysis()}

@@ -89,8 +89,8 @@ class AnalyzeRequest(BaseModel):
         example="autocomplete"
     )
     notify: bool = Field(
-        True,
-        description="是否发送推送通知（Telegram/企业微信等）"
+        False,
+        description="是否在分析完成后向外部通知渠道推送（默认关闭；Web 以页面内结果为准）"
     )
 
     class Config:
@@ -105,7 +105,7 @@ class AnalyzeRequest(BaseModel):
                 "stock_name": "Apple Inc.",
                 "original_query": "AAPL",
                 "selection_source": "manual",
-                "notify": True
+                "notify": False
             }
         }
 

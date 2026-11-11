@@ -1,6 +1,7 @@
 import { useCallback, useMemo, useRef, useState } from 'react';
 import { createParsedApiError, getParsedApiError, type ParsedApiError } from '../api/error';
 import { systemConfigApi, SystemConfigConflictError, SystemConfigValidationError } from '../api/systemConfig';
+import { WEB_HIDDEN_SETTINGS_CATEGORIES } from '../constants/settingsCategories';
 import type {
   ConfigValidationIssue,
   SystemConfigCategorySchema,
@@ -122,13 +123,18 @@ export function useSystemConfig() {
       categoryMap.get(category)?.fields.push(item.schema);
     }
 
-    return [...categoryMap.values()].sort((a, b) => a.displayOrder - b.displayOrder);
+    return [...categoryMap.values()]
+      .filter((c) => !WEB_HIDDEN_SETTINGS_CATEGORIES.has(c.category))
+      .sort((a, b) => a.displayOrder - b.displayOrder);
   }, [mergedItems]);
 
   const itemsByCategory = useMemo(() => {
     const map: Record<string, SystemConfigItem[]> = {};
     for (const item of mergedItems) {
       const category = item.schema?.category ?? 'uncategorized';
+      if (WEB_HIDDEN_SETTINGS_CATEGORIES.has(category)) {
+        continue;
+      }
       if (!map[category]) {
         map[category] = [];
       }

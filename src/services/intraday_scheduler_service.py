@@ -1,4 +1,4 @@
-"""分钟级调度服务。"""
+"""日线级信号调度服务。"""
 
 from __future__ import annotations
 
@@ -12,7 +12,7 @@ from src.services.paper_trading_service import PaperTradingService
 
 
 class IntradaySchedulerService:
-    """以后台线程按分钟滚动执行分钟级信号与模拟交易。"""
+    """以后台线程低频执行日线信号与模拟交易。"""
 
     def __init__(
         self,
@@ -33,16 +33,18 @@ class IntradaySchedulerService:
         *,
         symbols: List[str],
         intervals: List[str],
-        lookback_minutes: int = 390,
-        poll_seconds: int = 60,
+        lookback_days: int = 120,
+        lookback_minutes: Optional[int] = None,
+        poll_seconds: int = 3600,
         paper_account_ids: Optional[List[int]] = None,
         order_quantity: float = 1.0,
     ) -> Dict[str, Any]:
+        days = self._resolve_lookback_days(lookback_days, lookback_minutes)
         with self._lock:
             self._job_config = {
                 "symbols": [s for s in symbols if (s or "").strip()],
                 "intervals": [i for i in intervals if (i or "").strip()],
-                "lookback_minutes": int(lookback_minutes),
+                "lookback_days": days,
                 "poll_seconds": max(5, int(poll_seconds)),
                 "paper_account_ids": paper_account_ids or [],
                 "order_quantity": float(order_quantity),
@@ -67,14 +69,16 @@ class IntradaySchedulerService:
         *,
         symbols: List[str],
         intervals: List[str],
-        lookback_minutes: int = 390,
+        lookback_days: int = 120,
+        lookback_minutes: Optional[int] = None,
         paper_account_ids: Optional[List[int]] = None,
         order_quantity: float = 1.0,
     ) -> Dict[str, Any]:
+        days = self._resolve_lookback_days(lookback_days, lookback_minutes)
         config = {
             "symbols": [s for s in symbols if (s or "").strip()],
             "intervals": [i for i in intervals if (i or "").strip()],
-            "lookback_minutes": int(lookback_minutes),
+            "lookback_days": days,
             "paper_account_ids": paper_account_ids or [],
             "order_quantity": float(order_quantity),
         }
@@ -105,7 +109,7 @@ class IntradaySchedulerService:
                 signal = self.signal_service.analyze_symbol(
                     code=symbol,
                     interval=interval,
-                    lookback_minutes=int(config.get("lookback_minutes", 390)),
+                    lookback_days=int(config.get("lookback_days", 120)),
                     refresh_data=True,
                 )
                 results.append(signal)
@@ -121,6 +125,12 @@ class IntradaySchedulerService:
             "signal_count": len(results),
             "results": results,
         }
+
+    @staticmethod
+    def _resolve_lookback_days(lookback_days: int, lookback_minutes: Optional[int]) -> int:
+        if lookback_minutes is not None:
+            return max(30, min(2000, int(lookback_minutes / 1440) or 1))
+        return max(30, min(2000, int(lookback_days or 120)))
 
 
 _SCHEDULER_SINGLETON: Optional[IntradaySchedulerService] = None

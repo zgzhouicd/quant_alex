@@ -22,7 +22,6 @@ type SubmitAnalysisOptions = {
   stockName?: string;
   originalQuery?: string;
   selectionSource?: SelectionSource;
-  notify?: boolean;
 };
 
 let reportRequestSeq = 0;
@@ -33,7 +32,6 @@ const dismissedTaskIds = new Set<string>();
 export interface StockPoolState {
   query: string;
   selectionSource: SelectionSource;
-  notify: boolean;
   inputError?: string;
   duplicateError: string | null;
   error: ParsedApiError | null;
@@ -62,7 +60,6 @@ export interface StockPoolState {
   toggleSelectAllVisible: () => void;
   deleteSelectedHistory: () => Promise<void>;
   submitAnalysis: (options?: SubmitAnalysisOptions) => Promise<void>;
-  setNotify: (notify: boolean) => void;
   syncTaskCreated: (task: TaskInfo) => void;
   syncTaskUpdated: (task: TaskInfo) => void;
   syncTaskFailed: (task: TaskInfo) => void;
@@ -73,7 +70,6 @@ export interface StockPoolState {
 const initialState = {
   query: '',
   selectionSource: 'manual' as SelectionSource,
-  notify: true,
   inputError: undefined,
   duplicateError: null,
   error: null,
@@ -188,8 +184,6 @@ export const useStockPoolStore = create<StockPoolState>((set, get) => ({
   clearError: () => set({ error: null }),
 
   clearInlineMessages: () => set({ inputError: undefined, duplicateError: null }),
-
-  setNotify: (notify) => set({ notify }),
 
   openMarkdownDrawer: () => set({ markdownDrawerOpen: true }),
 
@@ -307,8 +301,6 @@ export const useStockPoolStore = create<StockPoolState>((set, get) => ({
     const stockName = options?.stockName;
     const selectionSource = options?.selectionSource ?? state.selectionSource;
     const originalQuery = (options?.originalQuery ?? state.query).trim();
-    const notify = options?.notify ?? state.notify;
-
     if (!stockCodeInput) {
       set({ inputError: '请输入股票代码', duplicateError: null });
       return;
@@ -344,7 +336,7 @@ export const useStockPoolStore = create<StockPoolState>((set, get) => ({
         stockName,
         originalQuery: originalQuery || stockCodeInput,
         selectionSource,
-        notify,
+        notify: false,
       });
 
       if (requestId !== analyzeRequestSeq) {

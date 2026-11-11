@@ -1,4 +1,4 @@
-"""分钟级指标与信号引擎。"""
+"""日线级指标与信号引擎。"""
 
 from __future__ import annotations
 
@@ -66,7 +66,7 @@ class IntradaySignalResult:
 
 
 class IntradaySignalEngine:
-    """基于分钟级 OHLCV 计算 VWAP / EMA / MACD / RSI 与结构化信号。"""
+    """基于 OHLCV 计算 VWAP / EMA / MACD / RSI 与结构化信号。"""
 
     EMA_FAST = 9
     EMA_SLOW = 21
@@ -84,7 +84,8 @@ class IntradaySignalEngine:
         frame = self._prepare_frame(df, code=code, interval=interval)
         latest = frame.iloc[-1]
 
-        signal, setup, reasons = self._decide_signal(frame)
+        is_daily = self._is_daily_interval(interval)
+        signal, setup, reasons = self._decide_signal(frame, is_daily=is_daily)
         score = min(1.0, max(0.0, len(reasons) / 5.0))
         if signal == "neutral":
             score = min(score, 0.55)
@@ -103,6 +104,7 @@ class IntradaySignalEngine:
             "ema_slow_name": f"ema_{self.EMA_SLOW}",
             "macd_hist": round(float(latest["macd_hist"]), 4),
             "session_vwap_ready": bool(latest["session_volume_cum"] > 0),
+            "signal_timeframe": "daily" if is_daily else "intraday",
         }
 
         return IntradaySignalResult(
@@ -144,12 +146,19 @@ class IntradaySignalEngine:
         if frame.empty:
             raise ValueError("intraday dataframe has no usable rows")
 
+        interval_minutes = self._interval_to_minutes(interval)
+        is_daily = self._is_daily_interval(interval)
         session_tz = self._infer_session_timezone(code)
         frame["session_date"] = frame["timestamp"].dt.tz_convert(session_tz).dt.date
         typical_price = (frame["high"] + frame["low"] + frame["close"]) / 3.0
-        pv = typical_price * frame["volume"].fillna(0.0)
-        frame["session_volume_cum"] = frame.groupby("session_date")["volume"].transform(lambda s: s.fillna(0.0).cumsum())
-        frame["session_pv_cum"] = pv.groupby(frame["session_date"]).cumsum()
+        volume = frame["volume"].fillna(0.0)
+        pv = typical_price * volume
+        if is_daily:
+            frame["session_volume_cum"] = volume.rolling(window=self.VOLUME_WINDOW, min_periods=1).sum()
+            frame["session_pv_cum"] = pv.rolling(window=self.VOLUME_WINDOW, min_periods=1).sum()
+        else:
+            frame["session_volume_cum"] = frame.groupby("session_date")["volume"].transform(lambda s: s.fillna(0.0).cumsum())
+            frame["session_pv_cum"] = pv.groupby(frame["session_date"]).cumsum()
         frame["vwap_session"] = frame["session_pv_cum"] / frame["session_volume_cum"].replace(0, pd.NA)
         frame["vwap_session"] = frame["vwap_session"].ffill().fillna(frame["close"])
 
@@ -169,29 +178,35 @@ class IntradaySignalEngine:
         rs = avg_gain / avg_loss.replace(0, pd.NA)
         frame["rsi"] = (100 - (100 / (1 + rs))).fillna(50.0)
 
-        interval_minutes = self._interval_to_minutes(interval)
-        opening_bars = max(1, int(30 / max(interval_minutes, 1)))
-        frame["opening_range_high"] = frame.groupby("session_date")["high"].transform(
-            lambda s: s.iloc[:opening_bars].max()
-        )
-        frame["opening_range_low"] = frame.groupby("session_date")["low"].transform(
-            lambda s: s.iloc[:opening_bars].min()
-        )
+        if is_daily:
+            frame["opening_range_high"] = frame["high"].rolling(window=self.RECENT_WINDOW, min_periods=1).max()
+            frame["opening_range_low"] = frame["low"].rolling(window=self.RECENT_WINDOW, min_periods=1).min()
+        else:
+            opening_bars = max(1, int(30 / max(interval_minutes, 1)))
+            frame["opening_range_high"] = frame.groupby("session_date")["high"].transform(
+                lambda s: s.iloc[:opening_bars].max()
+            )
+            frame["opening_range_low"] = frame.groupby("session_date")["low"].transform(
+                lambda s: s.iloc[:opening_bars].min()
+            )
         frame["recent_high"] = frame["high"].rolling(window=self.RECENT_WINDOW, min_periods=1).max()
         frame["recent_low"] = frame["low"].rolling(window=self.RECENT_WINDOW, min_periods=1).min()
         avg_vol = frame["volume"].rolling(window=self.VOLUME_WINDOW, min_periods=1).mean()
         frame["volume_ratio"] = (frame["volume"] / avg_vol.replace(0, pd.NA)).fillna(1.0)
         return frame
 
-    def _decide_signal(self, frame: pd.DataFrame) -> tuple[str, str, List[str]]:
+    def _decide_signal(self, frame: pd.DataFrame, *, is_daily: bool = False) -> tuple[str, str, List[str]]:
         latest = frame.iloc[-1]
         reasons: List[str] = []
         bearish_reasons: List[str] = []
+        vwap_label = "20日量价均衡线" if is_daily else "会话 VWAP"
+        breakout_high_label = "突破近20日高点" if is_daily else "突破开盘区间高点"
+        breakout_low_label = "跌破近20日低点" if is_daily else "跌破开盘区间低点"
 
         if latest["close"] > latest["vwap_session"]:
-            reasons.append("价格位于会话 VWAP 上方")
+            reasons.append(f"价格位于{vwap_label}上方")
         else:
-            bearish_reasons.append("价格位于会话 VWAP 下方")
+            bearish_reasons.append(f"价格位于{vwap_label}下方")
 
         if latest["ema_fast"] > latest["ema_slow"]:
             reasons.append(f"EMA{self.EMA_FAST} 高于 EMA{self.EMA_SLOW}")
@@ -214,28 +229,34 @@ class IntradaySignalEngine:
             bearish_reasons.append("量能低于近期均值")
 
         if latest["close"] >= latest["opening_range_high"]:
-            reasons.append("突破开盘区间高点")
+            reasons.append(breakout_high_label)
         elif latest["close"] <= latest["opening_range_low"]:
-            bearish_reasons.append("跌破开盘区间低点")
+            bearish_reasons.append(breakout_low_label)
 
         if len(reasons) >= 4:
-            return "long", "intraday_momentum_long", reasons
+            return "long", "daily_momentum_long" if is_daily else "intraday_momentum_long", reasons
         if len(bearish_reasons) >= 4:
-            return "short", "intraday_momentum_short", bearish_reasons
+            return "short", "daily_momentum_short" if is_daily else "intraday_momentum_short", bearish_reasons
         if len(reasons) >= len(bearish_reasons):
             merged = reasons or ["信号分歧，维持观望"]
-            return "neutral", "mixed_intraday_conditions", merged
+            return "neutral", "mixed_daily_conditions" if is_daily else "mixed_intraday_conditions", merged
         merged = bearish_reasons or ["信号分歧，维持观望"]
-        return "neutral", "mixed_intraday_conditions", merged
+        return "neutral", "mixed_daily_conditions" if is_daily else "mixed_intraday_conditions", merged
 
     @staticmethod
     def _interval_to_minutes(interval: str) -> int:
         text = (interval or "1m").strip().lower()
+        if text in {"1d", "d", "day", "daily"}:
+            return 1440
         if text.endswith("m") and text[:-1].isdigit():
             return max(1, int(text[:-1]))
         if text.endswith("h") and text[:-1].isdigit():
             return max(1, int(text[:-1]) * 60)
         return 1
+
+    @staticmethod
+    def _is_daily_interval(interval: str) -> bool:
+        return (interval or "").strip().lower() in {"1d", "d", "day", "daily"}
 
     @staticmethod
     def _infer_session_timezone(code: str) -> str:

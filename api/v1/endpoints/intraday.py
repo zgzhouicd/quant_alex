@@ -1,12 +1,13 @@
-"""分钟级数据与信号 API。"""
+"""日线级数据与信号 API。"""
 
 from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
-from typing import List
+from typing import List, Optional
 
 from fastapi import APIRouter, HTTPException, Query
 
+from data_provider.base import DataFetchError
 from api.v1.schemas.common import ErrorResponse
 from api.v1.schemas.intraday import (
     IntradayBarsResponse,
@@ -27,26 +28,74 @@ def _bad_request(message: str) -> HTTPException:
     return HTTPException(status_code=400, detail={"error": "validation_error", "message": message})
 
 
+def _upstream_data_error(exc: DataFetchError) -> HTTPException:
+    """行情来自外部数据源；失败时返回 502 与可读原因，避免笼统 500。"""
+    text = str(exc).strip()
+    if len(text) > 4000:
+        text = text[:3997] + "..."
+    return HTTPException(
+        status_code=502,
+        detail={
+            "error": "data_fetch_error",
+            "message": text or "日线数据拉取失败（请检查网络、代理或数据源可用性）",
+        },
+    )
+
+
+def _insufficient_bars_error(exc: ValueError) -> HTTPException:
+    msg = str(exc).strip()
+    if "intraday dataframe is empty" in msg:
+        return HTTPException(
+            status_code=400,
+            detail={
+                "error": "insufficient_intraday_data",
+                "message": (
+                    "无可用日线K线：数据源未返回数据或本地库中无该标的/周期的记录。"
+                    "可检查网络/代理，或关闭「刷新」以仅使用已缓存的日线。"
+                ),
+            },
+        )
+    return HTTPException(status_code=400, detail={"error": "validation_error", "message": msg or "invalid input"})
+
+
+def _resolve_lookback_days(
+    lookback_days: Optional[int],
+    lookback_minutes: Optional[int],
+) -> int:
+    if lookback_days is not None:
+        return lookback_days
+    if lookback_minutes is not None:
+        return max(30, min(2000, int(lookback_minutes / 1440) or 1))
+    return 120
+
+
 @router.get(
     "/bars",
     response_model=IntradayBarsResponse,
     responses={400: {"model": ErrorResponse}, 500: {"model": ErrorResponse}},
-    summary="Query intraday bars",
+    summary="查询 K 线（默认日线 1d）",
 )
 def get_intraday_bars(
     code: str = Query(..., min_length=1),
-    interval: str = Query("1m"),
-    lookback_minutes: int = Query(390, ge=30, le=10080),
+    interval: str = Query("1d"),
+    lookback_days: Optional[int] = Query(None, ge=30, le=2000),
+    lookback_minutes: Optional[int] = Query(None, ge=30, le=10080),
     refresh: bool = Query(True),
 ) -> IntradayBarsResponse:
     service = IntradaySignalService()
     repo = IntradayRepository()
+    days = _resolve_lookback_days(lookback_days, lookback_minutes)
     if refresh:
-        fetch_result = service.fetch_and_store_bars(code=code, interval=interval, lookback_minutes=lookback_minutes)
+        try:
+            fetch_result = service.fetch_and_store_bars(
+                code=code, interval=interval, lookback_days=days
+            )
+        except DataFetchError as exc:
+            raise _upstream_data_error(exc) from exc
         source = fetch_result["source"]
     else:
         source = None
-    start_time = datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(minutes=lookback_minutes)
+    start_time = datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(days=days)
     bars = repo.get_bars(code=code.upper(), interval=interval, start_time=start_time)
     payload = []
     for row in bars:
@@ -61,21 +110,28 @@ def get_intraday_bars(
     "/signal",
     response_model=IntradaySignalResponse,
     responses={400: {"model": ErrorResponse}, 500: {"model": ErrorResponse}},
-    summary="Generate intraday signal for one symbol",
+    summary="生成结构化信号（默认周期 1d）",
 )
 def analyze_intraday_signal(
     code: str = Query(..., min_length=1),
-    interval: str = Query("1m"),
-    lookback_minutes: int = Query(390, ge=30, le=10080),
+    interval: str = Query("1d"),
+    lookback_days: Optional[int] = Query(None, ge=30, le=2000),
+    lookback_minutes: Optional[int] = Query(None, ge=30, le=10080),
     refresh: bool = Query(True),
 ) -> IntradaySignalResponse:
     service = IntradaySignalService()
-    result = service.analyze_symbol(
-        code=code,
-        interval=interval,
-        lookback_minutes=lookback_minutes,
-        refresh_data=refresh,
-    )
+    days = _resolve_lookback_days(lookback_days, lookback_minutes)
+    try:
+        result = service.analyze_symbol(
+            code=code,
+            interval=interval,
+            lookback_days=days,
+            refresh_data=refresh,
+        )
+    except DataFetchError as exc:
+        raise _upstream_data_error(exc) from exc
+    except ValueError as exc:
+        raise _insufficient_bars_error(exc) from exc
     return IntradaySignalResponse(**result)
 
 
@@ -83,23 +139,30 @@ def analyze_intraday_signal(
     "/signals/batch",
     response_model=IntradaySignalBatchResponse,
     responses={400: {"model": ErrorResponse}, 500: {"model": ErrorResponse}},
-    summary="Generate intraday signals for multiple symbols",
+    summary="批量生成信号（默认周期 1d）",
 )
 def analyze_intraday_signal_batch(
     symbols: List[str],
-    interval: str = Query("1m"),
-    lookback_minutes: int = Query(390, ge=30, le=10080),
+    interval: str = Query("1d"),
+    lookback_days: Optional[int] = Query(None, ge=30, le=2000),
+    lookback_minutes: Optional[int] = Query(None, ge=30, le=10080),
     refresh: bool = Query(True),
 ) -> IntradaySignalBatchResponse:
     if not symbols:
         raise _bad_request("symbols is required")
     service = IntradaySignalService()
-    items = service.analyze_symbols(
-        symbols=symbols,
-        interval=interval,
-        lookback_minutes=lookback_minutes,
-        refresh_data=refresh,
-    )
+    days = _resolve_lookback_days(lookback_days, lookback_minutes)
+    try:
+        items = service.analyze_symbols(
+            symbols=symbols,
+            interval=interval,
+            lookback_days=days,
+            refresh_data=refresh,
+        )
+    except DataFetchError as exc:
+        raise _upstream_data_error(exc) from exc
+    except ValueError as exc:
+        raise _insufficient_bars_error(exc) from exc
     return IntradaySignalBatchResponse(items=[IntradaySignalResponse(**item) for item in items])
 
 
@@ -107,11 +170,11 @@ def analyze_intraday_signal_batch(
     "/signal/latest",
     response_model=IntradaySignalResponse,
     responses={404: {"model": ErrorResponse}, 500: {"model": ErrorResponse}},
-    summary="Get latest stored intraday signal",
+    summary="读取最近落库信号（默认周期 1d）",
 )
 def get_latest_intraday_signal(
     code: str = Query(..., min_length=1),
-    interval: str = Query("1m"),
+    interval: str = Query("1d"),
 ) -> IntradaySignalResponse:
     service = IntradaySignalService()
     result = service.get_latest_signal(code=code, interval=interval)
@@ -124,7 +187,7 @@ def get_latest_intraday_signal(
     "/scheduler/start",
     response_model=IntradaySchedulerStatusResponse,
     responses={400: {"model": ErrorResponse}},
-    summary="Start background intraday scheduler",
+    summary="启动后台信号调度（默认 1d + 低频轮询）",
 )
 def start_intraday_scheduler(request: IntradaySchedulerStartRequest) -> IntradaySchedulerStatusResponse:
     if not request.symbols:
@@ -137,7 +200,7 @@ def start_intraday_scheduler(request: IntradaySchedulerStartRequest) -> Intraday
     "/scheduler/run-once",
     response_model=IntradaySchedulerStatusResponse,
     responses={400: {"model": ErrorResponse}},
-    summary="Run intraday scheduler cycle once",
+    summary="执行一轮调度（默认 1d）",
 )
 def run_intraday_scheduler_once(request: IntradaySchedulerRunOnceRequest) -> IntradaySchedulerStatusResponse:
     if not request.symbols:
@@ -150,7 +213,7 @@ def run_intraday_scheduler_once(request: IntradaySchedulerRunOnceRequest) -> Int
 @router.post(
     "/scheduler/stop",
     response_model=IntradaySchedulerStatusResponse,
-    summary="Stop background intraday scheduler",
+    summary="停止后台调度",
 )
 def stop_intraday_scheduler() -> IntradaySchedulerStatusResponse:
     scheduler = get_intraday_scheduler_service()
@@ -160,7 +223,7 @@ def stop_intraday_scheduler() -> IntradaySchedulerStatusResponse:
 @router.get(
     "/scheduler/status",
     response_model=IntradaySchedulerStatusResponse,
-    summary="Get intraday scheduler status",
+    summary="调度器状态",
 )
 def get_intraday_scheduler_status() -> IntradaySchedulerStatusResponse:
     scheduler = get_intraday_scheduler_service()

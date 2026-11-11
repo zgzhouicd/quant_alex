@@ -7,7 +7,7 @@ import SettingsPage from './pages/SettingsPage';
 import LoginPage from './pages/LoginPage';
 import NotFoundPage from './pages/NotFoundPage';
 import ChatPage from './pages/ChatPage';
-import PortfolioPage from './pages/PortfolioPage';
+import DecisionPage from './pages/DecisionPage';
 import { ApiErrorAlert, Shell } from './components/common';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { useAgentChatStore } from './stores/agentChatStore';
@@ -63,7 +63,8 @@ const AppContent: React.FC = () => {
       <Route element={<Shell />}>
         <Route path="/" element={<HomePage />} />
         <Route path="/chat" element={<ChatPage />} />
-        <Route path="/portfolio" element={<PortfolioPage />} />
+        <Route path="/decision" element={<DecisionPage />} />
+        <Route path="/intraday" element={<Navigate to="/decision" replace />} />
         <Route path="/backtest" element={<BacktestPage />} />
         <Route path="/settings" element={<SettingsPage />} />
         <Route path="*" element={<NotFoundPage />} />

@@ -42,6 +42,35 @@ class IntradaySignalEngineTestCase(unittest.TestCase):
         self.assertGreater(result.last_price, result.vwap_session)
         self.assertGreaterEqual(len(result.reasons), 4)
 
+    def test_analyze_daily_interval_marks_payload_and_setup(self) -> None:
+        base = datetime(2025, 1, 2, tzinfo=timezone.utc)
+        rows = []
+        price = 100.0
+        for i in range(40):
+            d = base + timedelta(days=i)
+            close = price + 0.35
+            rows.append(
+                {
+                    "timestamp": d,
+                    "open": price,
+                    "high": close + 0.15,
+                    "low": price - 0.1,
+                    "close": close,
+                    "volume": 1_000_000 + i * 2000,
+                    "amount": close * (1_000_000 + i * 2000),
+                    "pct_chg": 0.15,
+                    "interval": "1d",
+                }
+            )
+            price = close
+
+        df = pd.DataFrame(rows)
+        engine = IntradaySignalEngine()
+        result = engine.analyze(df, code="AAPL", interval="1d")
+
+        self.assertEqual(result.payload.get("signal_timeframe"), "daily")
+        self.assertTrue(result.setup.startswith("daily_") or "daily" in result.setup)
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -1,7 +1,6 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { createMemoryRouter, MemoryRouter, RouterProvider } from 'react-router-dom';
 import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
-import { createParsedApiError } from '../../api/error';
 import { historyApi } from '../../api/history';
 import type { Message } from '../../stores/agentChatStore';
 import ChatPage from '../ChatPage';
@@ -19,15 +18,11 @@ function createDeferred<T>() {
 const {
   mockGetSkills,
   mockDeleteChatSession,
-  mockSendChat,
   mockDownloadSession,
-  mockFormatSessionAsMarkdown,
 } = vi.hoisted(() => ({
   mockGetSkills: vi.fn(),
   mockDeleteChatSession: vi.fn(),
-  mockSendChat: vi.fn(),
   mockDownloadSession: vi.fn(),
-  mockFormatSessionAsMarkdown: vi.fn(),
 }));
 
 const mockLoadSessions = vi.fn();
@@ -64,13 +59,11 @@ vi.mock('../../api/agent', () => ({
   agentApi: {
     getSkills: mockGetSkills,
     deleteChatSession: mockDeleteChatSession,
-    sendChat: mockSendChat,
   },
 }));
 
 vi.mock('../../utils/chatExport', () => ({
   downloadSession: mockDownloadSession,
-  formatSessionAsMarkdown: mockFormatSessionAsMarkdown,
 }));
 
 vi.mock('../../api/history', () => ({
@@ -146,9 +139,7 @@ beforeEach(() => {
     default_skill_id: 'bull_trend',
   });
   mockDeleteChatSession.mockResolvedValue(undefined);
-  mockSendChat.mockResolvedValue({ success: true });
   mockDownloadSession.mockImplementation(() => {});
-  mockFormatSessionAsMarkdown.mockReturnValue('# exported session');
 });
 
 describe('ChatPage', () => {
@@ -208,7 +199,6 @@ describe('ChatPage', () => {
 
     expect(await screen.findByRole('heading', { name: '问股' })).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: '导出会话' })).not.toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: '发送到已配置的通知机器人/邮箱' })).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: '历史对话' })).toBeInTheDocument();
   });
 
@@ -227,7 +217,6 @@ describe('ChatPage', () => {
     fireEvent.click(await screen.findByRole('button', { name: '导出会话为 Markdown 文件' }));
 
     expect(mockDownloadSession).toHaveBeenCalledWith(mockStoreState.messages);
-    expect(mockFormatSessionAsMarkdown).not.toHaveBeenCalled();
   });
 
   it('renders assistant skill labels with shared badge semantics', async () => {
@@ -262,85 +251,6 @@ describe('ChatPage', () => {
 
     expect(actionGroup).toHaveClass('chat-message-actions');
     expect(actionGroup?.className).not.toMatch(/pointer-events-none|opacity-0/);
-  });
-
-  it('sends exported markdown to notification channel and shows success feedback', async () => {
-    mockStoreState.messages = [
-      { id: 'user-1', role: 'user', content: '请分析 600519' },
-      { id: 'assistant-1', role: 'assistant', content: '趋势偏强', skillName: '趋势分析' },
-    ];
-    mockFormatSessionAsMarkdown.mockReturnValue('# exported markdown');
-
-    render(
-      <MemoryRouter initialEntries={['/chat']}>
-        <ChatPage />
-      </MemoryRouter>
-    );
-
-    fireEvent.click(await screen.findByRole('button', { name: '发送到已配置的通知机器人/邮箱' }));
-
-    await waitFor(() => {
-      expect(mockFormatSessionAsMarkdown).toHaveBeenCalledWith(mockStoreState.messages);
-      expect(mockSendChat).toHaveBeenCalledWith('# exported markdown');
-    });
-
-    expect(await screen.findByText('已发送到通知渠道')).toBeInTheDocument();
-  });
-
-  it('shows parsed error feedback when notification delivery fails', async () => {
-    mockStoreState.messages = [
-      { id: 'user-1', role: 'user', content: '请分析 AAPL' },
-      { id: 'assistant-1', role: 'assistant', content: '短线震荡', skillName: '趋势分析' },
-    ];
-    mockSendChat.mockRejectedValue(
-      createParsedApiError({
-        title: '发送失败',
-        message: '通知渠道不可用',
-        category: 'unknown',
-      }),
-    );
-
-    render(
-      <MemoryRouter initialEntries={['/chat']}>
-        <ChatPage />
-      </MemoryRouter>
-    );
-
-    fireEvent.click(await screen.findByRole('button', { name: '发送到已配置的通知机器人/邮箱' }));
-
-    expect(await screen.findByText('通知渠道不可用')).toBeInTheDocument();
-  });
-
-  it('prevents duplicate notification sends while the request is in flight', async () => {
-    mockStoreState.messages = [
-      { id: 'user-1', role: 'user', content: '请分析 TSLA' },
-      { id: 'assistant-1', role: 'assistant', content: '波动较大', skillName: '趋势分析' },
-    ];
-    const deferred = createDeferred<{ success: boolean }>();
-    mockSendChat.mockImplementation(() => deferred.promise);
-
-    render(
-      <MemoryRouter initialEntries={['/chat']}>
-        <ChatPage />
-      </MemoryRouter>
-    );
-
-    const sendButton = await screen.findByRole('button', { name: '发送到已配置的通知机器人/邮箱' });
-    fireEvent.click(sendButton);
-
-    await waitFor(() => {
-      expect(mockSendChat).toHaveBeenCalledTimes(1);
-      expect(sendButton).toBeDisabled();
-    });
-
-    fireEvent.click(sendButton);
-    expect(mockSendChat).toHaveBeenCalledTimes(1);
-
-    deferred.resolve({ success: true });
-
-    await waitFor(() => {
-      expect(sendButton).not.toBeDisabled();
-    });
   });
 
   it('allows sending with base follow-up context before report hydration completes', async () => {

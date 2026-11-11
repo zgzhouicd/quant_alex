@@ -818,12 +818,14 @@ class DataFetcherManager:
         """
         初始化默认数据源列表。
 
-        默认链：Yahoo Finance + 长桥（美股 / 期货 / 加密等国际标的）。
+        默认链：Binance 现货公共 K 线（加密货币 intraday 优先）+ Yahoo Finance + 长桥。
         A 股 / 港股专用 fetcher 已从本仓库移除；扩展数据源请自行实现 BaseFetcher 并 add_fetcher()。
         """
+        from .binance_public_fetcher import BinancePublicFetcher
         from .yfinance_fetcher import YfinanceFetcher
         from .longbridge_fetcher import LongbridgeFetcher
 
+        binance = BinancePublicFetcher()
         yfinance = YfinanceFetcher()
         longbridge = LongbridgeFetcher()  # 长桥（美股/港股兜底，懒加载）
 
@@ -831,6 +833,7 @@ class DataFetcherManager:
         self._ensure_concurrency_guards()
         with self._fetchers_lock:
             self._fetchers = [
+                binance,
                 yfinance,
                 longbridge,
             ]
@@ -880,7 +883,12 @@ class DataFetcherManager:
         errors = []
         request_start = time.time()
 
-        preferred_order = ["YfinanceFetcher", "LongbridgeFetcher"]
+        from .binance_public_fetcher import should_prefer_binance_intraday
+
+        if should_prefer_binance_intraday(stock_code):
+            preferred_order = ["BinancePublicFetcher", "YfinanceFetcher", "LongbridgeFetcher"]
+        else:
+            preferred_order = ["YfinanceFetcher", "LongbridgeFetcher"]
 
         for source_name in preferred_order:
             for fetcher in fetchers:

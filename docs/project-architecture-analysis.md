@@ -31,6 +31,8 @@
 | 机器人 | `bot/` | IM 接入 |
 | 部署 | `docker/`、`scripts/` | 镜像、Compose、本地脚本 |
 
+**产品定位与实盘边界**：本系统为**辅助交易系统**，不向券商或交易所发送真实委托；用户实盘开仓、平仓、反手在**他端**执行。`paper_trading` 与日内调度中的自动成交仅为**本地模拟**。详见 [架构详解 — 辅助交易与实盘边界](./architecture-detailed-guide.md#辅助交易与实盘边界)。
+
 ---
 
 ## 二、运行流程
@@ -121,7 +123,7 @@
 
 **建议：** 对外统一推荐 `session_scope()`，逐步收敛 API。
 
-**状态：** 返回 ORM 实体并在会话外继续使用的路径（如 `storage` 读表、`backtest_repo`、`stock_repo`、`portfolio_repo`）仍用 `get_session` + 显式 `commit`，避免 `session_scope` 关闭后出现 DetachedInstanceError；`session_scope` 仍推荐用于纯服务内短事务。异步任务写库在 `storage` 内显式 `commit`。
+**状态：** 返回 ORM 实体并在会话外继续使用的路径（如 `storage` 读表、`backtest_repo`、`stock_repo`）仍用 `get_session` + 显式 `commit`，避免 `session_scope` 关闭后出现 DetachedInstanceError；`session_scope` 仍推荐用于纯服务内短事务。异步任务写库在 `storage` 内显式 `commit`。
 
 #### P8. `_find_sniper_in_dashboard` 嵌套深度硬编码
 

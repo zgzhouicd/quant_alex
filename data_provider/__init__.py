@@ -7,6 +7,7 @@
 """
 
 from .base import BaseFetcher, DataFetcherManager
+from .binance_public_fetcher import BinancePublicFetcher, binance_spot_symbol_for_intraday
 from .yfinance_fetcher import YfinanceFetcher
 from .longbridge_fetcher import LongbridgeFetcher
 from .us_index_mapping import (
@@ -20,6 +21,8 @@ from .us_index_mapping import (
 __all__ = [
     'BaseFetcher',
     'DataFetcherManager',
+    'BinancePublicFetcher',
+    'binance_spot_symbol_for_intraday',
     'YfinanceFetcher',
     'LongbridgeFetcher',
     'is_us_index_code',

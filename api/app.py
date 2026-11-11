@@ -132,11 +132,14 @@ def create_app(static_dir: Optional[Path] = None) -> FastAPI:
     
     has_frontend = static_dir.exists() and (static_dir / "index.html").exists()
     
+    # SPA 入口需避免浏览器长期缓存旧 index.html，否则仅重启后端仍可能一直命中旧 JS 引用。
+    _index_headers = {"Cache-Control": "no-cache, no-store, must-revalidate"}
+
     if has_frontend:
         @app.get("/", include_in_schema=False)
         async def root():
             """根路由 - 返回前端页面"""
-            return FileResponse(static_dir / "index.html")
+            return FileResponse(static_dir / "index.html", headers=_index_headers)
     else:
         _FRONTEND_NOT_BUILT_HTML = """<!DOCTYPE html>
 <html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
@@ -211,7 +214,7 @@ def create_app(static_dir: Optional[Path] = None) -> FastAPI:
                 content_type, _ = mimetypes.guess_type(str(file_path))
                 return FileResponse(file_path, media_type=content_type)
             
-            return FileResponse(static_dir / "index.html")
+            return FileResponse(static_dir / "index.html", headers=_index_headers)
     
     return app
 

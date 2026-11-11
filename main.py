@@ -43,6 +43,7 @@ if os.getenv("GITHUB_ACTIONS") != "true" and os.getenv("USE_PROXY", "false").low
     os.environ["https_proxy"] = proxy_url
 
 import argparse
+import json
 import logging
 import sys
 import time

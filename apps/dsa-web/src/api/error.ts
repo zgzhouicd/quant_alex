@@ -6,8 +6,7 @@ export type ApiErrorCategory =
   | 'llm_not_configured'
   | 'model_tool_incompatible'
   | 'invalid_tool_call'
-  | 'portfolio_oversell'
-  | 'portfolio_busy'
+  | 'data_fetch_error'
   | 'upstream_llm_400'
   | 'upstream_timeout'
   | 'upstream_network'
@@ -323,26 +322,6 @@ export function parseApiError(error: unknown): ParsedApiError {
     });
   }
 
-  if (errorCode === 'portfolio_oversell' || includesAny(matchText, ['oversell detected'])) {
-    return createParsedApiError({
-      title: '卖出数量超过可用持仓',
-      message: '卖出数量超过当前可用持仓，请删除或修正对应卖出流水后重试。',
-      rawMessage,
-      status,
-      category: 'portfolio_oversell',
-    });
-  }
-
-  if (errorCode === 'portfolio_busy' || includesAny(matchText, ['portfolio ledger is busy'])) {
-    return createParsedApiError({
-      title: '持仓账本正忙',
-      message: '持仓账本正在处理另一笔变更，请稍后重试。',
-      rawMessage,
-      status,
-      category: 'portfolio_busy',
-    });
-  }
-
   const noConfiguredLlm = (
     includesAny(matchText, ['all llm models failed']) && includesAny(matchText, ['last error: none'])
   ) || includesAny(matchText, [
@@ -399,6 +378,20 @@ export function parseApiError(error: unknown): ParsedApiError {
       rawMessage,
       status,
       category: 'upstream_timeout',
+    });
+  }
+
+  if (errorCode === 'data_fetch_error') {
+    const detail =
+      payloadText && payloadText !== 'data_fetch_error'
+        ? payloadText
+        : '本地服务在拉取行情或分钟线数据时失败，请检查网络、代理或数据源可用性后重试。';
+    return createParsedApiError({
+      title: '市场数据拉取失败',
+      message: detail,
+      rawMessage,
+      status,
+      category: 'data_fetch_error',
     });
   }
 

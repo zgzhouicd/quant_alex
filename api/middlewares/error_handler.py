@@ -78,7 +78,23 @@ def add_error_handlers(app) -> None:
     """
     from fastapi import HTTPException
     from fastapi.exceptions import RequestValidationError
-    
+
+    from data_provider.base import DataFetchError
+
+    @app.exception_handler(DataFetchError)
+    async def data_fetch_exception_handler(request: Request, exc: DataFetchError):
+        """行情/分钟线等数据源失败：返回 502，避免落入 Exception 兜底成笼统 500。"""
+        text = str(exc).strip()
+        if len(text) > 4000:
+            text = text[:3997] + "..."
+        return JSONResponse(
+            status_code=502,
+            content={
+                "error": "data_fetch_error",
+                "message": text or "数据拉取失败（请检查网络、代理或数据源可用性）",
+            },
+        )
+
     @app.exception_handler(HTTPException)
     async def http_exception_handler(request: Request, exc: HTTPException):
         """处理 HTTP 异常"""

@@ -71,18 +71,6 @@ export const agentApi = {
   async deleteChatSession(sessionId: string): Promise<void> {
     await apiClient.delete(`/api/v1/agent/chat/sessions/${sessionId}`);
   },
-  async sendChat(content: string): Promise<{ success: boolean }> {
-    const response = await apiClient.post<{
-      success: boolean;
-      error?: string;
-      message?: string;
-    }>('/api/v1/agent/chat/send', { content });
-    const data = response.data;
-    if (data.success === false) {
-      throw new Error(data.message || '发送失败');
-    }
-    return { success: true };
-  },
   async chatStream(
     payload: ChatStreamRequest,
     options?: ChatStreamOptions,

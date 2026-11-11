@@ -20,11 +20,20 @@ Analyze your watchlist daily → generate a decision dashboard → push to multi
 
 **Zero-cost deployment** · Runs on GitHub Actions · No server required
 
-[**Quick Start**](#-quick-start) · [**Key Features**](#-key-features) · [**Sample Output**](#-sample-output) · [**Architecture deep dive (diagrams)**](./architecture-detailed-guide.md) · [**Intraday Refactor Plan**](./intraday-refactor-plan.md) · [**Full Guide**](./full-guide_EN.md) · [**Small-scale ops boundary**](./small-scale-operations.md) · [**FAQ**](./FAQ_EN.md) · [**Contributing**](./CONTRIBUTING_EN.md) · [**All Docs**](./INDEX_EN.md)
+[**Quick Start**](#-quick-start) · [**Key Features**](#-key-features) · [**Sample Output**](#-sample-output) · [**Architecture deep dive (diagrams)**](./architecture-detailed-guide.md) · [**Intraday / daily signal plan**](./intraday-refactor-plan.md) · [**Full Guide**](./full-guide_EN.md) · [**Small-scale ops boundary**](./small-scale-operations.md) · [**FAQ**](./FAQ_EN.md) · [**Contributing**](./CONTRIBUTING_EN.md) · [**All Docs**](./INDEX_EN.md)
 
 English | [简体中文](../README.md) | [繁體中文](README_CHT.md)
 
 </div>
+
+## Product scope: advisory only (no live broker execution)
+
+This project is an **auxiliary trading / decision-support system**. It ingests quotes, runs technical and sentiment analysis, generates AI and Agent reports, and exposes **structured signals and level guidance** (bias, entry/invalidation hints, when conditions favor standing aside). It **does not send orders to any broker or exchange**. If you trade for real, you place, change, and close positions **in your own terminal or broker app**.
+
+- **Live execution** happens **outside** this codebase; outputs here are for research and decision support only, not investment advice.
+- **Paper trading & intraday scheduler** update a **local simulated book** only, to exercise signals and equity curves—not your live account or broker statements.
+
+See [Architecture deep dive — Advisory vs execution boundary](./architecture-detailed-guide.md#advisory-vs-execution-boundary).
 
 ## 💖 Sponsors
 
@@ -42,7 +51,7 @@ English | [简体中文](../README.md) | [繁體中文](README_CHT.md)
 | AI | Decision Dashboard | One-sentence conclusion + precise entry/exit levels + action checklist |
 | Analysis | Multi-dimensional Analysis | Technicals + chip distribution + sentiment + real-time quotes |
 | Market | Multi-entry & markets | **Web/API** can target A/HK/US symbols and regions as configured; **CLI** is US/futures/crypto-only (see `main.py` header). Quotes/K-lines are primarily **yfinance**, with optional **Longbridge-first** for US/HK when configured. |
-| Intraday Trading | Minute Signals + Paper Trading | New `/api/v1/intraday/*` and `/api/v1/paper-trading/*` endpoints support `1m/5m/15m` bar storage, structured `VWAP/EMA/MACD/RSI` signals, minute scheduler runs, and a paper account / order / fill / intraday snapshot loop. The CLI can also launch the experimental flow with `--intraday`. |
+| Intraday Trading | Minute Signals + Paper Trading | The Web workspace route **`/intraday`** surfaces signals, paper snapshots, orders/fills, and (experimental) scheduler status against the same APIs. Backend: `/api/v1/intraday/*` and `/api/v1/paper-trading/*` (`1m/5m/15m` bars, structured `VWAP/EMA/MACD/RSI` signals, paper loop). CLI: `--intraday`. |
 | Search | Smart Autocomplete (MVP) | **[Beta]** Code/name/pinyin/aliases; index via `scripts/generate_stock_index.py` / `generate_index_from_csv.py`; optional **Tushare** CSV workflow ([guide](./TUSHARE_STOCK_LIST_GUIDE.md)). Legacy AkShare fetchers were removed from `data_provider`. |
 | Review | Market Review | Daily overview, sectors, northbound capital flow |
 | Intel | Announcement + Capital Flow Intelligence | IntelAgent now also pulls listed-company announcements (SSE/SZSE/CNINFO) and A-share main-force capital flow, and exposes `capital_flow_signal` (`inflow/outflow/neutral/not_available`) for flow direction context |
@@ -53,7 +62,7 @@ English | [简体中文](../README.md) | [繁體中文](README_CHT.md)
 
 > The Backtest page now includes a 1-day next-session validation view. You can filter by stock code and analysis date range to compare the original AI prediction with the next trading day close and inspect the filtered accuracy rate. This is based on historical analysis plus `eval_window_days=1` backtest data, not real trade execution logs.
 
-> Intraday scope note: the current intraday + paper trading path is phase-1 only. It targets **US equities / US futures / crypto** minute bars from **yfinance**, and it drives simulated execution from structured signals rather than real broker orders.
+> Intraday scope note: the current intraday + paper trading path is phase-1 only. **Crypto** minute bars prefer **Binance spot public klines**, with **yfinance** as fallback; **US equities / US futures** use **yfinance** (and optional **Longbridge** where supported). Simulated execution is driven by structured signals, not real broker orders.
 
 ### Tech Stack & Data Sources
 

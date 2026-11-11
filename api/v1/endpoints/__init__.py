@@ -18,7 +18,6 @@ from api.v1.endpoints import (
     auth,
     agent,
     usage,
-    portfolio,
     intraday,
     paper_trading,
 )
@@ -32,7 +31,6 @@ __all__ = [
     "auth",
     "agent",
     "usage",
-    "portfolio",
     "intraday",
     "paper_trading",
 ]

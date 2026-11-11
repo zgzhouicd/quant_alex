@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""Storage/repository tests for minute bars and signals."""
+"""Storage/repository tests for intraday bar table and signal records (multi-interval)."""
 
 from __future__ import annotations
 
