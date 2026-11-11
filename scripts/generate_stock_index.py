@@ -6,9 +6,7 @@ Stock Index Generation Script
 Generate stock index file for frontend autocomplete functionality
 Output to apps/dsa-web/public/stocks.index.json
 
-Two-phase strategy:
-1. MVP: Use existing STOCK_NAME_MAP
-2. Future: Combine with AkShare for complete list
+US-only scope: index entries are built from STOCK_NAME_MAP (MVP tickers).
 
 Usage:
     python3 scripts/generate_stock_index.py
@@ -46,7 +44,6 @@ def normalize_name_for_pinyin(name: str) -> str:
     """
     normalized = unicodedata.normalize('NFKC', name).strip()
 
-    # Strip common A-share prefixes while preserving the core name.
     normalized = re.sub(r'^(?:\*?ST|N)+', '', normalized, flags=re.IGNORECASE)
 
     return normalized.strip() or unicodedata.normalize('NFKC', name).strip()
@@ -99,35 +96,7 @@ def generate_stock_index_from_map() -> List[Dict[str, Any]]:
 
 
 def determine_market_and_type(code: str) -> tuple:
-    """
-    Determine market and asset type based on stock code
-
-    Args:
-        code: Stock code
-
-    Returns:
-        Tuple of (market, asset_type)
-    """
-    if code.isdigit():
-        if len(code) == 5:
-            # Five digits: likely HK stock or legacy B-share.
-            if code.startswith('0') or code.startswith('2'):
-                return 'HK', 'stock'
-            return 'CN', 'stock'
-        elif len(code) == 6:
-            # Six digits: A-share universe.
-            if code.startswith('6'):
-                return 'CN', 'stock'  # Shanghai
-            elif code.startswith(('0', '2', '3')):
-                return 'CN', 'stock'  # Shenzhen
-            elif code.startswith('8'):
-                return 'BSE', 'stock'  # Beijing Stock Exchange
-            return 'CN', 'stock'
-        elif len(code) == 4:
-            # Four digits: likely a US symbol or special market code.
-            return 'US', 'stock'
-
-    # 字母代码，美股或其他
+    """All mapped symbols are US-listed equities or US ETFs in MVP scope."""
     return 'US', 'stock'
 
 
@@ -141,44 +110,11 @@ def market_to_suffix(market: str) -> str:
     Returns:
         Market suffix
     """
-    suffix_map = {
-        'CN': 'SH',  # 简化处理，默认上海
-        'HK': 'HK',
-        'US': 'US',
-        'INDEX': 'SH',
-        'ETF': 'SH',
-        'BSE': 'BJ',
-    }
-    return suffix_map.get(market, 'SH')
+    return 'US' if market == 'US' else 'US'
 
 
 def build_canonical_code(code: str, market: str) -> str:
-    """
-    Generate canonical stock code based on code and market.
-
-    A-shares need to distinguish between SH/SZ/BJ, cannot rely solely on the general CN -> SH mapping.
-    """
-    if market == 'CN' and code.isdigit() and len(code) == 6:
-        # Shanghai Stock Exchange (SH)
-        # 60xxxx: Main board, 688xxx: STAR market, 900xxx: B-shares
-        if code.startswith(('6', '900')):
-            return f"{code}.SH"
-
-        # Shenzhen Stock Exchange (SZ)
-        # 00xxxx: Main board, 30xxxx: ChiNext, 20xxxx: B-shares
-        if code.startswith(('0', '2', '3')):
-            return f"{code}.SZ"
-
-        # Beijing Stock Exchange (BJ)
-        # 920xxx: New codes and migrated stock codes after April 2024
-        # 43xxxx, 83xxxx, 87xxxx, 88xxxx: Historical/Temporary codes
-        # 81xxxx, 82xxxx: Convertible bonds/Preferred stocks
-        if code.startswith(('920', '43', '83', '87', '88', '81', '82')):
-            return f"{code}.BJ"
-
-    if market == 'BSE' and code.isdigit() and len(code) == 6:
-        return f"{code}.BJ"
-
+    """US tickers use canonical form TICKER.US for frontend index compatibility."""
     return f"{code}.{market_to_suffix(market)}"
 
 
@@ -194,31 +130,14 @@ def generate_aliases(name: str) -> List[str]:
     """
     aliases = []
 
-    # 常见简称映射
     alias_map = {
-        '贵州茅台': ['茅台'],
-        '中国平安': ['平安'],
-        '平安银行': ['平银'],
-        '招商银行': ['招行'],
-        '五粮液': ['五粮'],
-        '宁德时代': ['宁德'],
-        '比亚迪': ['比亚'],
-        '工商银行': ['工行'],
-        '建设银行': ['建行'],
-        '农业银行': ['农行'],
-        '中国银行': ['中行'],
-        '交通银行': ['交行'],
-        '兴业银行': ['兴业'],
-        '浦发银行': ['浦发'],
-        '民生银行': ['民生'],
-        '中信证券': ['中信'],
-        '东方财富': ['东财'],
-        '海康威视': ['海康'],
-        '隆基绿能': ['隆基'],
-        '中国神华': ['神华'],
-        '长江电力': ['长电'],
-        '中国石化': ['石化'],
-        '中国石油': ['石油'],
+        '苹果': ['AAPL'],
+        '特斯拉': ['TSLA'],
+        '英伟达': ['NVDA'],
+        '亚马逊': ['AMZN'],
+        '谷歌A': ['GOOGL'],
+        '标普500ETF': ['SPY'],
+        '纳指100ETF': ['QQQ'],
     }
 
     if name in alias_map:

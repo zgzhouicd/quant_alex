@@ -16,11 +16,11 @@
 
 **AI-powered stock analysis system.** **Market data path:** Yahoo Finance (yfinance) plus optional **Longbridge** (US/HK priority when configured). **`main.py` CLI** accepts **US equities, US futures, and crypto contract symbols only**; use the **Web UI or `api/v1`** for workflows aligned with multi-market analysis.
 
-Analyze your watchlist daily → generate a decision dashboard → push to multiple channels (Telegram/Discord/Slack/Email/WeChat Work/Feishu)
+Daily analysis and in-browser decision desk (`/decision`); external IM push is **optional** via `.env` / Actions (`notify` defaults to **false** for API tasks).
 
 **Zero-cost deployment** · Runs on GitHub Actions · No server required
 
-[**Quick Start**](#-quick-start) · [**Key Features**](#-key-features) · [**Sample Output**](#-sample-output) · [**Architecture deep dive (diagrams)**](./architecture-detailed-guide.md) · [**Intraday / daily signal plan**](./intraday-refactor-plan.md) · [**Full Guide**](./full-guide_EN.md) · [**Small-scale ops boundary**](./small-scale-operations.md) · [**FAQ**](./FAQ_EN.md) · [**Contributing**](./CONTRIBUTING_EN.md) · [**All Docs**](./INDEX_EN.md)
+[**Quick Start**](#-quick-start) · [**Key Features**](#-key-features) · [**Sample Output**](#-sample-output) · [**Web workspace**](./web-workspace_EN.md) · [**Architecture deep dive (diagrams)**](./architecture-detailed-guide.md) · [**Intraday / daily signal plan**](./intraday-refactor-plan.md) · [**Full Guide**](./full-guide_EN.md) · [**Small-scale ops boundary**](./small-scale-operations.md) · [**FAQ**](./FAQ_EN.md) · [**Contributing**](./CONTRIBUTING_EN.md) · [**All Docs**](./INDEX_EN.md)
 
 English | [简体中文](../README.md) | [繁體中文](README_CHT.md)
 
@@ -31,7 +31,7 @@ English | [简体中文](../README.md) | [繁體中文](README_CHT.md)
 This project is an **auxiliary trading / decision-support system**. It ingests quotes, runs technical and sentiment analysis, generates AI and Agent reports, and exposes **structured signals and level guidance** (bias, entry/invalidation hints, when conditions favor standing aside). It **does not send orders to any broker or exchange**. If you trade for real, you place, change, and close positions **in your own terminal or broker app**.
 
 - **Live execution** happens **outside** this codebase; outputs here are for research and decision support only, not investment advice.
-- **Paper trading & intraday scheduler** update a **local simulated book** only, to exercise signals and equity curves—not your live account or broker statements.
+- **Paper trading & intraday scheduler** (API/CLI only) update a **local simulated book**—not your live account. **Web** uses **`/decision`** for daily signals and in-page alerts (no paper/scheduler UI). The ledger **`/portfolio`** API and page were removed in this fork.
 
 See [Architecture deep dive — Advisory vs execution boundary](./architecture-detailed-guide.md#advisory-vs-execution-boundary).
 
@@ -51,13 +51,13 @@ See [Architecture deep dive — Advisory vs execution boundary](./architecture-d
 | AI | Decision Dashboard | One-sentence conclusion + precise entry/exit levels + action checklist |
 | Analysis | Multi-dimensional Analysis | Technicals + chip distribution + sentiment + real-time quotes |
 | Market | Multi-entry & markets | **Web/API** can target A/HK/US symbols and regions as configured; **CLI** is US/futures/crypto-only (see `main.py` header). Quotes/K-lines are primarily **yfinance**, with optional **Longbridge-first** for US/HK when configured. |
-| Intraday Trading | Minute Signals + Paper Trading | The Web workspace route **`/intraday`** surfaces signals, paper snapshots, orders/fills, and (experimental) scheduler status against the same APIs. Backend: `/api/v1/intraday/*` and `/api/v1/paper-trading/*` (`1m/5m/15m` bars, structured `VWAP/EMA/MACD/RSI` signals, paper loop). CLI: `--intraday`. |
-| Search | Smart Autocomplete (MVP) | **[Beta]** Code/name/pinyin/aliases; index via `scripts/generate_stock_index.py` / `generate_index_from_csv.py`; optional **Tushare** CSV workflow ([guide](./TUSHARE_STOCK_LIST_GUIDE.md)). Legacy AkShare fetchers were removed from `data_provider`. |
+| Daily decision desk | Watchlist + structure signals | Web **`/decision`**: batch daily (`1d`) signals and in-page alert stream; `/intraday` redirects here. Paper/scheduler remain on `/api/v1/*` and CLI `--intraday`, not on the Web UI. |
+| Search | Smart Autocomplete (MVP) | **[Beta]** US tickers: code/name/pinyin/aliases; run `scripts/generate_stock_index.py` to refresh `stocks.index.json`. |
 | Review | Market Review | Daily overview, sectors, northbound capital flow |
 | Intel | Announcement + Capital Flow Intelligence | IntelAgent now also pulls listed-company announcements (SSE/SZSE/CNINFO) and A-share main-force capital flow, and exposes `capital_flow_signal` (`inflow/outflow/neutral/not_available`) for flow direction context |
 | Backtest | AI Backtest Validation | Auto-evaluate historical analysis accuracy, with a 1-day next-session validation view for AI prediction vs actual move and accuracy |
 | Agent Q&A | Strategy Chat | Multi-turn strategy chat with 11 built-in trading strategies (internally loaded as skills) (Web/Bot/API) |
-| Notifications | Multi-channel Push | Telegram, Discord, Slack, Email, WeChat Work, Feishu, etc. |
+| Notifications | In-page + optional outbound | Task SSE and decision alert stream on Web; Telegram/Feishu/etc. only via `.env` (hidden from Web settings) |
 | Automation | Scheduled Runs | GitHub Actions scheduled execution, no server required |
 
 > The Backtest page now includes a 1-day next-session validation view. You can filter by stock code and analysis date range to compare the original AI prediction with the next trading day close and inspect the filtered accuracy rate. This is based on historical analysis plus `eval_window_days=1` backtest data, not real trade execution logs.
@@ -140,7 +140,7 @@ Go to your forked repo → `Settings` → `Secrets and variables` → `Actions` 
 | `REPORT_LANGUAGE` | Report output language: `zh` (default Chinese) / `en` (English); affects prompt instructions, Markdown templates, notification fallbacks, and fixed labels in the Web report view | Optional |
 | `ANALYSIS_DELAY` | Delay between stocks and market review (seconds) | Optional |
 
-> Note: Configure at least one channel; multiple channels will all receive notifications.
+> Web works without outbound channels. Configure secrets when using GitHub Actions or CLI with `notify=true`. See [web-workspace_EN.md](./web-workspace_EN.md).
 
 </details>
 
@@ -348,6 +348,8 @@ PUSHPLUS_TOKEN=your_token_here
 
 ## 🎨 Sample Output
 
+Samples below assume **outbound notification channels** are configured. The Web app defaults to **in-browser** reports and the [**decision desk**](./web-workspace_EN.md) (`/decision`); API tasks use `notify=false` unless set explicitly.
+
 ### Decision Dashboard Format
 
 ```markdown
@@ -506,7 +508,7 @@ The home analysis input now behaves more like a search box, reducing the need to
   - If the index is outdated, missing a newly listed symbol, or fails to load, the UI falls back to plain manual input without blocking analysis.
   - If no suggestion matches, pressing Enter still submits the original input directly.
 
-> Tip: to refresh the index, run `python3 scripts/fetch_tushare_stock_list.py` to update the stock-list CSV files, then run `python3 scripts/generate_index_from_csv.py` to rebuild the static index.
+> Tip: to refresh the index, run `python3 scripts/generate_stock_index.py`.
 
 ---
 

@@ -14,13 +14,13 @@
   <a href="https://hellogithub.com/repository/ZhuLinsen/daily_stock_analysis" target="_blank"><img src="https://api.hellogithub.com/v1/widgets/recommend.svg?rid=6daa16e405ce46ed97b4a57706aeb29f&claim_uid=pfiJMqhR9uvDGlT&theme=neutral" alt="Featured｜HelloGitHub" style="width: 250px; height: 54px;" width="250" height="54" /></a>
 </p>
 
-**基於 AI 大模型的股票智能分析系統**（預設偏重美股 / 美期貨 / 加密永續等，可配置擴展）
+**基於 AI 大模型的美股智能分析系統**（僅美股 / 美期貨 / 加密永續等，拒收 A 股 / 港股）
 
-自動分析自選股 → 生成決策儀表盤 → 多渠道推送（Telegram/Discord/Slack/郵件/企業微信/飛書）
+日常以 **Web 報告 + 決策台**（`/decision`）為主；分析 API 預設 `notify=false`。可選在 `.env` 設定 Telegram/企微/飛書等外推（設定頁不展示通知表單）。
 
 **零成本部署** · GitHub Actions 免費運行 · 無需伺服器
 
-[**功能特性**](#-功能特性) · [**快速開始**](#-快速開始) · [**推送效果**](#-推送效果) · [**完整指南**](./full-guide.md) · [**小流量運行邊界**](./small-scale-operations.md) · [**常見問題**](./FAQ.md) · [**更新日誌**](./CHANGELOG.md)
+[**功能特性**](#-功能特性) · [**快速開始**](#-快速開始) · [**推送效果**](#-推送效果) · [**Web 工作台**](./web-workspace.md) · [**完整指南**](./full-guide.md) · [**小流量運行邊界**](./small-scale-operations.md) · [**常見問題**](./FAQ.md) · [**更新日誌**](./CHANGELOG.md)
 
  繁體中文 | [English](README_EN.md) | [简体中文](../README.md)
 
@@ -41,12 +41,13 @@
 |------|------|------|
 | AI | 決策儀表盤 | 一句話核心結論 + 精確買賣點位 + 操作檢查清單 |
 | 分析 | 多維度分析 | 技術面 + 籌碼分布 + 輿情情報 + 實時行情 |
-| 市場 | 全球市場 | 支援 A股、港股、美股 |
-| 補全 | 智慧補全 (MVP) | **[測試階段]** 首頁搜尋框支援代碼 / 名稱 / 拼音 / 別名聯想；本地索引已覆蓋 A股、港股、美股，並可透過 Tushare 或 AkShare 重新生成 |
+| 市場 | 美股為主 | Web / API / CLI 僅美股、美期貨、加密永續（拒收 A 股 / 港股） |
+| 補全 | 智慧補全 (MVP) | **[測試階段]** 美股代碼 / 中文名 / 拼音 / 別名；執行 `scripts/generate_stock_index.py` 更新索引 |
 | 復盤 | 大盤復盤 | 每日市場概覽、板塊漲跌、北向資金 |
 | 回測 | AI 回測驗證 | 自動評估歷史分析準確率，方向勝率、止盈止損命中率 |
+| 日線決策 | 觀察名單 + 結構信號 | Web **`/decision`** 批量日線信號與頁內提醒流；`/intraday` 重定向至此 |
 | **Agent 問股** | **策略對話** | **多輪策略問答，支援 11 種內建策略（Web/Bot/API）** |
-| 推送 | 多渠道通知 | Telegram、Discord、Slack、郵件、企業微信、飛書等 |
+| 推送 | 頁面內 + 可選外鏈 | SSE 任務進度、決策台提醒流；外部 IM 僅 **`.env`/Actions** 可選 |
 | 自動化 | 定時運行 | GitHub Actions 定時執行，無需伺服器 |
 
 ### 技術棧與數據來源
@@ -96,7 +97,7 @@
 > *注：`GEMINI_API_KEY` 和 `OPENAI_API_KEY` 至少配置一個
 
 <details>
-<summary><b>通知渠道配置</b>（點擊展開，至少配置一個）</summary>
+<summary><b>通知渠道配置</b>（點擊展開，可選；僅 CLI / 定時 / <code>notify=true</code> 時使用，Web 設定頁已隱藏）</summary>
 
 | Secret 名稱 | 說明 | 必填 |
 |------------|------|:----:|
@@ -124,7 +125,7 @@
 | `REPORT_LANGUAGE` | 報告輸出語言：`zh`(預設中文) / `en`(英文)；會同步影響 Prompt、Markdown 模板、通知 fallback 與 Web 報告頁固定文案 | 可選 |
 | `ANALYSIS_DELAY` | 個股分析和大盤分析之間的延遲（秒），避免API限流，如 `10` | 可選 |
 
-> 至少配置一個渠道，配置多個則同時推送。更多配置請參考 [完整指南](./full-guide.md)
+> 不配通知渠道也可正常使用 Web。需要 Actions 外推時再配置。更多說明見 [Web 工作台](./web-workspace.md) 與 [完整指南](./full-guide.md)
 
 </details>
 
@@ -268,7 +269,7 @@
   - 若索引尚未更新、缺少新上市標的，或載入失敗，介面會自動退回一般手動輸入模式，不阻斷分析流程。
   - 若補全未命中，直接按 Enter 仍會送出原始輸入。
 
-> 提示：如需更新索引，可先執行 `python3 scripts/fetch_tushare_stock_list.py` 更新股票列表 CSV，再執行 `python3 scripts/generate_index_from_csv.py` 重新生成靜態索引。
+> 提示：執行 `python3 scripts/generate_stock_index.py` 重新生成美股靜態索引。
 
 ## 項目結構
 

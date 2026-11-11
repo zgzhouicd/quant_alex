@@ -20,9 +20,12 @@ from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
 from typing import Optional, Dict, Any, List, Union
 
-from src.enums import ReportType
-from src.storage import get_db
+from data_provider.base import canonical_stock_code
+
 from bot.models import BotMessage
+from src.enums import ReportType
+from src.services.instrument_resolver import is_legacy_cn_hk_symbol, resolve_instrument_input
+from src.storage import get_db
 
 logger = logging.getLogger(__name__)
 
@@ -89,6 +92,23 @@ class TaskService:
         # 确保 report_type 是枚举类型
         if isinstance(report_type, str):
             report_type = ReportType.from_str(report_type)
+
+        normalized = canonical_stock_code(code)
+        if is_legacy_cn_hk_symbol(normalized):
+            return {
+                "success": False,
+                "message": "已移除 A股/港股标的，请使用美股、期货或永续合约代码",
+                "code": code,
+            }
+        try:
+            resolve_instrument_input(stock_code=normalized, reject_cn_hk=True)
+        except ValueError as exc:
+            return {
+                "success": False,
+                "message": str(exc),
+                "code": code,
+            }
+        code = normalized
 
         task_id = f"{code}_{datetime.now().strftime('%Y%m%d_%H%M%S_%f')}"
 

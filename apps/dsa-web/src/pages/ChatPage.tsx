@@ -26,12 +26,12 @@ import { getReportText } from '../utils/reportLanguage';
 
 // Quick question examples shown on empty state
 const QUICK_QUESTIONS = [
-  { label: '用缠论分析茅台', skill: 'chan_theory' },
-  { label: '波浪理论看宁德时代', skill: 'wave_theory' },
-  { label: '分析比亚迪趋势', skill: 'bull_trend' },
-  { label: '箱体震荡技能看中芯国际', skill: 'box_oscillation' },
-  { label: '分析腾讯 hk00700', skill: 'bull_trend' },
-  { label: '用情绪周期分析东方财富', skill: 'emotion_cycle' },
+  { label: '用缠论分析 AAPL', skill: 'chan_theory' },
+  { label: '波浪理论看 NVDA', skill: 'wave_theory' },
+  { label: '分析 TSLA 趋势', skill: 'bull_trend' },
+  { label: '箱体震荡技能看 MSFT', skill: 'box_oscillation' },
+  { label: '分析 META 财报预期', skill: 'bull_trend' },
+  { label: '用情绪周期分析 COIN', skill: 'emotion_cycle' },
 ];
 
 const ChatPage: React.FC = () => {
@@ -202,7 +202,7 @@ const ChatPage: React.FC = () => {
     setDeleteConfirmId(null);
   }, [deleteConfirmId, sessionId, loadSessions, handleStartNewChat]);
 
-  // Handle follow-up from report page: ?stock=600519&name=贵州茅台&recordId=xxx
+  // Handle follow-up from report page: ?stock=AAPL&name=苹果&recordId=xxx
   useEffect(() => {
     const stock = sanitizeFollowUpStockCode(searchParams.get('stock'));
     const name = sanitizeFollowUpStockName(searchParams.get('name'));
@@ -635,7 +635,7 @@ const ChatPage: React.FC = () => {
               <div className="flex h-full items-center justify-center">
                 <EmptyState
                   title="开始问股"
-                  description="输入「分析 600519」或「茅台现在能买吗」，AI 将调用实时数据工具为您生成决策报告。"
+                  description="输入「分析 AAPL」或「英伟达现在能买吗」，AI 将调用实时数据工具为您生成决策报告。"
                   className="max-w-2xl border-dashed bg-card/55"
                   icon={(
                     <svg
@@ -874,7 +874,7 @@ const ChatPage: React.FC = () => {
                   value={input}
                   onChange={(e) => setInput(e.target.value)}
                   onKeyDown={handleKeyDown}
-                  placeholder="例如：分析 600519 / 茅台现在适合买入吗？ (Enter 发送, Shift+Enter 换行)"
+                  placeholder="例如：分析 NVDA / 特斯拉现在适合买入吗？ (Enter 发送, Shift+Enter 换行)"
                   disabled={loading}
                   rows={1}
                   className="input-surface input-focus-glow flex-1 min-h-[44px] max-h-[200px] rounded-xl border bg-transparent px-4 py-2.5 text-sm transition-all focus:outline-none resize-none disabled:cursor-not-allowed disabled:opacity-60"

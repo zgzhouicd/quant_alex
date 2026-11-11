@@ -469,7 +469,7 @@ class YfinanceFetcher(BaseFetcher):
             'amplitude': amplitude,
         }
 
-    def get_main_indices(self, region: str = "cn") -> Optional[List[Dict[str, Any]]]:
+    def get_main_indices(self, region: str = "us") -> Optional[List[Dict[str, Any]]]:
         """
         获取主要指数行情 (Yahoo Finance)，支持 A 股与美股。
         region=us 时委托给 _get_us_main_indices。

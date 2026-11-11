@@ -349,7 +349,7 @@ def _handle_get_derivatives_snapshot(
             symbol=symbol,
             asset_class=resolved_asset,
             exchange=exchange,
-            reject_cn_hk=False,
+            reject_cn_hk=True,
         )
         if hasattr(instrument, "model_dump"):
             instrument_payload = instrument.model_dump()

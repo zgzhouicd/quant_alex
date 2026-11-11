@@ -40,7 +40,7 @@ python scripts/check_ai_assets.py
 
 ## 3. 仓库速览
 
-- 项目定位：股票智能分析系统，覆盖 A 股、港股、美股。
+- 项目定位：美股（及美期货 / 加密永续等）智能分析系统；**不接受 A 股 / 港股标的**。
 - 主流程：抓取数据 -> 技术分析/新闻检索 -> LLM 分析 -> 生成报告 -> 通知推送。
 - 关键入口：
   - `main.py`：分析任务主入口
@@ -70,7 +70,7 @@ python scripts/check_ai_assets.py
 python main.py
 python main.py --debug
 python main.py --dry-run
-python main.py --stocks 600519,hk00700,AAPL
+python main.py --stocks AAPL,MSFT,NVDA
 python main.py --market-review
 python main.py --schedule
 python main.py --serve

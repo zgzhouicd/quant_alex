@@ -10,6 +10,6 @@
 
 ## 注意
 
-- **Portfolio** 等路径使用 SQLite `BEGIN IMMEDIATE`；在 PostgreSQL 上应依赖默认事务与行锁语义，必要时需单独做方言分支（见 `portfolio_write_session`）。
+- 历史版本的日级 **Portfolio 账本** API 已移除；若在 PostgreSQL 上扩展新的串行写路径，应单独设计事务边界（勿再引用已删除的 `portfolio_write_session`）。
 - 新建表随 `Base.metadata.create_all` 创建；生产环境建议后续引入迁移工具（当前仓库无 Alembic）。
 - JSON 与文本字段行为与 SQLite 略有差异，任务表 `result_json` 等为 `Text` 存储的 JSON 字符串，两方言均可使用。

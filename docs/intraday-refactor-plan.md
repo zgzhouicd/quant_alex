@@ -29,10 +29,9 @@
 
 | 区域 | 文件 | 说明 |
 |------|------|------|
-| API 封装 | [`apps/dsa-web/src/api/intraday.ts`](../apps/dsa-web/src/api/intraday.ts) | 默认 `interval=1d`；查询参数 `lookback_days`；调度默认 `intervals: ['1d']`、`poll_seconds` 提高。 |
-| 类型 | [`apps/dsa-web/src/types/intraday.ts`](../apps/dsa-web/src/types/intraday.ts) | `IntradayInterval` 等包含 `1d`（可保留旧分钟枚举以兼容历史数据）。 |
-| 决策台 | [`apps/dsa-web/src/pages/DecisionPage.tsx`](../apps/dsa-web/src/pages/DecisionPage.tsx) | 主 Web 入口：`/decision`；`/intraday` 重定向；批量 `/signals/batch` + 本地提醒流。 |
+| 决策台 | [`apps/dsa-web/src/pages/DecisionPage.tsx`](../apps/dsa-web/src/pages/DecisionPage.tsx) | 主 Web 入口：`/decision`；`/intraday` 重定向；批量 `/signals/batch` + 本地提醒流。详见 [web-workspace.md](./web-workspace.md)。 |
 | API 封装 | [`apps/dsa-web/src/api/intraday.ts`](../apps/dsa-web/src/api/intraday.ts) | 仅 `getSignalBatch` / `getLatestSignal`（调度与 paper 不在 Web 暴露）。 |
+| 类型 | [`apps/dsa-web/src/types/intraday.ts`](../apps/dsa-web/src/types/intraday.ts) | `IntradayInterval` 等包含 `1d`（可保留旧分钟枚举以兼容历史数据）。 |
 | 导航 | [`apps/dsa-web/src/components/layout/SidebarNav.tsx`](../apps/dsa-web/src/components/layout/SidebarNav.tsx) | 侧栏仅 **决策**，无独立「日线」页。 |
 
 ### 1.4 测试与文档

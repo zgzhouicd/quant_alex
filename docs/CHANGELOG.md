@@ -11,9 +11,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 <!-- 新条目格式：- [类型] 描述（类型取值：新功能/改进/修复/文档/测试/chore）-->
 <!-- 每条独立一行追加到本段末尾，无需分类标题，合并时冲突最小 -->
+- [改进] **产品范围锁定为美股**：API/任务队列/Bot/名称解析/前端校验拒收 A 股与港股；`STOCK_NAME_MAP` 与 `stocks.index.json` 重建为美股 MVP；移除 Tushare 列表脚本与专文；`market_context` 仅注入美股 Prompt。
 - [新功能] Web **决策台**（`/decision`）：观察名单批量扫描日线信号、居中大字结论与页面内「提醒流」，借鉴 trade_agent 核验台布局；`/intraday` 重定向至此。
 - [改进] 设置页隐藏 **通知渠道** 分类（`WEB_HIDDEN_SETTINGS_CATEGORIES`）；通知相关项改由 `.env` 维护，降低 Web 配置复杂度。
 - [chore] Web 精简：移除 **IntradayPage**、**paperTrading** 前端封装与侧栏「日线」；问股/首页去掉外部推送 UI；删除 `POST /api/v1/agent/chat/send`；分析请求 `notify` 默认 **false**。
+- [文档] 产品文档全面同步：新增 `web-workspace.md` / `web-workspace_EN.md`、`docs/INDEX.md`；更新 `api-v1-surface.md`、`architecture-detailed-guide.md`、`project-architecture-analysis.md`、`full-guide.md`（Portfolio 归档）、`full-guide_EN.md`、`intraday-refactor-plan.md`、`small-scale-operations.md`、`postgresql.md`、`README.md` / `README_EN.md` / `README_CHT.md`、`INDEX_EN.md`。
 - [测试] 补充 `/api/v1/intraday/signal` **默认 1d** + mock `get_daily_data` 冒烟；`IntradaySignalEngine` 日线 `payload.signal_timeframe` 单测。
 - [改进] `api/v1/intraday` OpenAPI **summary** 与 Web 调度说明对齐「默认日线、低频轮询」语义。
 - [文档] `docs/intraday-refactor-plan.md`：正文改为 **日线级信号重构（Daily Signal Refactor）** 方案与文件对照表；原「分钟级日内」分阶段草案移入附录，避免与当前默认 `1d` 语义混淆。

@@ -19,15 +19,15 @@
 |------|------|------|
 | CLI 入口 | `main.py` | 参数解析、定时/单次分析、`--serve`、回测等 |
 | API 入口 | `server.py` → `api/app.py` | FastAPI 应用：CORS、静态资源、v1 路由、认证中间件 |
-| HTTP 路由 | `api/v1/endpoints/*.py` | 分析任务、历史、持仓、Agent、系统配置等 |
+| HTTP 路由 | `api/v1/endpoints/*.py` | 分析任务、历史、日线信号、回测、Agent、系统配置等（**日级组合账本 `/portfolio` 已移除**） |
 | 核心编排 | `src/core/pipeline.py` | 单股/批量：拉数 → 技术/搜索/舆情 → LLM → 存库 → 通知 |
 | 市场侧 | `src/core/market_review.py`、`market_strategy.py` 等 | 大盘复盘、策略输出 |
-| 领域服务 | `src/services/*.py` | 任务队列、分析服务、回测、持仓、历史、报告渲染等 |
+| 领域服务 | `src/services/*.py` | 任务队列、分析服务、回测、日内/日线信号、历史、报告渲染等 |
 | Agent | `src/agent/` | 问股：编排、工具、策略/技能路由、会话 |
 | 数据层 | `data_provider/` | 多数据源适配与降级 |
 | 持久化 | `src/storage.py` | SQLite（可配置 URL）、ORM、写重试、业务表 |
 | 通知 | `src/notification*.py`、`src/notification_sender/` | 汇总与各渠道发送 |
-| 前端 | `apps/dsa-web/` | Web；`apps/dsa-desktop/` 为 Electron |
+| 前端 | `apps/dsa-web/` | Web（见 [web-workspace.md](./web-workspace.md)）；`apps/dsa-desktop/` 为 Electron |
 | 机器人 | `bot/` | IM 接入 |
 | 部署 | `docker/`、`scripts/` | 镜像、Compose、本地脚本 |
 

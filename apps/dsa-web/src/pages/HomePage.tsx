@@ -163,7 +163,7 @@ const HomePage: React.FC = () => {
                 onSubmit={(stockCode, stockName, selectionSource) => {
                   handleSubmitAnalysis(stockCode, stockName, selectionSource);
                 }}
-                placeholder="输入股票代码或名称，如 600519、贵州茅台、AAPL"
+                placeholder="输入美股代码或名称，如 AAPL、苹果、NVDA"
                 disabled={isAnalyzing}
                 className={inputError ? 'border-danger/50' : undefined}
               />

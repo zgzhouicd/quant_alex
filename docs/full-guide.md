@@ -1,6 +1,6 @@
 # 📖 完整配置与部署指南
 
-本文档包含 A股智能分析系统的完整配置说明，适合需要高级功能或特殊部署方式的用户。
+本文档包含**美股**智能分析系统的完整配置说明，适合需要高级功能或特殊部署方式的用户。本产品不接受 A 股 / 港股标的。
 
 > 💡 快速上手请参考 [README.md](../README.md)，本文档为进阶配置。
 
@@ -120,7 +120,7 @@ daily_stock_analysis/
 
 | Secret 名称 | 说明 | 必填 |
 |------------|------|:----:|
-| `STOCK_LIST` | 自选股代码，如 `600519,300750,002594` | ✅ |
+| `STOCK_LIST` | 自选股代码，如 `AAPL,MSFT,NVDA` | ✅ |
 | `TAVILY_API_KEYS` | [Tavily](https://tavily.com/) 搜索 API（新闻搜索） | 推荐 |
 | `MINIMAX_API_KEYS` | [MiniMax](https://platform.minimaxi.com/) Coding Plan Web Search（结构化搜索结果） | 可选 |
 | `BOCHA_API_KEYS` | [博查搜索](https://open.bocha.cn/) Web Search API（中文搜索优化，支持AI摘要，多个key用逗号分隔） | 可选 |
@@ -326,7 +326,7 @@ daily_stock_analysis/
 | `TRUST_X_FORWARDED_FOR` | 单层可信反向代理部署时设为 `true`，取 `X-Forwarded-For` 最右值作为真实客户端 IP（用于登录限流等）；直连公网时保持 `false` 防伪造。多级代理/CDN 场景下限流 key 可能退化为边缘代理 IP，需额外评估 | `false` |
 | `MAX_WORKERS` | 并发线程数 | `3` |
 | `MARKET_REVIEW_ENABLED` | 启用大盘复盘 | `true` |
-| `MARKET_REVIEW_REGION` | 大盘复盘市场区域：cn(A股)、us(美股)、both(两者)，us 适合仅关注美股的用户 | `cn` |
+| `MARKET_REVIEW_REGION` | 大盘复盘市场区域（仅 `us`） | `us` |
 | `TRADING_DAY_CHECK_ENABLED` | 交易日检查：默认 `true`，非交易日跳过执行；设为 `false` 或使用 `--force-run` 可强制执行（Issue #373） | `true` |
 | `SCHEDULE_ENABLED` | 启用定时任务 | `false` |
 | `SCHEDULE_TIME` | 定时执行时间 | `18:00` |
@@ -456,7 +456,7 @@ pip install -r requirements.txt
 python main.py                        # 完整分析（个股 + 大盘复盘）
 python main.py --market-review        # 仅大盘复盘
 python main.py --no-market-review     # 仅个股分析
-python main.py --stocks 600519,300750 # 指定股票
+python main.py --stocks AAPL,MSFT # 指定美股
 python main.py --dry-run              # 仅获取数据，不 AI 分析
 python main.py --no-notify            # 不发送推送
 python main.py --schedule             # 定时任务模式
@@ -1030,7 +1030,7 @@ python main.py --serve-only --host 0.0.0.0 --port 8888
 
 - 浏览器访问：`http://127.0.0.1:8000`（或您配置的端口）
 - 在云服务器上部署后，不知道浏览器该输入什么地址？请看 [云服务器 Web 界面访问指南](deploy-webui-cloud.md)
-- 分析完成后自动推送通知到配置的渠道
+- Web 首页分析默认 **不** 外推（`notify=false`）；需外发时在 `.env` 配渠道，并由 CLI/Actions 或 API 显式 `notify=true`
 - 此功能在 GitHub Actions 环境中会自动禁用
 - 另见 [openclaw Skill 集成指南](openclaw-skill-integration.md)
 
@@ -1053,6 +1053,10 @@ A: 检查是否启用了 Actions，以及 cron 表达式是否正确（注意是
 ---
 
 更多问题请 [提交 Issue](https://github.com/ZhuLinsen/daily_stock_analysis/issues)
+
+## Portfolio P0（归档 · Web/API 已移除）
+
+> **2026 起本 fork 已删除** `/api/v1/portfolio/*`、Web `/portfolio` 与 Agent `get_portfolio_snapshot`。**勿**按下列 PR1–PR4 对接产品面；多标的仓位分析请用 **问股 / PortfolioAgent**（文字建议，非账本）。Paper 模拟仍见 `/api/v1/paper-trading/*` 与 `main.py --intraday`。
 
 ## Portfolio P0 PR1 (Core Ledger and Snapshot)
 

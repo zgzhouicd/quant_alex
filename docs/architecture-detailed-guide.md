@@ -11,6 +11,7 @@
 | [agent-capabilities.md](./agent-capabilities.md) | Agent 与传统 pipeline 的能力边界 |
 | [small-scale-operations.md](./small-scale-operations.md) | 小流量部署边界与「不必做」项 |
 | [timezone-policy.md](./timezone-policy.md) | 时区与 `utc_now` 约定 |
+| [web-workspace.md](./web-workspace.md) | Web 路由、决策台、页面内推送与 notify 默认 |
 
 ---
 
@@ -20,13 +21,13 @@
 
 ## 辅助交易与实盘边界
 
-本系统在架构上**不承担真实证券/期货/加密货币报单**：不向券商、交易所或钱包接口发送可产生真实成交的委托。产品线应理解为**辅助决策**：输出分析报告、仪表盘价位、分钟级结构化信号等，由用户在**他端**决定是否开仓、加仓、平仓或反手。
+本系统在架构上**不承担真实证券/期货/加密货币报单**：不向券商、交易所或钱包接口发送可产生真实成交的委托。产品线应理解为**辅助决策**：输出分析报告、仪表盘价位、**日线（默认可扩展分钟）** 结构化信号等，由用户在**他端**决定是否开仓、加仓、平仓或反手。Web 主触点见 [web-workspace.md](./web-workspace.md)（**`/decision` 决策台** + 页面内提醒流）。
 
 | 能力类别 | 代码与入口（示例） | 与「实盘」的关系 |
 |----------|-------------------|------------------|
 | **建议与信号** | `StockAnalysisPipeline`、决策仪表盘、`IntradaySignalEngine`、`get_intraday_signal` 工具、多 Agent 结论 | 仅表达**当下偏多与偏空、关键位与失效参考**等，**不**触发外部下单。 |
 | **组合分析（多标的）** | `PortfolioAgent`、问股/Agent 编排 | 对自选列表做**集中度与风险文字评估**，不涉及真实持仓同步或报单。 |
-| **模拟与回测** | `PaperTradingService`、`api/v1/paper-trading/*`、回测引擎 | **本机数据库**内模拟撮合或历史假设评估，与真实账户隔离；Scheduler 内的 `apply_signal` 只驱动**模拟**持仓。 |
+| **模拟与回测** | `PaperTradingService`、`api/v1/paper-trading/*`（**无 Web 页**）、回测引擎 | **本机数据库**内模拟撮合或历史假设评估，与真实账户隔离；Scheduler 内的 `apply_signal` 只驱动**模拟**账本，可由 CLI/`--intraday` 使用。 |
 
 对外文档与界面如需满足合规表述，应明确：**真实资金与委托均在用户自选渠道完成**。
 
@@ -34,7 +35,7 @@
 
 ## 1. 系统上下文（谁在用什么）
 
-从部署视角看，本项目是多入口、共享同一套后端库的「分析 + 展示 + 推送」系统。
+从部署视角看，本项目是多入口、共享同一套后端库的「分析 + 展示 +（可选）外推」系统；**Web 默认以页面内结果为主**，外推通知依赖 `.env` 且分析 API `notify` 默认为 `false`。
 
 > 流程图使用 `graph` 语法，以兼容 **Mermaid 8.8** 等旧版渲染器（不支持 `flowchart` 关键字）。
 

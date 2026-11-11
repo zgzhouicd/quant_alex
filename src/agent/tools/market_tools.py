@@ -24,7 +24,7 @@ def _get_fetcher_manager():
 # get_market_indices
 # ============================================================
 
-def _handle_get_market_indices(region: str = "cn") -> dict:
+def _handle_get_market_indices(region: str = "us") -> dict:
     """获取主要市场指数列表。"""
     manager = _get_fetcher_manager()
     indices = manager.get_main_indices(region=region)
@@ -41,15 +41,15 @@ def _handle_get_market_indices(region: str = "cn") -> dict:
 
 get_market_indices_tool = ToolDefinition(
     name="get_market_indices",
-    description="获取主要市场指数（如 A 股上证/深证/沪深300；美股标普/纳指/道指等），用于大盘概览。",
+    description="获取主要市场指数（美股标普/纳指/道指等），用于大盘概览。",
     parameters=[
         ToolParameter(
             name="region",
             type="string",
-            description="市场区域：'cn' A 股，'us' 美股（默认 'cn'）",
+            description="市场区域：仅 'us' 美股（默认）",
             required=False,
-            default="cn",
-            enum=["cn", "us"],
+            default="us",
+            enum=["us"],
         ),
     ],
     handler=_handle_get_market_indices,

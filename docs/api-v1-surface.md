@@ -2,6 +2,8 @@
 
 本页描述 **`/api/v1/*`**（及根路径 **`/api/health`**）与 Web 工作台 `apps/dsa-web/src/api/*.ts` 的对应关系，便于联调与人工测试。
 
+**Web 路由与推送策略**（决策台、notify 默认值等）见 [web-workspace.md](./web-workspace.md)。
+
 **OpenAPI 真源**：启动应用后访问 `/openapi.json`，或使用仓库脚本生成路由列表：
 
 ```bash
@@ -57,7 +59,7 @@ python scripts/list_openapi_paths.py --json
 
 | Method | Path | 前端 | 说明 |
 |--------|------|------|------|
-| POST | `/api/v1/analysis/analyze` | [analysis.ts](../apps/dsa-web/src/api/analysis.ts) | |
+| POST | `/api/v1/analysis/analyze` | [analysis.ts](../apps/dsa-web/src/api/analysis.ts) | 请求体 `notify` 默认 **false**；Web 不展示外推勾选。 |
 | GET | `/api/v1/analysis/status/{task_id}` | analysis.ts | |
 | GET | `/api/v1/analysis/tasks` | analysis.ts | |
 | GET | `/api/v1/analysis/tasks/stream` | analysis.ts（SSE URL） | EventSource/轮询配合。 |
@@ -111,16 +113,16 @@ python scripts/list_openapi_paths.py --json
 
 完整路径以 `python scripts/list_openapi_paths.py` 为准。（历史版本曾暴露 `/api/v1/portfolio/*`，已移除。）
 
-## Intraday
+## Intraday（路径名保留；默认日线 `1d`）
 
 | Method | Path | 前端 | 说明 |
 |--------|------|------|------|
-| GET | `/api/v1/intraday/bars` | [intraday.ts](../apps/dsa-web/src/api/intraday.ts) | |
-| POST | `/api/v1/intraday/signal` | intraday.ts | |
-| GET | `/api/v1/intraday/signal/latest` | intraday.ts | |
-| POST | `/api/v1/intraday/signals/batch` | — | 批量；Web 页可仅用单标的。 |
-| POST | `/api/v1/intraday/scheduler/*` | intraday.ts | start / run-once / stop |
-| GET | `/api/v1/intraday/scheduler/status` | intraday.ts | |
+| GET | `/api/v1/intraday/bars` | — | Web 未封装 |
+| POST | `/api/v1/intraday/signal` | — | 单标的分析；Web 用 batch |
+| GET | `/api/v1/intraday/signal/latest` | [intraday.ts](../apps/dsa-web/src/api/intraday.ts) | 决策台「读库最新」 |
+| POST | `/api/v1/intraday/signals/batch` | intraday.ts | 决策台「扫描信号」 |
+| POST | `/api/v1/intraday/scheduler/*` | — | CLI/API；Web 无调度 UI |
+| GET | `/api/v1/intraday/scheduler/status` | — | 同上 |
 
 **语义（与 OpenAPI 一致）**：路径名仍为 `intraday`，默认 **`interval=1d`**；查询参数以 **`lookback_days`** 为主（默认约 120 天范围，具体见 schema），仍兼容旧客户端传入 **`lookback_minutes`**（服务端按天折算）。调度请求体使用 **`lookback_days`**，默认 **`intervals: ["1d"]`**，**`poll_seconds`** 默认较大以适配日线节奏。
 

@@ -57,6 +57,7 @@ from src.report_language import (
 from src.schemas.instrument_schema import InstrumentSchema
 from src.services.instrument_resolver import (
     instrument_to_legacy_code,
+    is_legacy_cn_hk_symbol,
     resolve_instrument_input,
 )
 from src.services.name_to_code_resolver import resolve_name_to_code
@@ -90,6 +91,16 @@ def _invalid_analysis_input_error() -> HTTPException:
     )
 
 
+def _legacy_cn_hk_rejection_error() -> HTTPException:
+    return HTTPException(
+        status_code=400,
+        detail={
+            "error": "validation_error",
+            "message": "已移除 A股/港股标的，请使用美股、期货或永续合约代码",
+        },
+    )
+
+
 def _is_obviously_invalid_analysis_input(text: str) -> bool:
     """Reject mixed alphanumeric noise and unsupported symbols early."""
     if not text or is_code_like(text):
@@ -115,8 +126,12 @@ def _resolve_and_normalize_input(raw_value: str) -> str:
     if not text:
         return ""
 
+    canonical = canonical_stock_code(text)
+    if is_legacy_cn_hk_symbol(text) or is_legacy_cn_hk_symbol(canonical):
+        raise _legacy_cn_hk_rejection_error()
+
     if is_code_like(text):
-        return canonical_stock_code(text)
+        return canonical
 
     if _is_obviously_invalid_analysis_input(text):
         raise _invalid_analysis_input_error()

@@ -36,7 +36,7 @@
 
 - 大文件拆分（config / search_service / data_provider）仅在为 **修改频繁且痛苦** 时做。
 - 全仓时区改造、`session_scope` 全库替换、通知分渠道结构化返回 — **等有运维/产品需求再上**。
-- PostgreSQL + 持仓方言改造 — **等确定要弃用单机 SQLite 再上**。
+- PostgreSQL 全量迁移 — **等确定要弃用单机 SQLite 再上**（日级组合账本 API 已移除，勿再规划 `portfolio_write_session` 类改造）。
 
 ## 相关文档
 

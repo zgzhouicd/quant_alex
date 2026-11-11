@@ -39,17 +39,15 @@ EXTRACT_PROMPT = """请分析这张股票市场截图或图片，提取其中所
 
 输出格式：仅返回有效的 JSON 数组，不要 markdown、不要解释。
 每个元素为对象：{"code":"股票代码","name":"股票名称","confidence":"high|medium|low"}
-- code: 必填，股票代码（A股6位、港股5位、美股1-5字母、ETF 如 159887/512880）
-- name: 若图中有名称则必填（如 贵州茅台、银行ETF、证券ETF），与代码一一对应；仅当图中确实无名称时可省略
+- code: 必填，美股/美交所 ETF 代码（1–10 位字母与点，如 AAPL、BRK.B、SPY、QQQ）
+- name: 若图中有名称则必填（如 Apple、英伟达、SPDR S&P 500），与代码一一对应；仅当图中确实无名称时可省略
 - confidence: 必填，识别置信度，high=确定、medium=较确定、low=不确定
 
 示例（图中同时有名称和代码时）：
-- 个股：600519 贵州茅台、300750 宁德时代
-- 港股：00700 腾讯控股、09988 阿里巴巴
-- 美股：AAPL 苹果、TSLA 特斯拉
-- ETF：159887 银行ETF、512880 证券ETF、512000 券商ETF、512480 半导体ETF、515030 新能源车ETF
+- 个股：AAPL Apple、NVDA NVIDIA、TSLA Tesla
+- ETF：SPY SPDR S&P 500、QQQ Invesco QQQ、VOO Vanguard S&P 500
 
-输出示例：[{"code":"600519","name":"贵州茅台","confidence":"high"},{"code":"159887","name":"银行ETF","confidence":"high"}]
+输出示例：[{"code":"AAPL","name":"Apple","confidence":"high"},{"code":"SPY","name":"SPDR S&P 500 ETF","confidence":"high"}]
 
 禁止只返回代码数组如 ["159887","512880"]，必须使用对象格式。若未找到任何股票代码，返回：[]"""
 

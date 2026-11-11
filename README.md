@@ -14,9 +14,9 @@
   <a href="https://hellogithub.com/repository/ZhuLinsen/daily_stock_analysis" target="_blank"><img src="https://api.hellogithub.com/v1/widgets/recommend.svg?rid=6daa16e405ce46ed97b4a57706aeb29f&claim_uid=pfiJMqhR9uvDGlT&theme=neutral" alt="Featured｜HelloGitHub" style="width: 250px; height: 54px;" width="250" height="54" /></a>
 </p>
 
-> 🤖 基于 AI 大模型的股票智能分析系统：**行情与 K 线主路径为 Yahoo Finance（yfinance）**，可选配置 **Longbridge** 作为美/港股优先源；**`main.py` CLI 仅接受美股、美期货、加密货币合约**，多市场分析与 Web/API 行为一致时请使用 **Web 工作台或 `api/v1`**。每日自动分析并推送「决策仪表盘」到企业微信/飞书/Telegram/Discord/Slack/邮箱等渠道。
+> 🤖 基于 AI 大模型的**美股**智能分析系统：**行情与 K 线主路径为 Yahoo Finance（yfinance）**，可选配置 **Longbridge** 作为美股优先源；**`main.py` CLI 与 Web/API 均仅接受美股、美期货、加密货币合约**（拒收 A 股 / 港股）。日常以 **Web 内报告 + 决策台提醒流** 为主；分析任务默认 `notify=false`。可选在 `.env` 或 GitHub Actions 中配置企微/飞书/Telegram 等外部推送（Web 设置页不展示通知渠道表单）。
 
-[**功能特性**](#-功能特性) · [**快速开始**](#-快速开始) · [**推送效果**](#-推送效果) · [**架构详解（流程图）**](docs/architecture-detailed-guide.md) · [**Intraday / 日线方案**](docs/intraday-refactor-plan.md) · [**完整指南**](docs/full-guide.md) · [**小流量运行边界**](docs/small-scale-operations.md) · [**常见问题**](docs/FAQ.md) · [**更新日志**](docs/CHANGELOG.md)
+[**功能特性**](#-功能特性) · [**快速开始**](#-快速开始) · [**推送效果**](#-推送效果) · [**Web 工作台**](docs/web-workspace.md) · [**架构详解（流程图）**](docs/architecture-detailed-guide.md) · [**Intraday / 日线方案**](docs/intraday-refactor-plan.md) · [**完整指南**](docs/full-guide.md) · [**小流量运行边界**](docs/small-scale-operations.md) · [**常见问题**](docs/FAQ.md) · [**更新日志**](docs/CHANGELOG.md)
 
 简体中文 | [English](docs/README_EN.md) | [繁體中文](docs/README_CHT.md)
 
@@ -24,10 +24,10 @@
 
 ## 产品定位与交易边界
 
-本仓库定位为**辅助交易系统**：负责行情拉取、技术面与舆情分析、AI/Agent 报告与推送，以及**结构化信号与价位建议**（例如是否偏多/偏空、参考入场与失效位、是否更适合观望）。**本项目不向券商或交易所发送真实委托**；用户若实盘交易，须在**其他终端或券商客户端**自行开仓、平仓与反手。
+本仓库定位为**辅助交易系统**：负责行情拉取、技术面与舆情分析、AI/Agent 报告，以及**结构化信号与价位建议**（例如是否偏多/偏空、参考入场与失效位、是否更适合观望）。**本项目不向券商或交易所发送真实委托**；用户若实盘交易，须在**其他终端或券商客户端**自行开仓、平仓与反手。
 
 - **实盘操作**：一切真实下单与资金交收均在**他端**完成；本系统输出仅供决策参考，不构成投资建议。
-- **Paper Trading 与分钟级调度**：仅在**本地模拟账户**中写入订单与成交，用于验证信号与权益曲线，**不代表**代用户执行实盘，也**不**替代券商持仓或对账系统。
+- **模拟与调度（可选）**：`/api/v1/paper-trading/*` 与 `main.py --intraday` 仍在后端/CLI 提供本地模拟与日线调度；**Web 主路径为 `/decision` 决策台**（观察名单、日线结构信号、页面内变更提醒），不再提供持仓账本页或 Web 模拟盘表单。
 
 更细的架构分层说明见 [架构详解 — 辅助交易与实盘边界](docs/architecture-detailed-guide.md#辅助交易与实盘边界)。
 
@@ -38,33 +38,33 @@
 | ---------------- | ------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | AI             | 决策仪表盘        | 一句话核心结论 + 精确买卖点位 + 操作检查清单                                                                                                                                                                    |
 | 分析           | 多维度分析        | 技术面（盘中实时 MA/多头排列）+ 筹码分布 + 舆情情报 + 实时行情                                                                                                                                                  |
-| 市场           | 多入口与多市场    | **Web / API** 可分析 A/港/美等配置的标的，并支持美股指数（SPX、DJI、IXIC 等）；**`main.py` CLI** 仅美股 / 美期货 / 加密合约（见 CLI 文件头说明）。行情拉取以 **yfinance** 为主、**Longbridge** 可选优先（美/港股）。                                                                                                                                                             |
+| 市场           | 美股为主          | **Web / API / CLI** 仅美股、美期货、加密永续等（拒收 A 股 / 港股）；支持美股指数（SPX、DJI、IXIC 等）。行情以 **yfinance** 为主，可选 **Longbridge** 优先（美股）。                                                                                                                                                             |
 | 日线决策       | 观察名单 + 结构信号 | Web **决策台** [`/decision`](docs/intraday-refactor-plan.md) 批量日线信号与页面内提醒流；后端 `/api/v1/intraday/*`（默认 `1d`）；Paper/调度见 API 与 CLI `--intraday`，Web 不再维护模拟盘页。 |
 | 基本面         | 结构化聚合        | 新增`fundamental_context`（valuation/growth/earnings/institution/capital_flow/dragon_tiger/boards，其中 `earnings.data` 新增 `financial_report` 与 `dividend`，`boards` 表示板块涨跌榜），主链路 fail-open 降级 |
-| 策略           | 市场策略系统      | 内置 A股「三段式复盘策略」与美股「Regime Strategy」，输出进攻/均衡/防守或 risk-on/neutral/risk-off 计划，并附“仅供参考，不构成投资建议”提示                                                                   |
-| 复盘           | 大盘复盘          | 每日市场概览、板块涨跌；支持 cn(A股)/us(美股)/both(两者) 切换                                                                                                                                                   |
-| 界面           | 双主题工作台      | Web 工作台现支持全新浅色主题与深色主题切换，首页 / 问股 / 日内 / 回测 / 设置统一升级为同一套视觉与交互体系                                                                                                      |
-| 补全           | 智能补全 (MVP)    | **[测试阶段]** 首页搜索框支持代码/名称/拼音/别名联想；索引由 `scripts/generate_stock_index.py` / `generate_index_from_csv.py` 等生成；可选用 **Tushare** 脚本导出 CSV 后再生成索引（见 [Tushare 列表说明](docs/TUSHARE_STOCK_LIST_GUIDE.md)）。行情侧已不再依赖 AkShare 链路。                                                                                |
+| 策略           | 市场策略系统      | 美股大盘「Regime Strategy」，输出 risk-on/neutral/risk-off 计划，并附“仅供参考，不构成投资建议”提示                                                                   |
+| 复盘           | 大盘复盘          | 每日美股市场概览与板块轮动（`MARKET_REVIEW_REGION` 仅 `us`）                                                                                                                                                   |
+| 界面           | 双主题工作台      | 浅色/深色主题；侧栏：**首页 · 问股 · 决策 · 回测 · 设置**（`/decision` 为日线观察与结构信号入口；`/intraday` 重定向至决策台）                                                                                    |
+| 补全           | 智能补全 (MVP)    | **[测试阶段]** 首页搜索框支持美股代码 / 中文名 / 拼音 / 别名联想；运行 `python3 scripts/generate_stock_index.py` 写入 `apps/dsa-web/public/stocks.index.json`。                                                                                |
 | 智能导入       | 多源导入          | 支持图片、CSV/Excel、剪贴板；Vision LLM 提取代码与名称；置信度分层确认；名称→代码为 **本地映射 + 拼音与模糊匹配**（AkShare 在线列表兜底已随数据层收敛移除）                                                                                             |
 | 历史记录       | 批量管理          | 支持多选、全选及批量删除历史分析记录，优化管理效率与 UI/UX 体验                                                                                                                                                 |
 | 回测           | AI 回测验证       | 自动评估历史分析准确率，支持按股票与分析日期查看“AI 预测 vs 次日实际（1 日窗口）”和准确率                                                                                                                     |
-| 资讯           | 公司公告 + 资金流 | IntelAgent 新增公告抓取与主力资金流维度（上交所/深交所/cninfo + A 股主力资金流）用于补强舆情链路                                                                                                                |
+| 资讯           | 公司公告 + 舆情 | 美股公告与多源新闻检索（Tavily / SerpAPI 等）用于补强舆情链路                                                                                                                |
 | **Agent 问股** | **策略对话**      | **多轮策略问答，支持均线金叉/缠论/波浪等 11 种内置策略，Web/Bot/API 全链路**                                                                                                                                    |
-| 推送           | 多渠道通知        | 企业微信、飞书、Telegram、Discord、Slack、钉钉、邮件、Pushover                                                                                                                                                  |
+| 推送           | 页面内 + 可选外链 | Web：SSE 任务进度、决策台「提醒流」；外部渠道（企微/飞书/Telegram 等）仅 **`.env` / Actions** 可选配置，非 Web 必填项                                                                                            |
 | 自动化         | 定时运行          | GitHub Actions 定时执行，无需服务器                                                                                                                                                                             |
 
 > 历史报告详情会优先展示 AI 返回的原始「狙击点位」文本，避免区间价、条件说明等复杂内容在历史回看时被压缩成单个数字。
 
 > 回测页现支持“次日验证 / 1 日窗口”视图，可按股票代码和分析日期范围查看当时 AI 预测、次日实际涨跌以及区间准确率；该视图基于历史分析记录与 1 日回测结果，不代表真实成交流水。
 
-> Web 工作台已完成一轮 UI 升级：新增完整浅色主题，并支持浅色 / 深色主题一键切换；首页、问股、日内、回测、设置页改为共享同一套设计 token、输入表面、状态反馈和抽屉/滚动语义，日常使用与移动端浏览更连贯。
+> Web 工作台已完成一轮 UI 升级：浅色/深色主题切换；首页、问股、决策、回测、设置共享同一套设计 token 与交互语义。
 
-> 问股页进一步补强了消息复制、会话导出、通知发送、历史删除和追问上下文保护；首页与报告抽屉的复制反馈、空态和错误态也已按面板独立收口，减少误触和状态串扰。
+> 问股支持会话导出为 Markdown、历史删除与追问上下文保护；问股页**不再提供**「发送到通知渠道」按钮。首页分析默认不向外部 IM 推送（`notify=false`）。
 
 > Web 管理认证支持运行时开关；如果系统中已保留管理员密码，重新开启认证时必须提供当前密码，避免在认证关闭窗口内直接获取新的管理员会话。
 > 多进程/多 worker 部署时，认证开关仅在当前进程即时生效；需重启或滚动重启全部 worker 以统一状态。
 
-> 分钟级能力说明：当前 intraday / paper trading 以 **加密货币优先 Binance 现货公共 K 线**、**美股 / 美期货以 yfinance（及可选 Longbridge）分钟线** 为第一阶段主路径，默认通过结构化信号驱动模拟交易，尚未接入真实券商下单。
+> 信号能力说明：产品默认 **日线（`interval=1d`）** 结构化信号；分钟线与 paper 闭环仍可通过 API/CLI 使用。加密货币分钟线可优先 **Binance 现货公共 K 线**，美股/美期货以 **yfinance**（及可选 Longbridge）为主；未接入真实券商下单。
 
 ### 技术栈与数据来源
 
@@ -72,11 +72,11 @@
 | 类型     | 支持                                                                                                                                                                                                |
 | ---------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | AI 模型  | [AIHubMix](https://aihubmix.com/?aff=CfMq)、Gemini、OpenAI 兼容、DeepSeek、通义千问、Claude、Ollama 本地模型 等（统一通过 [LiteLLM](https://github.com/BerriAI/litellm) 调用，支持多 Key 负载均衡） |
-| 行情数据 | **Yahoo Finance（yfinance）**、可选 **[Longbridge](https://open.longbridge.com/)**（配置后美/港股日线与实时优先）；遗留 A 股专用抓取器已从 `data_provider` 移除，扩展请见 `data_provider/__init__.py` 说明                                                                                      |
+| 行情数据 | **Yahoo Finance（yfinance）**、可选 **[Longbridge](https://open.longbridge.com/)**（配置后美股日线与实时优先）；扩展请见 `data_provider/__init__.py`                                                                                      |
 | 新闻搜索 | Tavily、SerpAPI、Bocha、Brave、MiniMax                                                                                                                                                              |
 | 社交舆情 | [Stock Sentiment API](https://api.adanos.org/docs)（Reddit / X / Polymarket，仅美股，可选）                                                                                                         |
 
-> **长桥优先策略（仅美/港股）**：在配置 `LONGBRIDGE_APP_KEY` / `LONGBRIDGE_APP_SECRET` / `LONGBRIDGE_ACCESS_TOKEN` 的前提下，美股与港股的 **日线 K 线** 与 **实时行情** 由 **Longbridge 优先拉取**；若长桥失败或部分字段缺失，再由 **YFinance** 兜底或合并补全。**未配置长桥凭据时不会调用 Longbridge**，此时美/港股与指数仍以 **YFinance** 为主。**美股大盘指数**（如 SPX）始终以 YFinance 优先（长桥不提供指数行情）。个股主链路不再使用「Efinance → AkShare → …」旧式 A 股抓取链；A 股大盘复盘等增强能力可独立配置 **TickFlow** 等（与主 fetcher 解耦）。详见 `.env.example`、[架构详解](docs/architecture-detailed-guide.md) 与 [完整指南](docs/full-guide.md)。
+> **长桥优先策略（美股）**：在配置 `LONGBRIDGE_APP_KEY` / `LONGBRIDGE_APP_SECRET` / `LONGBRIDGE_ACCESS_TOKEN` 的前提下，美股的 **日线 K 线** 与 **实时行情** 可由 **Longbridge 优先拉取**；失败时由 **YFinance** 兜底。**未配置长桥凭据时不会调用 Longbridge**。**美股大盘指数**（如 SPX）始终以 YFinance 优先。详见 `.env.example` 与 [架构详解](docs/architecture-detailed-guide.md)。
 
 ### 内置交易纪律
 
@@ -127,7 +127,7 @@
 > 注：AI 优先级 Gemini > Anthropic > OpenAI（含 AIHubmix）> Ollama，至少配置一个。`AIHUBMIX_KEY` 无需配置 `OPENAI_BASE_URL`，系统自动适配。图片识别需 Vision 能力模型。DeepSeek 思考模式（deepseek-reasoner、deepseek-r1、qwq、deepseek-chat）按模型名自动识别，无需额外配置。**Ollama 本地模型**（无需 API Key）必须使用 `OLLAMA_API_BASE`，误用 `OPENAI_BASE_URL` 会导致 404。
 
 <details>
-<summary><b>通知渠道配置</b>（点击展开，至少配置一个）</summary>
+<summary><b>通知渠道配置</b>（点击展开，可选；仅 CLI / 定时任务 / 显式 <code>notify=true</code> 时使用，Web 设置页已隐藏该类表单）</summary>
 
 
 | Secret 名称                       | 说明                                                                                                                 | 必填 |
@@ -148,7 +148,7 @@
 | `EMAIL_PASSWORD`                  | 邮箱授权码（非登录密码）                                                                                             | 可选 |
 | `EMAIL_RECEIVERS`                 | 收件人邮箱（多个用逗号分隔，留空则发给自己）                                                                         | 可选 |
 | `EMAIL_SENDER_NAME`               | 邮件发件人显示名称（默认：daily_stock_analysis股票分析助手，支持中文并自动编码邮件头）                               | 可选 |
-| `STOCK_GROUP_N` / `EMAIL_GROUP_N` | 股票分组发往不同邮箱（如`STOCK_GROUP_1=600519,300750` `EMAIL_GROUP_1=user1@example.com`）                            | 可选 |
+| `STOCK_GROUP_N` / `EMAIL_GROUP_N` | 股票分组发往不同邮箱（如`STOCK_GROUP_1=AAPL,NVDA` `EMAIL_GROUP_1=user1@example.com`）                            | 可选 |
 | `PUSHPLUS_TOKEN`                  | PushPlus Token（[获取地址](https://www.pushplus.plus)，国内推送服务）                                                | 可选 |
 | `PUSHPLUS_TOPIC`                  | PushPlus 群组编码（一对多推送，配置后消息推送给群组所有订阅用户）                                                    | 可选 |
 | `SERVERCHAN3_SENDKEY`             | Server酱³ Sendkey（[获取地址](https://sc3.ft07.com/)，手机APP推送服务）                                             | 可选 |
@@ -175,7 +175,7 @@
 | `MARKDOWN_TO_IMAGE_MAX_CHARS`     | 超过此长度不转图片，避免超大图片（默认`15000`）                                                                      | 可选 |
 | `MD2IMG_ENGINE`                   | 转图引擎：`wkhtmltoimage`（默认）或 `markdown-to-file`（emoji 更好）                                                 | 可选 |
 
-> 至少配置一个渠道，配置多个则同时推送。图片发送与引擎安装细节请参考 [完整指南](docs/full-guide.md)
+> 不配通知渠道也可正常使用 Web。需要 GitHub Actions 或 CLI 外发时再配置；多个渠道可同时推送。图片发送与引擎安装细节见 [完整指南](docs/full-guide.md)
 
 </details>
 
@@ -194,9 +194,7 @@
 | `SEARXNG_PUBLIC_INSTANCES_ENABLED`   | 是否在`SEARXNG_BASE_URLS` 为空时自动从 `searx.space` 获取公共实例（默认 `true`）                                                             | 可选 |
 | `SOCIAL_SENTIMENT_API_KEY`           | [Stock Sentiment API](https://api.adanos.org/docs)（Reddit/X/Polymarket 社交舆情，仅美股）                                                   | 可选 |
 | `SOCIAL_SENTIMENT_API_URL`           | 自定义社交舆情 API 地址（默认`https://api.adanos.org`）                                                                                      | 可选 |
-| `TUSHARE_TOKEN`                      | [Tushare Pro](https://tushare.pro/weborder/#/login?reg=834638 ) Token                                                                        | 可选 |
-| `TICKFLOW_API_KEY`                   | [TickFlow](https://tickflow.org) API Key（增强 A 股大盘复盘指数；若套餐支持标的池查询，也可增强市场统计）                                    | 可选 |
-| `LONGBRIDGE_APP_KEY`                 | [Longbridge OpenAPI](https://open.longbridge.com/) App Key（配置后自动成为美股/港股首选数据源）                                              | 可选 |
+| `LONGBRIDGE_APP_KEY`                 | [Longbridge OpenAPI](https://open.longbridge.com/) App Key（配置后可选作为美股首选数据源）                                              | 可选 |
 | `LONGBRIDGE_APP_SECRET`              | Longbridge App Secret                                                                                                                        | 可选 |
 | `LONGBRIDGE_ACCESS_TOKEN`            | Longbridge Access Token                                                                                                                      | 可选 |
 | `LONGBRIDGE_STATIC_INFO_TTL_SECONDS` | 长桥`static_info` 进程内缓存秒数，默认 `86400`；`0` 表示不缓存                                                                               | 可选 |
@@ -241,8 +239,6 @@
 > - 日线与实时行情以 **Yahoo Finance（yfinance）** 与可选的 **Longbridge** 为主路径；未配置长桥时仍可走 Yahoo 单列。
 > - 若配置 `LONGBRIDGE_*`，量比 / 换手率 / 部分估值字段可在 Yahoo 缺项时由长桥补齐。
 > - 历史上基于东财 / 新浪等的多源实时优先级已收敛；`REALTIME_SOURCE_PRIORITY` 默认 `yfinance,longbridge`，详见 `.env.example` 与 `docs/full-guide.md`。
-> - 仍配置 `TICKFLOW_API_KEY` 时，仅影响 A 股大盘复盘等有限能力；与个股主链路默认数据源相互独立。
-
 #### 3. 启用 Actions
 
 `Actions` 标签 → `I understand my workflows, go ahead and enable them`
@@ -304,6 +300,8 @@ LITELLM_MODEL=openai/deepseek-chat
 > 桌面客户端打包请参考 [桌面端打包说明](docs/desktop-package.md)
 
 ## 📱 推送效果
+
+本节展示**配置了外部通知渠道**时的 IM/邮件样例（CLI、GitHub Actions 或 `notify=true`）。**Web 默认不在线推送**；报告与决策变更请在首页、问股与 [**决策台**](docs/web-workspace.md) 查看。
 
 ### 决策仪表盘
 
@@ -396,12 +394,12 @@ LITELLM_MODEL=openai/deepseek-chat
 首页分析输入框已升级为”类搜索引擎”补全框，显著降低记忆负担：
 
 - **多维匹配**：支持输入股票代码、中文名、拼音缩写或别名（如 `gzmt` -> 贵州茅台、`tencent` -> 腾讯控股、`aapl` -> Apple Inc.）。
-- **多市场覆盖**：索引可覆盖 **A 股、港股、美股** 等（取决于你生成的 CSV/映射来源）；常用路径为 **Tushare 导出列表 → `generate_index_from_csv.py`**，或使用 `generate_stock_index.py` 基于内置映射生成 MVP 索引。
+- **美股覆盖**：索引基于 `STOCK_NAME_MAP` 与 `scripts/generate_stock_index.py` 生成 MVP 列表；可按需扩展映射后重新生成索引。
 - **自动降级逻辑**：
   - **新股/异常**：若索引未及时更新或加载失败，系统将无缝退回普通输入模式，确保分析链路 100% 可用。
   - **未命中**：搜索未命中时，用户直接按回车即可走原有手动输入流程，完全不影响分析。
 
-> 💡 **索引更新提示**：运行 `scripts/fetch_tushare_stock_list.py` 生成各市场 CSV 后，执行 `scripts/generate_index_from_csv.py` 写入 `apps/dsa-web/public/stocks.index.json`。详见 [Tushare 股票列表获取工具使用说明](docs/TUSHARE_STOCK_LIST_GUIDE.md)（Tushare Token 为可选运维步骤，与主行情 fetcher 独立）。
+> 💡 **索引更新提示**：运行 `python3 scripts/generate_stock_index.py` 写入 `apps/dsa-web/public/stocks.index.json`。
 
 **LLM 用量查询**：`GET /api/v1/usage/summary?period=today|month|all`，返回按调用类型和模型分组的 token 消耗汇总（`total_calls`、`total_tokens`、`by_call_type`、`by_model`）。
 
@@ -423,10 +421,10 @@ LITELLM_MODEL=openai/deepseek-chat
 > 对用户侧文案，本项目仍以“策略”为主称呼；代码、配置和 API 主字段统一使用 `skill`，可理解为“可复用的策略能力包”。
 
 - **选择策略**：均线金叉、缠论、波浪理论、多头趋势等 11 种内置策略
-- **自然语言提问**：如「用缠论分析 600519」，Agent 自动调用实时行情、K线、技术指标、新闻等工具
+- **自然语言提问**：如「用缠论分析 AAPL」，Agent 自动调用实时行情、K线、技术指标、新闻等工具
 - **流式进度反馈**：实时展示 AI 思考路径（行情获取 → 技术分析 → 新闻搜索 → 生成结论）
 - **多轮对话**：支持追问上下文，会话历史持久化保存
-- **导出与发送**：可将会话导出为 `.md` 文件，或发送到已配置的通知渠道，并提供明确的成功/失败反馈
+- **导出会话**：可将会话导出为 `.md` 文件（页面内使用，不依赖 IM）
 - **后台执行**：切换页面不中断分析，完成时 Dock 问股图标显示角标
 - **Bot 命令**：`/ask` 技能分析（支持多股对比）、`/chat` 自由对话、`/history` 会话历史、`/strategies` 策略/技能列表、`/research` 深度研究
 - **自定义策略（Skill）**：在 `strategies/` 目录下新建 YAML 文件或在自定义 skill 目录中放入 `SKILL.md` bundle，即可添加新的交易策略，无需写代码
@@ -452,7 +450,15 @@ LITELLM_MODEL=openai/deepseek-chat
    cd ../..
    ```
 
-访问 `http://127.0.0.1:8000` 即可使用。
+访问 `http://127.0.0.1:8000` 即可使用。常用路由：
+
+| 路径 | 说明 |
+|------|------|
+| `/` | 首页：选股分析、历史报告、任务 SSE |
+| `/chat` | 问股：多轮策略对话 |
+| `/decision` | **决策台**：观察名单、批量日线信号、页面内提醒流 |
+| `/backtest` | 回测与次日验证视图 |
+| `/settings` | 模型、数据源、认证等（通知渠道请在 `.env` 配置） |
 
 > 在云服务器上部署后，不知道浏览器该输入什么地址？请看 [云服务器 Web 界面访问指南](docs/deploy-webui-cloud.md)。
 

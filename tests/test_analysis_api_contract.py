@@ -421,7 +421,7 @@ class AnalysisApiContractTestCase(unittest.TestCase):
             with self.assertRaises(Exception) as ctx:
                 trigger_analysis(
                     request=SimpleNamespace(
-                        stock_code="aaaaaaa",
+                        stock_code="not_a_real_company_xyz",
                         stock_codes=None,
                         report_type="detailed",
                         force_refresh=False,

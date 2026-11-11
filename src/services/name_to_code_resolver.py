@@ -15,6 +15,7 @@ import logging
 from typing import Dict, Optional, Set, Tuple
 
 from src.data.stock_mapping import STOCK_NAME_MAP
+from src.services.instrument_resolver import is_legacy_cn_hk_symbol
 from src.services.stock_code_utils import is_code_like, normalize_code
 
 logger = logging.getLogger(__name__)
@@ -102,7 +103,7 @@ def resolve_name_to_code(name: str) -> Optional[str]:
     将股票名称解析为代码。
 
     策略（顺序）:
-    1. 输入形似代码（5–6 位数字或 1–5 位字母）则规范化后返回。
+    1. 输入形似美股/期货/永续代码则规范化后返回（拒收 A 股 / 港股形态）。
     2. 本地 STOCK_NAME_MAP 反向表（排除歧义名）。
     3. 与本地名称做拼音精确匹配。
     4. 仅在本地映射上做模糊匹配（difflib）。
@@ -122,7 +123,10 @@ def resolve_name_to_code(name: str) -> Optional[str]:
 
     # 1. 输入形似代码
     if _is_code_like(s):
-        return _normalize_code(s)
+        normalized = _normalize_code(s)
+        if normalized and is_legacy_cn_hk_symbol(normalized):
+            return None
+        return normalized
 
     # 2. 本地反向表（已去重）
     local_reverse = _LOCAL_REVERSE_MAP

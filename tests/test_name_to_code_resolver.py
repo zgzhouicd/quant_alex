@@ -1,15 +1,5 @@
 # -*- coding: utf-8 -*-
-"""Tests for name_to_code_resolver.
-
-Covers:
-- Local mapping (STOCK_NAME_MAP reverse)
-- Pinyin match (when pypinyin available)
-- Fuzzy match (difflib, local map only)
-- Ambiguous names return None
-
-Code-shape checks live in tests/test_stock_code_utils.py (_is_code_like / _normalize_code
-are thin wrappers around stock_code_utils).
-"""
+"""Tests for name_to_code_resolver (US-only STOCK_NAME_MAP)."""
 
 import pytest
 
@@ -21,51 +11,41 @@ from src.services.name_to_code_resolver import (
 
 class TestBuildReverseMapNoDuplicates:
     def test_excludes_ambiguous_names(self):
-        # "阿里巴巴" maps to both BABA and 09988
-        code_to_name = {"BABA": "阿里巴巴", "09988": "阿里巴巴", "600519": "贵州茅台"}
+        code_to_name = {"BABA": "阿里巴巴", "BIDU": "百度", "AAPL": "苹果"}
         result = _build_reverse_map_no_duplicates(code_to_name)
-        assert "阿里巴巴" not in result
-        assert result.get("贵州茅台") == "600519"
+        assert result.get("苹果") == "AAPL"
+        assert result.get("百度") == "BIDU"
 
     def test_includes_unique_names(self):
-        code_to_name = {"600519": "贵州茅台", "00700": "腾讯控股"}
+        code_to_name = {"AAPL": "苹果", "NVDA": "英伟达"}
         result = _build_reverse_map_no_duplicates(code_to_name)
-        assert result["贵州茅台"] == "600519"
-        assert result["腾讯控股"] == "00700"
+        assert result["苹果"] == "AAPL"
+        assert result["英伟达"] == "NVDA"
 
-
-# ---------------------------------------------------------------------------
-# resolve_name_to_code
-# ---------------------------------------------------------------------------
 
 class TestResolveNameToCode:
     def test_code_like_input_returned_normalized(self):
-        assert resolve_name_to_code("600519") == "600519"
-        assert resolve_name_to_code("600519.SH") == "600519"
         assert resolve_name_to_code("  AAPL  ") == "AAPL"
+        assert resolve_name_to_code("brk.b") == "BRK.B"
+
+    def test_legacy_cn_hk_code_rejected(self):
+        assert resolve_name_to_code("600519") is None
+        assert resolve_name_to_code("600519.SH") is None
+        assert resolve_name_to_code("HK00700") is None
 
     def test_local_map_exact_match(self):
-        assert resolve_name_to_code("贵州茅台") == "600519"
-        assert resolve_name_to_code("腾讯控股") == "00700"
+        assert resolve_name_to_code("苹果") == "AAPL"
+        assert resolve_name_to_code("英伟达") == "NVDA"
 
     def test_returns_none_for_empty_or_invalid_input(self):
         assert resolve_name_to_code("") is None
         assert resolve_name_to_code("   ") is None
         assert resolve_name_to_code(None) is None  # type: ignore
 
-    def test_ambiguous_name_returns_none(self):
-        # "阿里巴巴" maps to both BABA and 09988 in STOCK_NAME_MAP
-        assert resolve_name_to_code("阿里巴巴") is None
-
-    def test_fuzzy_match_fallback_local_only(self):
-        # Typo: 贵州茅苔 -> fuzzy match 贵州茅台 in STOCK_NAME_MAP
-        result = resolve_name_to_code("贵州茅苔")
-        assert result == "600519"
-
     def test_returns_none_when_no_match(self):
         result = resolve_name_to_code("不存在的股票名称xyz")
         assert result is None
 
     def test_skips_fuzzy_for_non_cjk_garbage_input(self):
-        result = resolve_name_to_code("aaaaaaa")
+        result = resolve_name_to_code("not-a-valid-ticker!!!")
         assert result is None
