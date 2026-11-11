@@ -1,4 +1,4 @@
-"""日线级数据获取与信号编排服务。"""
+"""分钟级 K 线拉取、落库与结构化信号编排服务。"""
 
 from __future__ import annotations
 
@@ -7,12 +7,13 @@ from typing import Any, Dict, List, Optional
 
 from data_provider import DataFetcherManager
 from data_provider.base import canonical_stock_code
+from src.core.intraday_defaults import DEFAULT_INTRADAY_INTERVAL, DEFAULT_LOOKBACK_MINUTES
 from src.core.intraday_signal_engine import IntradaySignalEngine, IntradaySignalResult
 from src.repositories.intraday_repo import IntradayRepository
 
 
 class IntradaySignalService:
-    """协调日线拉数、落库与信号计算。"""
+    """协调分钟线拉数、落库与信号计算。"""
 
     def __init__(
         self,
@@ -29,7 +30,7 @@ class IntradaySignalService:
         self,
         *,
         code: str,
-        interval: str = "1d",
+        interval: str = DEFAULT_INTRADAY_INTERVAL,
         lookback_days: int = 120,
         lookback_minutes: Optional[int] = None,
     ) -> Dict[str, Any]:
@@ -63,9 +64,9 @@ class IntradaySignalService:
         self,
         *,
         code: str,
-        interval: str = "1d",
+        interval: str = DEFAULT_INTRADAY_INTERVAL,
         lookback_days: int = 120,
-        lookback_minutes: Optional[int] = None,
+        lookback_minutes: Optional[int] = DEFAULT_LOOKBACK_MINUTES,
         refresh_data: bool = True,
     ) -> Dict[str, Any]:
         code_norm = canonical_stock_code(code)
@@ -102,9 +103,9 @@ class IntradaySignalService:
         self,
         *,
         symbols: List[str],
-        interval: str = "1d",
+        interval: str = DEFAULT_INTRADAY_INTERVAL,
         lookback_days: int = 120,
-        lookback_minutes: Optional[int] = None,
+        lookback_minutes: Optional[int] = DEFAULT_LOOKBACK_MINUTES,
         refresh_data: bool = True,
     ) -> List[Dict[str, Any]]:
         results: List[Dict[str, Any]] = []
@@ -122,7 +123,7 @@ class IntradaySignalService:
             )
         return results
 
-    def get_latest_signal(self, *, code: str, interval: str = "1d") -> Optional[Dict[str, Any]]:
+    def get_latest_signal(self, *, code: str, interval: str = DEFAULT_INTRADAY_INTERVAL) -> Optional[Dict[str, Any]]:
         return self.repository.get_latest_signal(
             code=canonical_stock_code(code),
             interval=self._normalize_interval(interval),
@@ -140,7 +141,7 @@ class IntradaySignalService:
 
     @staticmethod
     def _normalize_interval(interval: str) -> str:
-        text = (interval or "1d").strip().lower()
+        text = (interval or DEFAULT_INTRADAY_INTERVAL).strip().lower()
         if text in {"d", "day", "daily", "1day"}:
             return "1d"
         return text
@@ -148,12 +149,12 @@ class IntradaySignalService:
     @staticmethod
     def _resolve_lookback_days(lookback_days: int, lookback_minutes: Optional[int]) -> int:
         if lookback_minutes is not None:
-            return max(30, min(2000, int(lookback_minutes / 1440) or 1))
+            return max(1, min(2000, int(lookback_minutes / 1440) or 1))
         return max(30, min(2000, int(lookback_days or 120)))
 
     @staticmethod
     def _interval_to_minutes(interval: str) -> int:
-        text = (interval or "1d").strip().lower()
+        text = (interval or DEFAULT_INTRADAY_INTERVAL).strip().lower()
         if text.endswith("d") and text[:-1].isdigit():
             return max(1, int(text[:-1]) * 1440)
         if text.endswith("m") and text[:-1].isdigit():

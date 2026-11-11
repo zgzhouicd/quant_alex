@@ -10,5 +10,6 @@
 | [project-architecture-analysis.md](./project-architecture-analysis.md) | 目录与模块职责速览 |
 | [full-guide.md](./full-guide.md) | 部署排障（文末 Portfolio P0 为**归档**） |
 | [CHANGELOG.md](./CHANGELOG.md) | 版本与 `[Unreleased]` 扁平条目 |
+| [product/invest-research-agent/README.md](./product/invest-research-agent/README.md) | **投研 Agent** 产品设计稿 + HTML 原型（外部迁入） |
 
 英文索引：[INDEX_EN.md](./INDEX_EN.md)

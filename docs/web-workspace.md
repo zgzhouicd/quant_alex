@@ -8,7 +8,7 @@
 |------|------|
 | `/` | 首页：选股分析、历史报告、任务列表；**SSE** `GET /api/v1/analysis/tasks/stream` |
 | `/chat` | 问股：多轮 Agent 对话、会话导出 Markdown |
-| `/decision` | **决策台**：观察名单、批量日线信号、`/intraday` 会 **302 重定向** 到此 |
+| `/decision` | **决策台**：观察名单、批量**分钟**信号（默认 `5m`），`/intraday` 会 **302 重定向** 到此 |
 | `/backtest` | 回测与次日验证视图 |
 | `/settings` | 模型、数据源、认证、智能导入等 |
 | `/login` | 开启 Web 认证时使用 |
@@ -24,10 +24,10 @@
 
 CLI、定时任务或 API 调用方若需外发，需显式 `notify=true` 且配置通知渠道。
 
-## 日线信号与后端能力边界
+## 分钟信号与后端能力边界
 
-- Web 封装：`apps/dsa-web/src/api/intraday.ts` 仅 **`getSignalBatch`**、**`getLatestSignal`**（默认 `interval=1d`）。
-- 后端仍提供 `/api/v1/intraday/bars`、`/signal`、调度器、`/api/v1/paper-trading/*` 等；由 **CLI**（`main.py --intraday`）或直接调用 API 使用，**无** Web 模拟盘/调度表单。
+- Web 封装：`apps/dsa-web/src/api/intraday.ts` 仅 **`getSignalBatch`**、**`getLatestSignal`**（默认 **`interval=5m`**、`lookback_minutes=390`）。
+- 后端仍提供 `/api/v1/intraday/bars`、`/signal`、调度器（默认 **60s** 轮询）、`/api/v1/paper-trading/*` 等；CLI **`main.py --intraday`** 默认 `1m` 周期；Web **无** Paper/调度表单。
 
 ## 已移除的 Web 能力（本 fork）
 

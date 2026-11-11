@@ -113,7 +113,7 @@ python scripts/list_openapi_paths.py --json
 
 完整路径以 `python scripts/list_openapi_paths.py` 为准。（历史版本曾暴露 `/api/v1/portfolio/*`，已移除。）
 
-## Intraday（路径名保留；默认日线 `1d`）
+## Intraday（路径名保留；默认分钟 `5m`）
 
 | Method | Path | 前端 | 说明 |
 |--------|------|------|------|
@@ -124,7 +124,7 @@ python scripts/list_openapi_paths.py --json
 | POST | `/api/v1/intraday/scheduler/*` | — | CLI/API；Web 无调度 UI |
 | GET | `/api/v1/intraday/scheduler/status` | — | 同上 |
 
-**语义（与 OpenAPI 一致）**：路径名仍为 `intraday`，默认 **`interval=1d`**；查询参数以 **`lookback_days`** 为主（默认约 120 天范围，具体见 schema），仍兼容旧客户端传入 **`lookback_minutes`**（服务端按天折算）。调度请求体使用 **`lookback_days`**，默认 **`intervals: ["1d"]`**，**`poll_seconds`** 默认较大以适配日线节奏。
+**语义（与 OpenAPI 一致）**：默认 **`interval=5m`**、**`lookback_minutes=390`**；显式 `interval=1d` 时使用 **`lookback_days`**。调度默认 **`intervals: ["5m"]`**、**`poll_seconds=60`**。常量见 `src/core/intraday_defaults.py`。
 
 ## PaperTrading
 

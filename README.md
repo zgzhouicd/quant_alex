@@ -16,7 +16,7 @@
 
 > 🤖 基于 AI 大模型的**美股**智能分析系统：**行情与 K 线主路径为 Yahoo Finance（yfinance）**，可选配置 **Longbridge** 作为美股优先源；**`main.py` CLI 与 Web/API 均仅接受美股、美期货、加密货币合约**（拒收 A 股 / 港股）。日常以 **Web 内报告 + 决策台提醒流** 为主；分析任务默认 `notify=false`。可选在 `.env` 或 GitHub Actions 中配置企微/飞书/Telegram 等外部推送（Web 设置页不展示通知渠道表单）。
 
-[**功能特性**](#-功能特性) · [**快速开始**](#-快速开始) · [**推送效果**](#-推送效果) · [**Web 工作台**](docs/web-workspace.md) · [**架构详解（流程图）**](docs/architecture-detailed-guide.md) · [**Intraday / 日线方案**](docs/intraday-refactor-plan.md) · [**完整指南**](docs/full-guide.md) · [**小流量运行边界**](docs/small-scale-operations.md) · [**常见问题**](docs/FAQ.md) · [**更新日志**](docs/CHANGELOG.md)
+[**功能特性**](#-功能特性) · [**快速开始**](#-快速开始) · [**推送效果**](#-推送效果) · [**Web 工作台**](docs/web-workspace.md) · [**架构详解（流程图）**](docs/architecture-detailed-guide.md) · [**Intraday / 分钟决策方案**](docs/intraday-refactor-plan.md) · [**完整指南**](docs/full-guide.md) · [**小流量运行边界**](docs/small-scale-operations.md) · [**常见问题**](docs/FAQ.md) · [**更新日志**](docs/CHANGELOG.md)
 
 简体中文 | [English](docs/README_EN.md) | [繁體中文](docs/README_CHT.md)
 
@@ -27,7 +27,7 @@
 本仓库定位为**辅助交易系统**：负责行情拉取、技术面与舆情分析、AI/Agent 报告，以及**结构化信号与价位建议**（例如是否偏多/偏空、参考入场与失效位、是否更适合观望）。**本项目不向券商或交易所发送真实委托**；用户若实盘交易，须在**其他终端或券商客户端**自行开仓、平仓与反手。
 
 - **实盘操作**：一切真实下单与资金交收均在**他端**完成；本系统输出仅供决策参考，不构成投资建议。
-- **模拟与调度（可选）**：`/api/v1/paper-trading/*` 与 `main.py --intraday` 仍在后端/CLI 提供本地模拟与日线调度；**Web 主路径为 `/decision` 决策台**（观察名单、日线结构信号、页面内变更提醒），不再提供持仓账本页或 Web 模拟盘表单。
+- **模拟与调度（可选）**：`/api/v1/paper-trading/*` 与 `main.py --intraday` 在后端/CLI 提供分钟滚动调度与 Paper；**Web 主路径为 `/decision` 决策台**（默认 **5m** 结构信号、观察名单、页面内提醒流），不提供 Web 模拟盘表单。
 
 更细的架构分层说明见 [架构详解 — 辅助交易与实盘边界](docs/architecture-detailed-guide.md#辅助交易与实盘边界)。
 
@@ -39,11 +39,11 @@
 | AI             | 决策仪表盘        | 一句话核心结论 + 精确买卖点位 + 操作检查清单                                                                                                                                                                    |
 | 分析           | 多维度分析        | 技术面（盘中实时 MA/多头排列）+ 筹码分布 + 舆情情报 + 实时行情                                                                                                                                                  |
 | 市场           | 美股为主          | **Web / API / CLI** 仅美股、美期货、加密永续等（拒收 A 股 / 港股）；支持美股指数（SPX、DJI、IXIC 等）。行情以 **yfinance** 为主，可选 **Longbridge** 优先（美股）。                                                                                                                                                             |
-| 日线决策       | 观察名单 + 结构信号 | Web **决策台** [`/decision`](docs/intraday-refactor-plan.md) 批量日线信号与页面内提醒流；后端 `/api/v1/intraday/*`（默认 `1d`）；Paper/调度见 API 与 CLI `--intraday`，Web 不再维护模拟盘页。 |
+| 分钟决策       | 观察名单 + 结构信号 | Web **决策台** [`/decision`](docs/intraday-refactor-plan.md) 默认 **5m** 批量信号与提醒流；`/api/v1/intraday/*`；Paper/调度见 API 与 `main.py --intraday`。 |
 | 基本面         | 结构化聚合        | 新增`fundamental_context`（valuation/growth/earnings/institution/capital_flow/dragon_tiger/boards，其中 `earnings.data` 新增 `financial_report` 与 `dividend`，`boards` 表示板块涨跌榜），主链路 fail-open 降级 |
 | 策略           | 市场策略系统      | 美股大盘「Regime Strategy」，输出 risk-on/neutral/risk-off 计划，并附“仅供参考，不构成投资建议”提示                                                                   |
 | 复盘           | 大盘复盘          | 每日美股市场概览与板块轮动（`MARKET_REVIEW_REGION` 仅 `us`）                                                                                                                                                   |
-| 界面           | 双主题工作台      | 浅色/深色主题；侧栏：**首页 · 问股 · 决策 · 回测 · 设置**（`/decision` 为日线观察与结构信号入口；`/intraday` 重定向至决策台）                                                                                    |
+| 界面           | 双主题工作台      | 浅色/深色主题；侧栏：**首页 · 问股 · 决策 · 回测 · 设置**（`/decision` 为分钟观察与结构信号入口；`/intraday` 重定向至决策台）                                                                                    |
 | 补全           | 智能补全 (MVP)    | **[测试阶段]** 首页搜索框支持美股代码 / 中文名 / 拼音 / 别名联想；运行 `python3 scripts/generate_stock_index.py` 写入 `apps/dsa-web/public/stocks.index.json`。                                                                                |
 | 智能导入       | 多源导入          | 支持图片、CSV/Excel、剪贴板；Vision LLM 提取代码与名称；置信度分层确认；名称→代码为 **本地映射 + 拼音与模糊匹配**（AkShare 在线列表兜底已随数据层收敛移除）                                                                                             |
 | 历史记录       | 批量管理          | 支持多选、全选及批量删除历史分析记录，优化管理效率与 UI/UX 体验                                                                                                                                                 |
@@ -64,7 +64,7 @@
 > Web 管理认证支持运行时开关；如果系统中已保留管理员密码，重新开启认证时必须提供当前密码，避免在认证关闭窗口内直接获取新的管理员会话。
 > 多进程/多 worker 部署时，认证开关仅在当前进程即时生效；需重启或滚动重启全部 worker 以统一状态。
 
-> 信号能力说明：产品默认 **日线（`interval=1d`）** 结构化信号；分钟线与 paper 闭环仍可通过 API/CLI 使用。加密货币分钟线可优先 **Binance 现货公共 K 线**，美股/美期货以 **yfinance**（及可选 Longbridge）为主；未接入真实券商下单。
+> 信号能力说明：产品默认 **分钟 K 线（`interval=5m`，回溯 390 分钟）** 结构化信号；日线 `1d` 仍可通过 API 显式指定。加密货币分钟线可优先 **Binance**；美股/美期货以 **yfinance** 为主；未接入真实券商下单。
 
 ### 技术栈与数据来源
 
@@ -456,7 +456,7 @@ LITELLM_MODEL=openai/deepseek-chat
 |------|------|
 | `/` | 首页：选股分析、历史报告、任务 SSE |
 | `/chat` | 问股：多轮策略对话 |
-| `/decision` | **决策台**：观察名单、批量日线信号、页面内提醒流 |
+| `/decision` | **决策台**：观察名单、默认 5m 批量信号、页面内提醒流 |
 | `/backtest` | 回测与次日验证视图 |
 | `/settings` | 模型、数据源、认证等（通知渠道请在 `.env` 配置） |
 

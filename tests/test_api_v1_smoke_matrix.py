@@ -144,42 +144,43 @@ class ApiV1SmokeMatrixTestCase(unittest.TestCase):
         detail = r.json()
         self.assertEqual(detail.get("error"), "validation_error")
 
-    def test_intraday_signal_daily_mock_fetch_defaults_1d_200(self) -> None:
-        """默认省略 interval 时走 1d，并通过 mock 日线拉数完成闭环。"""
+    def test_intraday_signal_minute_mock_fetch_defaults_5m_200(self) -> None:
+        """默认省略 interval 时走 5m，并通过 mock 分钟拉数完成闭环。"""
         rows = []
-        base = datetime(2025, 6, 1, tzinfo=timezone.utc)
+        base = datetime(2026, 1, 5, 14, 30, tzinfo=timezone.utc)
         price = 100.0
         for i in range(50):
-            d = base + timedelta(days=i)
-            close = price + 0.4
+            ts = base + timedelta(minutes=i * 5)
+            close = price + 0.05
             rows.append(
                 {
-                    "date": d,
+                    "timestamp": ts,
                     "open": price,
-                    "high": close + 0.2,
-                    "low": price - 0.1,
+                    "high": close + 0.02,
+                    "low": price - 0.02,
                     "close": close,
-                    "volume": 1_000_000 + i * 1000,
-                    "amount": close * (1_000_000 + i * 1000),
-                    "pct_chg": 0.2,
+                    "volume": 10_000 + i * 100,
+                    "amount": close * (10_000 + i * 100),
+                    "pct_chg": 0.05,
+                    "interval": "5m",
                 }
             )
             price = close
-        daily_df = pd.DataFrame(rows)
+        intraday_df = pd.DataFrame(rows)
         with patch(
-            "src.services.intraday_signal_service.DataFetcherManager.get_daily_data",
-            return_value=(daily_df, "mock-daily"),
+            "src.services.intraday_signal_service.DataFetcherManager.get_intraday_data",
+            return_value=(intraday_df, "mock-intraday"),
         ):
             r = self.client.post(
                 "/api/v1/intraday/signal",
-                params={"code": "AAPL", "lookback_days": 60, "refresh": "true"},
+                params={"code": "AAPL", "lookback_minutes": 390, "refresh": "true"},
             )
         self.assertEqual(r.status_code, 200, msg=r.text)
         data = r.json()
         self.assertEqual(data.get("code"), "AAPL")
-        self.assertEqual(data.get("interval"), "1d")
+        self.assertEqual(data.get("interval"), "5m")
         self.assertIn(data.get("signal"), {"long", "short", "neutral"})
-        self.assertEqual(data.get("payload", {}).get("signal_timeframe"), "daily")
+        self.assertEqual(data.get("payload", {}).get("signal_timeframe"), "intraday")
 
     def test_intraday_signal_data_fetch_error_502(self) -> None:
         with patch(

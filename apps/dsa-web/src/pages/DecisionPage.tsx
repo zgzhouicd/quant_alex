@@ -10,7 +10,12 @@ import {
   Card,
   PageHeader,
 } from '../components/common';
-import type { IntradaySignalResponse } from '../types/intraday';
+import {
+  DEFAULT_INTRADAY_INTERVAL,
+  DEFAULT_LOOKBACK_MINUTES,
+  INTRADAY_INTERVAL_OPTIONS,
+} from '../constants/intradayDefaults';
+import type { IntradayInterval, IntradaySignalResponse } from '../types/intraday';
 import { cn } from '../utils/cn';
 import {
   buildInboxOnChange,
@@ -46,7 +51,8 @@ const DecisionPage: React.FC = () => {
     if (typeof window === 'undefined') return DEFAULT_WATCHLIST;
     return localStorage.getItem(WATCHLIST_STORAGE_KEY) ?? DEFAULT_WATCHLIST;
   });
-  const [lookbackDays, setLookbackDays] = useState(120);
+  const [interval, setInterval] = useState<IntradayInterval>(DEFAULT_INTRADAY_INTERVAL);
+  const [lookbackMinutes, setLookbackMinutes] = useState(DEFAULT_LOOKBACK_MINUTES);
   const [signals, setSignals] = useState<IntradaySignalResponse[]>([]);
   const [selectedCode, setSelectedCode] = useState<string | null>(null);
   const [inbox, setInbox] = useState<DecisionInboxItem[]>([]);
@@ -98,8 +104,8 @@ const DecisionPage: React.FC = () => {
       try {
         const res = await intradayApi.getSignalBatch({
           symbols,
-          interval: '1d',
-          lookbackDays,
+          interval,
+          lookbackMinutes,
           refresh,
         });
         mergeSignals(res.items);
@@ -109,7 +115,7 @@ const DecisionPage: React.FC = () => {
         setLoading(false);
       }
     },
-    [lookbackDays, mergeSignals, symbols],
+    [interval, lookbackMinutes, mergeSignals, symbols],
   );
 
   const runLightRefresh = useCallback(async () => {
@@ -118,7 +124,7 @@ const DecisionPage: React.FC = () => {
     try {
       const items = await Promise.all(
         symbols.map((code) =>
-          intradayApi.getLatestSignal({ code, interval: '1d' }).catch(() => null),
+          intradayApi.getLatestSignal({ code, interval }).catch(() => null),
         ),
       );
       const valid = items.filter((x): x is IntradaySignalResponse => x != null);
@@ -128,7 +134,7 @@ const DecisionPage: React.FC = () => {
     } catch (e) {
       setError(getParsedApiError(e));
     }
-  }, [mergeSignals, symbols]);
+  }, [interval, mergeSignals, symbols]);
 
   useEffect(() => {
     if (!autoRefresh || !symbols.length) return undefined;
@@ -143,9 +149,9 @@ const DecisionPage: React.FC = () => {
   return (
     <div className="mx-auto max-w-[1400px] space-y-5 px-4 pb-10 pt-4 md:px-6">
       <PageHeader
-        eyebrow="导航 · 日线默认"
+        eyebrow="导航 · 分钟级默认"
         title="决策台"
-        description="观察名单 + 日线结构信号；变更记在右侧提醒流。结论仅在页面展示，不依赖外部 IM 推送。"
+        description="观察名单 + 分钟结构信号（默认 5m）；变更记在右侧提醒流。结论仅在页面展示，不依赖外部 IM 推送。"
       />
 
       <Card className="p-4 md:p-5">
@@ -159,15 +165,29 @@ const DecisionPage: React.FC = () => {
               placeholder="AAPL, NVDA, …"
             />
           </label>
-          <label className="w-full space-y-1.5 sm:w-28">
-            <span className="text-xs text-muted-text">回溯（天）</span>
+          <label className="w-full space-y-1.5 sm:w-24">
+            <span className="text-xs text-muted-text">K 线周期</span>
+            <select
+              className="input-surface input-focus-glow h-11 w-full rounded-xl border bg-transparent px-3 text-sm"
+              value={interval}
+              onChange={(e) => setInterval(e.target.value as IntradayInterval)}
+            >
+              {INTRADAY_INTERVAL_OPTIONS.map((opt) => (
+                <option key={opt} value={opt}>
+                  {opt}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="w-full space-y-1.5 sm:w-32">
+            <span className="text-xs text-muted-text">回溯（分钟）</span>
             <input
               type="number"
               min={30}
-              max={2000}
+              max={10080}
               className="input-surface input-focus-glow h-11 w-full rounded-xl border bg-transparent px-4 text-sm"
-              value={lookbackDays}
-              onChange={(e) => setLookbackDays(Number(e.target.value) || 120)}
+              value={lookbackMinutes}
+              onChange={(e) => setLookbackMinutes(Number(e.target.value) || DEFAULT_LOOKBACK_MINUTES)}
             />
           </label>
           <div className="flex flex-wrap gap-2">
@@ -205,7 +225,7 @@ const DecisionPage: React.FC = () => {
           </div>
         ) : null}
         <p className="mt-3 text-[11px] leading-relaxed text-muted-text">
-          展示词为日线引擎的简化结论（偏多 / 偏空 / 不操作），与 trade_agent 许可状态机可在后续版本对齐。
+          展示词为分钟引擎的简化结论（偏多 / 偏空 / 不操作），基于最近一根已闭合 K 线与 session VWAP 等规则。
           <span className="text-foreground/80"> 结构参考，非委托。</span>
         </p>
       </Card>

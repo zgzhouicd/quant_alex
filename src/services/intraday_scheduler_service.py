@@ -1,4 +1,4 @@
-"""日线级信号调度服务。"""
+"""分钟级信号滚动调度（可选联动 paper trading）。"""
 
 from __future__ import annotations
 
@@ -7,12 +7,18 @@ import time
 from datetime import datetime
 from typing import Any, Dict, List, Optional
 
+from src.core.intraday_defaults import (
+    DEFAULT_DAILY_LOOKBACK_DAYS,
+    DEFAULT_INTRADAY_INTERVAL,
+    DEFAULT_LOOKBACK_MINUTES,
+    DEFAULT_POLL_SECONDS,
+)
 from src.services.intraday_signal_service import IntradaySignalService
 from src.services.paper_trading_service import PaperTradingService
 
 
 class IntradaySchedulerService:
-    """以后台线程低频执行日线信号与模拟交易。"""
+    """后台线程按 poll_seconds 滚动：拉分钟线 → 算信号 → 可选 paper 撮合。"""
 
     def __init__(
         self,
@@ -33,18 +39,18 @@ class IntradaySchedulerService:
         *,
         symbols: List[str],
         intervals: List[str],
-        lookback_days: int = 120,
-        lookback_minutes: Optional[int] = None,
-        poll_seconds: int = 3600,
+        lookback_days: int = DEFAULT_DAILY_LOOKBACK_DAYS,
+        lookback_minutes: int = DEFAULT_LOOKBACK_MINUTES,
+        poll_seconds: int = DEFAULT_POLL_SECONDS,
         paper_account_ids: Optional[List[int]] = None,
         order_quantity: float = 1.0,
     ) -> Dict[str, Any]:
-        days = self._resolve_lookback_days(lookback_days, lookback_minutes)
         with self._lock:
             self._job_config = {
                 "symbols": [s for s in symbols if (s or "").strip()],
-                "intervals": [i for i in intervals if (i or "").strip()],
-                "lookback_days": days,
+                "intervals": [i for i in intervals if (i or "").strip()] or [DEFAULT_INTRADAY_INTERVAL],
+                "lookback_days": max(30, min(2000, int(lookback_days))),
+                "lookback_minutes": max(30, min(10080, int(lookback_minutes))),
                 "poll_seconds": max(5, int(poll_seconds)),
                 "paper_account_ids": paper_account_ids or [],
                 "order_quantity": float(order_quantity),
@@ -69,16 +75,16 @@ class IntradaySchedulerService:
         *,
         symbols: List[str],
         intervals: List[str],
-        lookback_days: int = 120,
-        lookback_minutes: Optional[int] = None,
+        lookback_days: int = DEFAULT_DAILY_LOOKBACK_DAYS,
+        lookback_minutes: int = DEFAULT_LOOKBACK_MINUTES,
         paper_account_ids: Optional[List[int]] = None,
         order_quantity: float = 1.0,
     ) -> Dict[str, Any]:
-        days = self._resolve_lookback_days(lookback_days, lookback_minutes)
         config = {
             "symbols": [s for s in symbols if (s or "").strip()],
-            "intervals": [i for i in intervals if (i or "").strip()],
-            "lookback_days": days,
+            "intervals": [i for i in intervals if (i or "").strip()] or [DEFAULT_INTRADAY_INTERVAL],
+            "lookback_days": max(30, min(2000, int(lookback_days))),
+            "lookback_minutes": max(30, min(10080, int(lookback_minutes))),
             "paper_account_ids": paper_account_ids or [],
             "order_quantity": float(order_quantity),
         }
@@ -99,17 +105,20 @@ class IntradaySchedulerService:
             with self._lock:
                 config = dict(self._job_config)
             self._last_cycle = self._execute_cycle(config)
-            self._stop_event.wait(timeout=max(5, int(config.get("poll_seconds", 60))))
+            self._stop_event.wait(timeout=max(5, int(config.get("poll_seconds", DEFAULT_POLL_SECONDS))))
 
     def _execute_cycle(self, config: Dict[str, Any]) -> Dict[str, Any]:
         started_at = datetime.utcnow().isoformat() + "Z"
         results: List[Dict[str, Any]] = []
-        for interval in config.get("intervals", []):
+        lookback_minutes = int(config.get("lookback_minutes", DEFAULT_LOOKBACK_MINUTES))
+        lookback_days = int(config.get("lookback_days", DEFAULT_DAILY_LOOKBACK_DAYS))
+        for interval in config.get("intervals", [DEFAULT_INTRADAY_INTERVAL]):
             for symbol in config.get("symbols", []):
                 signal = self.signal_service.analyze_symbol(
                     code=symbol,
                     interval=interval,
-                    lookback_days=int(config.get("lookback_days", 120)),
+                    lookback_days=lookback_days,
+                    lookback_minutes=lookback_minutes,
                     refresh_data=True,
                 )
                 results.append(signal)
@@ -125,12 +134,6 @@ class IntradaySchedulerService:
             "signal_count": len(results),
             "results": results,
         }
-
-    @staticmethod
-    def _resolve_lookback_days(lookback_days: int, lookback_minutes: Optional[int]) -> int:
-        if lookback_minutes is not None:
-            return max(30, min(2000, int(lookback_minutes / 1440) or 1))
-        return max(30, min(2000, int(lookback_days or 120)))
 
 
 _SCHEDULER_SINGLETON: Optional[IntradaySchedulerService] = None

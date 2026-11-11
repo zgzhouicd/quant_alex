@@ -1,62 +1,48 @@
-# Intraday 路由与日线信号：方案文档
+# Intraday 分钟级决策：方案文档
 
-> 本文档是 **intraday 相关能力** 在仓库内的说明真源：当前产品默认以 **日线（`1d`）** 为主；`/api/v1/intraday/*` 路径名保留以降低迁移成本。  
-> 下方 **附录** 保留早期「分钟级日内」分阶段草案，供后续若重新启用分钟决策时参考。
+> 本文档是 **intraday 相关能力** 在仓库内的说明真源：产品默认以 **分钟 K 线（默认 `5m`）** 与 **滚动信号** 为主；`/api/v1/intraday/*` 路径名保留以降低迁移成本。  
+> 默认参数真源：[`src/core/intraday_defaults.py`](../src/core/intraday_defaults.py)（与 Web `intradayDefaults.ts` 对齐）。
 
 ---
 
-## 一、日线级信号重构（Daily Signal Refactor）
+## 一、分钟级信号（当前主路径）
 
 ### 1.1 目标与范围
 
-- **后端**：保留现有 `/api/v1/intraday/*` 路由与数据库表名（如 `stock_intraday_bar`、`intraday_signal_record`），避免一次性重命名波及 API、前端、测试与迁移。
-- **行为**：默认 **`interval=1d`**；回溯窗口以 **`lookback_days`** 为主表达；必要时 **短期兼容** 旧查询参数 `lookback_minutes`（按「分钟 / 1440」折算为天，并 clamp 到合理区间）。
-- **前端**：页面与文案从「日内 / 分钟」调整为 **日线 / 日级**；默认回溯按 **天数**；后台调度默认轮询改为 **低频**（例如 3600 秒），适配日线刷新节奏。
-- **非目标**：不改变「不向券商真实报单」与 Paper Trading 本地模拟的定位。
+- **决策频率**：观察名单批量扫描 + 可选 60s 自动读库；调度默认 **`poll_seconds=60`**。
+- **周期**：Web/API 默认 **`interval=5m`**，可选 `1m` / `15m`；显式传 `interval=1d` 仍走日线兼容路径。
+- **回溯**：默认 **`lookback_minutes=390`**（约 1 个交易日）；日线模式用 `lookback_days`。
+- **非目标**：真实下单；Web 不暴露 Paper/调度表单（API/CLI 仍可用）。
 
-### 1.2 后端改动要点
-
-| 区域 | 文件 | 说明 |
-|------|------|------|
-| API | [`api/v1/endpoints/intraday.py`](../api/v1/endpoints/intraday.py) | `/bars`、`/signal`、`/signals/batch` 默认 `interval=1d`；支持 `lookback_days`；兼容 `lookback_minutes`；错误文案对齐「日线」语义。 |
-| Schema | [`api/v1/schemas/intraday.py`](../api/v1/schemas/intraday.py) | 调度请求默认 `intervals=["1d"]`；`lookback_days`；可选保留 `lookback_minutes` 兼容；`poll_seconds` 默认提高间隔。 |
-| 服务 | [`src/services/intraday_signal_service.py`](../src/services/intraday_signal_service.py) | `interval=1d` 时走 `DataFetcherManager.get_daily_data`，将结果规范为与 bar 存储一致的 DataFrame 再落库；非 `1d` 仍可走分钟 intraday 拉取。 |
-| 调度 | [`src/services/intraday_scheduler_service.py`](../src/services/intraday_scheduler_service.py) | Job 配置使用 `lookback_days`；轮询默认低频。 |
-| 数据源 | [`data_provider/yfinance_fetcher.py`](../data_provider/yfinance_fetcher.py) | `get_intraday_data` 在 `interval` 为日线别名时，可委托 `get_daily_data` 并映射为统一 bar 列（`timestamp`、OHLCV、`interval=1d` 等）。 |
-| 引擎 | [`src/core/intraday_signal_engine.py`](../src/core/intraday_signal_engine.py) | 日线模式下避免「开盘 30 分钟区间」等分钟语义；VWAP/区间类指标改为滚动窗口或日线可读文案；`setup` 等区分 daily / intraday。 |
-
-### 1.3 Web 改动要点
+### 1.2 后端要点
 
 | 区域 | 文件 | 说明 |
 |------|------|------|
-| 决策台 | [`apps/dsa-web/src/pages/DecisionPage.tsx`](../apps/dsa-web/src/pages/DecisionPage.tsx) | 主 Web 入口：`/decision`；`/intraday` 重定向；批量 `/signals/batch` + 本地提醒流。详见 [web-workspace.md](./web-workspace.md)。 |
-| API 封装 | [`apps/dsa-web/src/api/intraday.ts`](../apps/dsa-web/src/api/intraday.ts) | 仅 `getSignalBatch` / `getLatestSignal`（调度与 paper 不在 Web 暴露）。 |
-| 类型 | [`apps/dsa-web/src/types/intraday.ts`](../apps/dsa-web/src/types/intraday.ts) | `IntradayInterval` 等包含 `1d`（可保留旧分钟枚举以兼容历史数据）。 |
-| 导航 | [`apps/dsa-web/src/components/layout/SidebarNav.tsx`](../apps/dsa-web/src/components/layout/SidebarNav.tsx) | 侧栏仅 **决策**，无独立「日线」页。 |
+| 默认常量 | [`src/core/intraday_defaults.py`](../src/core/intraday_defaults.py) | `5m` / `390` / `60s` |
+| API | [`api/v1/endpoints/intraday.py`](../api/v1/endpoints/intraday.py) | 默认分钟周期与 `lookback_minutes` |
+| Schema | [`api/v1/schemas/intraday.py`](../api/v1/schemas/intraday.py) | 调度 `intervals=["5m"]`，`poll_seconds=60` |
+| 服务 | [`src/services/intraday_signal_service.py`](../src/services/intraday_signal_service.py) | 非 `1d` → `get_intraday_data` + session VWAP 引擎 |
+| 调度 | [`src/services/intraday_scheduler_service.py`](../src/services/intraday_scheduler_service.py) | 每轮传 `lookback_minutes` |
+| CLI | [`main.py`](../main.py) | `--intraday-intervals` 默认 `1m`，`--intraday-poll-seconds` 默认 `60` |
 
-### 1.4 测试与文档
+### 1.3 Web 要点
 
-- **测试**：更新 [`tests/test_intraday_api.py`](../tests/test_intraday_api.py)、[`tests/test_api_v1_smoke_matrix.py`](../tests/test_api_v1_smoke_matrix.py)、[`tests/test_intraday_signal_engine.py`](../tests/test_intraday_signal_engine.py)、[`tests/test_intraday_repository.py`](../tests/test_intraday_repository.py) 中与默认周期、参数名、断言相关的用例。
-- **对外 API 说明**：同步 [`docs/api-v1-surface.md`](api-v1-surface.md) 中 intraday 查询参数说明。
-- **变更记录**：在 [`docs/CHANGELOG.md`](CHANGELOG.md) 的 `[Unreleased]` 增加一条 **文档** 或 **改进** 条目（扁平一行格式）。
+| 区域 | 文件 |
+|------|------|
+| 决策台 | [`DecisionPage.tsx`](../apps/dsa-web/src/pages/DecisionPage.tsx) — 周期选择 + 回溯分钟 |
+| API 封装 | [`intraday.ts`](../apps/dsa-web/src/api/intraday.ts) |
 
-### 1.5 验证建议
+详见 [web-workspace.md](./web-workspace.md)。
 
-- **后端**：对改动过的 Python 文件执行 `python -m py_compile`；尽量跑 intraday 相关 `pytest`（优先 `-m "not network"`）。
-- **前端**：在 `apps/dsa-web` 执行 `npm run lint` 与 `npm run build`。
-- **联网**：若环境不可访问 Yahoo 等数据源，以 mock / 单测覆盖参数与分支，不强制在线拉数。
+### 1.4 兼容
 
-### 1.6 兼容说明（给调用方）
-
-- **路径**：仍为 `/api/v1/intraday/...`。
-- **默认周期**：`1d`（若仍传 `1m`/`5m` 等且数据源支持，可继续走分钟链路）。
-- **回溯**：优先使用 `lookback_days`；仅传 `lookback_minutes` 时由服务端折算为天（兼容旧客户端）。
+- 仍支持 `interval=1d` + `lookback_days`（波段/复盘）；与首页 **日线分析报告** 并存。
 
 ---
 
-## 附录：分钟级日内交易分阶段方案（历史草案）
+## 附录：分阶段落地草案（ infrastructure 已完成）
 
-以下内容为 **早期「分钟级滚动决策」** 的规划草案；当前默认产品路径已切换为 **日线信号**（见上文）。若未来重新启用分钟级，可据此分阶段落地。
+以下内容为分钟级基础设施与 Paper 的 **原始分阶段规划**；能力已在仓库实现，产品默认已切回分钟主路径。
 
 ### 目标与边界（原稿）
 

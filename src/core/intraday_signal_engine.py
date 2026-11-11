@@ -1,4 +1,4 @@
-"""日线级指标与信号引擎。"""
+"""分钟级 / 日线指标与结构化信号引擎。"""
 
 from __future__ import annotations
 
