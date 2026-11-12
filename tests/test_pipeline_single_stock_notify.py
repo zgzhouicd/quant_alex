@@ -83,7 +83,7 @@ class TestPipelineSingleStockNotify(unittest.TestCase):
         pipeline._save_local_report = MagicMock()
         pipeline._send_notifications = MagicMock()
         pipeline.config = SimpleNamespace(
-            stock_list=["000001", "600519"],
+            stock_list=["MSFT", "AAPL"],
             refresh_stock_list=lambda: None,
             single_stock_notify=True,
             report_type="simple",
@@ -104,7 +104,7 @@ class TestPipelineSingleStockNotify(unittest.TestCase):
         pipeline.process_single_stock = MagicMock(side_effect=_process)
 
         results = pipeline.run(
-            stock_codes=["000001", "600519"],
+            stock_codes=["MSFT", "AAPL"],
             dry_run=False,
             send_notification=True,
         )
@@ -116,8 +116,8 @@ class TestPipelineSingleStockNotify(unittest.TestCase):
             [threading.current_thread().name, threading.current_thread().name],
         )
         self.assertEqual(pipeline.notifier.max_inflight, 1)
-        self.assertCountEqual(pipeline.notifier.sent_reports, ["single:000001", "single:600519"])
-        self.assertCountEqual(pipeline.notifier.email_stock_codes, [["000001"], ["600519"]])
+        self.assertCountEqual(pipeline.notifier.sent_reports, ["single:MSFT", "single:AAPL"])
+        self.assertCountEqual(pipeline.notifier.email_stock_codes, [["MSFT"], ["AAPL"]])
         pipeline._save_local_report.assert_called_once()
         pipeline._send_notifications.assert_called_once()
         _, kwargs = pipeline._send_notifications.call_args
@@ -126,11 +126,11 @@ class TestPipelineSingleStockNotify(unittest.TestCase):
     def test_process_single_stock_direct_path_keeps_notify_compatibility(self):
         pipeline = StockAnalysisPipeline.__new__(StockAnalysisPipeline)
         pipeline.fetch_and_save_stock_data = MagicMock(return_value=(True, None))
-        pipeline.analyze_stock = MagicMock(return_value=_make_result("600519"))
+        pipeline.analyze_stock = MagicMock(return_value=_make_result("AAPL"))
         pipeline.notifier = _TrackingNotifier()
 
         result = pipeline.process_single_stock(
-            code="600519",
+            code="AAPL",
             skip_analysis=False,
             single_stock_notify=True,
             report_type=ReportType.BRIEF,
@@ -140,18 +140,18 @@ class TestPipelineSingleStockNotify(unittest.TestCase):
         self.assertIsNotNone(result)
         pipeline.notifier.generate_brief_report.assert_called_once_with([result])
         pipeline.notifier.send.assert_called_once_with(
-            "brief:600519",
-            email_stock_codes=["600519"],
+            "brief:AAPL",
+            email_stock_codes=["AAPL"],
         )
 
     def test_process_single_stock_direct_path_does_not_notify_when_failed(self):
         pipeline = StockAnalysisPipeline.__new__(StockAnalysisPipeline)
         pipeline.fetch_and_save_stock_data = MagicMock(return_value=(True, None))
-        pipeline.analyze_stock = MagicMock(return_value=_make_result("600519", success=False))
+        pipeline.analyze_stock = MagicMock(return_value=_make_result("AAPL", success=False))
         pipeline.notifier = _TrackingNotifier()
 
         result = pipeline.process_single_stock(
-            code="600519",
+            code="AAPL",
             skip_analysis=False,
             single_stock_notify=True,
             report_type=ReportType.BRIEF,

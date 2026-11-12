@@ -47,15 +47,15 @@ class TestPipelineEmailGroupImageRouting(unittest.TestCase):
         pipeline.notifier = _FakeNotifier()
         pipeline.config = SimpleNamespace(
             stock_email_groups=[
-                (["000001"], ["group@example.com"]),
+                (["MSFT"], ["group@example.com"]),
             ]
         )
         return pipeline
 
     def _make_results(self):
         return [
-            SimpleNamespace(code="000001"),
-            SimpleNamespace(code="600519"),
+            SimpleNamespace(code="MSFT"),
+            SimpleNamespace(code="AAPL"),
         ]
 
     @patch("src.md2img.markdown_to_image", return_value=b"png-bytes")
@@ -109,7 +109,7 @@ class TestPipelineWechatOnlyImageRouting(unittest.TestCase):
         pipeline = StockAnalysisPipeline.__new__(StockAnalysisPipeline)
         pipeline.notifier = _FakeWechatNotifier()
         pipeline.config = SimpleNamespace(stock_email_groups=[])
-        results = [SimpleNamespace(code="000001")]
+        results = [SimpleNamespace(code="MSFT")]
 
         with patch("src.md2img.markdown_to_image", return_value=b"wechat-image") as mock_md2img:
             pipeline._send_notifications(results, ReportType.SIMPLE)
@@ -124,7 +124,7 @@ class TestPipelineWechatOnlyImageRouting(unittest.TestCase):
         pipeline = StockAnalysisPipeline.__new__(StockAnalysisPipeline)
         pipeline.notifier = _FakeWechatNotifier()
         pipeline.config = SimpleNamespace(stock_email_groups=[])
-        results = [SimpleNamespace(code="000001")]
+        results = [SimpleNamespace(code="MSFT")]
 
         with patch("src.md2img.markdown_to_image", return_value=None), patch(
             "src.core.pipeline.get_config", return_value=SimpleNamespace(md2img_engine="wkhtmltoimage")

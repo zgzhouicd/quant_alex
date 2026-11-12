@@ -74,7 +74,7 @@ DISCORD_BOT_STATUS=A股智能分析 | /help
 Discord机器人支持以下Slash命令：
 
 1. `/analyze <stock_code> [full_report]` - 分析指定股票代码
-   - `stock_code`: 股票代码，如 600519
+   - `stock_code`: 美股 ticker，如 AAPL
    - `full_report`: 可选，是否生成完整报告（包含大盘）
 
 2. `/market_review` - 获取大盘复盘报告
@@ -85,7 +85,7 @@ Discord机器人支持以下Slash命令：
 
 1. 确保机器人已成功添加到你的服务器
 2. 在频道中输入`/help`，机器人会返回帮助信息
-3. 输入`/analyze 600519`测试股票分析功能
+3. 输入`/analyze AAPL`测试股票分析功能
 4. 输入`/market_review`测试大盘复盘功能
 
 ## 注意事项

@@ -210,16 +210,16 @@ class TestAnalyzerGenerateText:
 
         progress_updates = []
         first_result = AnalysisResult(
-            code="600519",
-            name="贵州茅台",
+            code="AAPL",
+            name="苹果公司",
             sentiment_score=80,
             trend_prediction="看多",
             operation_advice="持有",
             analysis_summary="首轮结果",
         )
         second_result = AnalysisResult(
-            code="600519",
-            name="贵州茅台",
+            code="AAPL",
+            name="苹果公司",
             sentiment_score=82,
             trend_prediction="看多",
             operation_advice="持有",
@@ -247,7 +247,7 @@ class TestAnalyzerGenerateText:
              patch.object(analyzer, "_build_integrity_retry_prompt", return_value="retry prompt"), \
              patch("src.analyzer.persist_llm_usage"):
             result = analyzer.analyze(
-                {"code": "600519", "stock_name": "贵州茅台"},
+                {"code": "AAPL", "stock_name": "苹果公司"},
                 progress_callback=lambda progress, message: progress_updates.append((progress, message)),
             )
 
@@ -263,10 +263,10 @@ class TestAnalyzerGenerateText:
 
         from src.analyzer import GeminiAnalyzer
 
-        result = GeminiAnalyzer._parse_response(analyzer, "这是一段纯文本分析，没有 JSON。", "600519", "贵州茅台")
+        result = GeminiAnalyzer._parse_response(analyzer, "这是一段纯文本分析，没有 JSON。", "AAPL", "苹果公司")
         assert result.success is False
         assert result.error_message is not None
-        assert result.code == "600519"
+        assert result.code == "AAPL"
 
     def test_parse_response_malformed_json_returns_failure(self):
         """_parse_response must return success=False when JSON extraction fails."""
@@ -294,7 +294,7 @@ class TestAnalyzerGenerateText:
             "operation_advice": "持有",
             "analysis_summary": "测试分析",
         })
-        result = GeminiAnalyzer._parse_response(analyzer, valid_response, "600519", "贵州茅台")
+        result = GeminiAnalyzer._parse_response(analyzer, valid_response, "AAPL", "苹果公司")
         assert result.success is True
         assert result.error_message is None
 
@@ -360,7 +360,7 @@ class TestMarketAnalyzerBypassFix:
             date="2026-03-05",
             indices=[
                 MarketIndex(
-                    code="000001",
+                    code="MSFT",
                     name="上证指数",
                     current=3300.0,
                     change=5.0,
@@ -381,7 +381,7 @@ class TestMarketAnalyzerBypassFix:
             date="2026-03-05",
             indices=[
                 MarketIndex(
-                    code="000001",
+                    code="MSFT",
                     name="上证指数",
                     current=3300.0,
                     change=5.0,

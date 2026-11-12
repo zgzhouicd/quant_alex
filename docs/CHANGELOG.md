@@ -11,6 +11,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 <!-- 新条目格式：- [类型] 描述（类型取值：新功能/改进/修复/文档/测试/chore）-->
 <!-- 每条独立一行追加到本段末尾，无需分类标题，合并时冲突最小 -->
+- [改进] 配置模块拆分：`src/config_parsers.py`、`src/config_llm_channels.py` 自 `config.py` 抽出；对外 `from src.config import …` 不变。
+- [改进] 全局异常处理收敛：移除未挂载的 `ErrorHandlerMiddleware`，统一使用 `add_error_handlers`。
+- [新功能] `GET /api/v1/health` 返回 `capabilities`（stable/beta/experimental）；真源 `src/product_capabilities.py`。
+- [文档] 新增 `docs/entrypoints-guide.md`（入口选型 / 队列边界）；README 导航链入。
+- [测试] 新增 `tests/fixtures/us_symbols.py`；`scripts/check_legacy_cn_symbols_in_tests.py` 阻断 OpenAPI 示例中的 A 股/港股符号。
+- [改进] OpenAPI 示例（analysis/history/stocks）统一为美股符号；FastAPI 描述对齐美股边界与 `notify` 默认关闭。
+- [测试] 批量迁移测试夹具至美股符号（`scripts/migrate_test_symbols_to_us.py`）；CI 默认 `LEGACY_SYMBOL_STRICT_TESTS=1`，拒收/市场判定用例白名单保留 legacy 样例。
+- [改进] 搜索模块拆分：`src/search_models.py` 承载 `SearchResult` / `SearchResponse`，`search_service` 保持导入兼容。
+- [改进] 搜索模块继续拆分：`search_http.py`（重试与正文抓取）、`search_base.py`（`BaseSearchProvider`）。
+- [改进] Agent `_extract_stock_code` 优先识别美股 ticker，再回退 legacy 数字/HK 形态（与产品边界一致）。
+- [文档] FAQ / FAQ_EN：Q3–Q4 对齐 yfinance/Longbridge 与美股范围，移除 Tushare/A 股数据源过时表述。
+- [改进] `data_provider` 拆分：`base_fetcher.py`、`fetcher_manager.py`、`errors.py`、`symbol_normalize.py`；`base.py` 为兼容 re-export。
+- [文档] `full-guide` / `full-guide_EN`：基本面与代码格式表对齐美股边界，移除港股支持与 TickFlow 主路径说明。
+- [文档] `README_EN`、`DEPLOY*`、`bot-command*`、`openclaw-skill-integration`、`image-extract-prompt` 示例对齐美股。
+- [修复] Web Vitest：`setupTests` 注入 `localStorage` mock；追问/自选用例改为 `AAPL`。
+- [文档] openclaw / Discord / README_CHT 示例对齐美股；README 补全说明改为 US 别名。
+- [测试] Playwright e2e 占位符与 smoke 用例改为 `AAPL` / `NVDA`；部分 Vitest 夹具同步。
+- [改进] Web：`STOCK_INPUT_PLACEHOLDER` 统一首页与 `StockAutocomplete`；`searchStocks` / `stockIndexLoader` 单测改为 US mock。
+- [改进] Web：`isStockCodeLike` 与 `validation.ts` 统一美股 ticker 规则；补全列表仅展示美股标签；类型注释对齐 US 索引。
+- [改进] Web 设置页隐藏遗留 `TUSHARE_TOKEN` / `TICKFLOW_API_KEY` 表单项（`WEB_HIDDEN_SETTINGS_KEYS`）。
+- [文档] `full-guide` / `DEPLOY` / `README_EN` 移除或标注 Tushare/TickFlow；数据源说明对齐 yfinance+Longbridge。
+- [改进] `search_comprehensive_intel` 显式优先 US 英文维度（`_is_us_stock`）；A 股维度分支仅兼容保留。
 - [改进] **产品范围锁定为美股**：API/任务队列/Bot/名称解析/前端校验拒收 A 股与港股；`STOCK_NAME_MAP` 与 `stocks.index.json` 重建为美股 MVP；移除 Tushare 列表脚本与专文；`market_context` 仅注入美股 Prompt。
 - [文档] 迁入投研 Agent 产品稿：`docs/product/invest-research-agent/`（`投研agent.md`、HTML 原型与目录说明）。
 - [改进] **决策主路径改回分钟级**：API/Web 默认 `5m` + `lookback_minutes=390`，调度 `poll_seconds=60`；新增 `intraday_defaults`；决策台可选 1m/5m/15m。

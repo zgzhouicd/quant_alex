@@ -23,7 +23,7 @@ class SystemConfigServiceTestCase(unittest.TestCase):
         self.env_path.write_text(
             "\n".join(
                 [
-                    "STOCK_LIST=600519,000001",
+                    "STOCK_LIST=AAPL,MSFT",
                     "GEMINI_API_KEY=secret-key-value",
                     "SCHEDULE_TIME=18:00",
                     "LOG_LEVEL=INFO",
@@ -60,7 +60,7 @@ class SystemConfigServiceTestCase(unittest.TestCase):
 
     def test_export_desktop_env_returns_raw_text(self) -> None:
         self.env_path.write_text(
-            "# Desktop config\nSTOCK_LIST=600519,000001\n\nGEMINI_API_KEY=secret-key-value\n",
+            "# Desktop config\nSTOCK_LIST=AAPL,MSFT\n\nGEMINI_API_KEY=secret-key-value\n",
             encoding="utf-8",
         )
 
@@ -68,7 +68,7 @@ class SystemConfigServiceTestCase(unittest.TestCase):
 
         self.assertEqual(
             payload["content"],
-            "# Desktop config\nSTOCK_LIST=600519,000001\n\nGEMINI_API_KEY=secret-key-value\n",
+            "# Desktop config\nSTOCK_LIST=AAPL,MSFT\n\nGEMINI_API_KEY=secret-key-value\n",
         )
         self.assertEqual(payload["config_version"], self.manager.get_config_version())
 
@@ -77,13 +77,13 @@ class SystemConfigServiceTestCase(unittest.TestCase):
 
         payload = self.service.import_desktop_env(
             config_version=current_version,
-            content="STOCK_LIST=300750\nCUSTOM_NOTE=desktop backup\n",
+            content="STOCK_LIST=TSLA\nCUSTOM_NOTE=desktop backup\n",
             reload_now=False,
         )
 
         self.assertTrue(payload["success"])
         current_map = self.manager.read_config_map()
-        self.assertEqual(current_map["STOCK_LIST"], "300750")
+        self.assertEqual(current_map["STOCK_LIST"], "TSLA")
         self.assertEqual(current_map["CUSTOM_NOTE"], "desktop backup")
         self.assertEqual(current_map["GEMINI_API_KEY"], "secret-key-value")
 
@@ -104,12 +104,12 @@ class SystemConfigServiceTestCase(unittest.TestCase):
 
         self.service.import_desktop_env(
             config_version=current_version,
-            content="STOCK_LIST=000001\nSTOCK_LIST=300750\n",
+            content="STOCK_LIST=MSFT\nSTOCK_LIST=TSLA\n",
             reload_now=False,
         )
 
         current_map = self.manager.read_config_map()
-        self.assertEqual(current_map["STOCK_LIST"], "300750")
+        self.assertEqual(current_map["STOCK_LIST"], "TSLA")
 
     def test_import_desktop_env_allows_empty_assignment(self) -> None:
         current_version = self.manager.get_config_version()
@@ -135,7 +135,7 @@ class SystemConfigServiceTestCase(unittest.TestCase):
         with self.assertRaises(ConfigConflictError):
             self.service.import_desktop_env(
                 config_version="stale-version",
-                content="STOCK_LIST=300750\n",
+                content="STOCK_LIST=TSLA\n",
                 reload_now=False,
             )
 
@@ -145,7 +145,7 @@ class SystemConfigServiceTestCase(unittest.TestCase):
             config_version=old_version,
             items=[
                 {"key": "GEMINI_API_KEY", "value": "******"},
-                {"key": "STOCK_LIST", "value": "600519,300750"},
+                {"key": "STOCK_LIST", "value": "AAPL,TSLA"},
             ],
             mask_token="******",
             reload_now=False,
@@ -157,7 +157,7 @@ class SystemConfigServiceTestCase(unittest.TestCase):
         self.assertIn("STOCK_LIST", response["updated_keys"])
 
         current_map = self.manager.read_config_map()
-        self.assertEqual(current_map["STOCK_LIST"], "600519,300750")
+        self.assertEqual(current_map["STOCK_LIST"], "AAPL,TSLA")
         self.assertEqual(current_map["GEMINI_API_KEY"], "secret-key-value")
 
     def test_validate_reports_invalid_time(self) -> None:
@@ -406,7 +406,7 @@ class SystemConfigServiceTestCase(unittest.TestCase):
             "key": "AGENT_EVENT_ALERT_RULES_JSON",
             "value": (
                 "[\n"
-                '  {"stock_code":"600519","alert_type":"price_cross","direction":"above","price":1800}\n'
+                '  {"stock_code":"AAPL","alert_type":"price_cross","direction":"above","price":1800}\n'
                 "]"
             ),
         }])
@@ -421,7 +421,7 @@ class SystemConfigServiceTestCase(unittest.TestCase):
                 "key": "AGENT_EVENT_ALERT_RULES_JSON",
                 "value": (
                     "[\n"
-                    '  {"stock_code":"600519","alert_type":"price_cross","direction":"above","price":1800}\n'
+                    '  {"stock_code":"AAPL","alert_type":"price_cross","direction":"above","price":1800}\n'
                     "]"
                 ),
             }],
@@ -432,7 +432,7 @@ class SystemConfigServiceTestCase(unittest.TestCase):
         current_map = self.manager.read_config_map()
         self.assertEqual(
             current_map["AGENT_EVENT_ALERT_RULES_JSON"],
-            '[{"stock_code":"600519","alert_type":"price_cross","direction":"above","price":1800}]',
+            '[{"stock_code":"AAPL","alert_type":"price_cross","direction":"above","price":1800}]',
         )
 
     def test_validate_accepts_legacy_agent_orchestrator_mode_alias(self) -> None:
@@ -705,7 +705,7 @@ class SystemConfigServiceTestCase(unittest.TestCase):
     def test_validate_reports_invalid_event_rule_semantics(self) -> None:
         validation = self.service.validate(items=[{
             "key": "AGENT_EVENT_ALERT_RULES_JSON",
-            "value": '[{"stock_code":"600519","alert_type":"price_cross","status":"bad","direction":"above","price":1800}]',
+            "value": '[{"stock_code":"AAPL","alert_type":"price_cross","status":"bad","direction":"above","price":1800}]',
         }])
 
         self.assertFalse(validation["valid"])
@@ -714,7 +714,7 @@ class SystemConfigServiceTestCase(unittest.TestCase):
     def test_validate_rejects_unsupported_event_rule_type(self) -> None:
         validation = self.service.validate(items=[{
             "key": "AGENT_EVENT_ALERT_RULES_JSON",
-            "value": '[{"stock_code":"600519","alert_type":"sentiment_shift"}]',
+            "value": '[{"stock_code":"AAPL","alert_type":"sentiment_shift"}]',
         }])
 
         self.assertFalse(validation["valid"])
@@ -727,7 +727,7 @@ class SystemConfigServiceTestCase(unittest.TestCase):
     ) -> None:
         response = self.service.update(
             config_version=self.manager.get_config_version(),
-            items=[{"key": "STOCK_LIST", "value": "600519"}],
+            items=[{"key": "STOCK_LIST", "value": "AAPL"}],
             reload_now=True,
         )
 
@@ -735,22 +735,22 @@ class SystemConfigServiceTestCase(unittest.TestCase):
         mock_reload_runtime_singletons.assert_called_once()
 
     def test_update_with_reload_applies_updated_env_file_when_process_env_is_stale(self) -> None:
-        os.environ["STOCK_LIST"] = "600519,000001"
+        os.environ["STOCK_LIST"] = "AAPL,MSFT"
 
         response = self.service.update(
             config_version=self.manager.get_config_version(),
-            items=[{"key": "STOCK_LIST", "value": "300750,TSLA"}],
+            items=[{"key": "STOCK_LIST", "value": "TSLA,TSLA"}],
             reload_now=True,
         )
 
         self.assertTrue(response["success"])
-        self.assertEqual(Config.get_instance().stock_list, ["300750", "TSLA"])
+        self.assertEqual(Config.get_instance().stock_list, ["TSLA", "TSLA"])
 
     def test_update_raises_conflict_for_stale_version(self) -> None:
         with self.assertRaises(ConfigConflictError):
             self.service.update(
                 config_version="stale-version",
-                items=[{"key": "STOCK_LIST", "value": "600519"}],
+                items=[{"key": "STOCK_LIST", "value": "AAPL"}],
                 reload_now=False,
             )
 

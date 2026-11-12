@@ -59,7 +59,7 @@ def _make_mock_adapter():
 
 
 SAMPLE_DASHBOARD = {
-    "stock_name": "贵州茅台",
+    "stock_name": "苹果公司",
     "sentiment_score": 75,
     "trend_prediction": "看多",
     "operation_advice": "持有",
@@ -67,7 +67,7 @@ SAMPLE_DASHBOARD = {
     "confidence_level": "中",
     "dashboard": {
         "core_conclusion": {
-            "one_sentence": "茅台近期震荡走强",
+            "one_sentence": "苹果近期震荡走强",
             "signal_type": "🟡持有观望",
         },
     },
@@ -105,7 +105,7 @@ class TestAgentExecutor(unittest.TestCase):
             default_skill_policy="",
             max_steps=2,
         )
-        result = executor.run("Analyze 600519")
+        result = executor.run("Analyze AAPL")
 
         self.assertTrue(result.success)
         prompt = adapter.call_with_tools.call_args.args[0][0]["content"]
@@ -132,7 +132,7 @@ class TestAgentExecutor(unittest.TestCase):
             use_legacy_default_prompt=True,
             max_steps=2,
         )
-        result = executor.run("Analyze 600519")
+        result = executor.run("Analyze AAPL")
 
         self.assertTrue(result.success)
         prompt = adapter.call_with_tools.call_args.args[0][0]["content"]
@@ -155,7 +155,7 @@ class TestAgentExecutor(unittest.TestCase):
         )
 
         executor = AgentExecutor(registry, adapter, max_steps=5)
-        result = executor.run("Analyze 600519")
+        result = executor.run("Analyze AAPL")
 
         self.assertTrue(result.success)
         self.assertIsNotNone(result.dashboard)
@@ -188,7 +188,7 @@ class TestAgentExecutor(unittest.TestCase):
         adapter.call_with_tools.side_effect = [step1_response, step2_response]
 
         executor = AgentExecutor(registry, adapter, max_steps=5)
-        result = executor.run("Analyze 600519")
+        result = executor.run("Analyze AAPL")
 
         self.assertTrue(result.success)
         self.assertEqual(result.total_steps, 2)
@@ -220,7 +220,7 @@ class TestAgentExecutor(unittest.TestCase):
         adapter.call_with_tools.side_effect = [step1, step2]
 
         executor = AgentExecutor(registry, adapter, max_steps=5)
-        result = executor.run("Analyze 600519")
+        result = executor.run("Analyze AAPL")
 
         self.assertTrue(result.success)
         self.assertEqual(len(result.tool_calls_log), 2)
@@ -405,7 +405,7 @@ class TestAgentExecutor(unittest.TestCase):
         adapter.call_with_tools.side_effect = [step1, step2, step3]
 
         executor = AgentExecutor(registry, adapter, max_steps=5)
-        result = executor.run("Analyze 600519")
+        result = executor.run("Analyze AAPL")
 
         self.assertTrue(result.success)
         self.assertEqual(result.model, "gemini/gemini-2.0-flash, openai/gpt-4o-mini")
@@ -423,7 +423,7 @@ class TestAgentExecutor(unittest.TestCase):
         )
 
         executor = AgentExecutor(registry, adapter, max_steps=2)
-        result = executor.run("Analyze 600519")
+        result = executor.run("Analyze AAPL")
 
         self.assertFalse(result.success)
         self.assertEqual(result.model, "")
@@ -445,7 +445,7 @@ class TestAgentExecutor(unittest.TestCase):
         adapter.call_with_tools.side_effect = _slow_llm
 
         executor = AgentExecutor(registry, adapter, max_steps=2, timeout_seconds=0.01)
-        result = executor.run("Analyze 600519")
+        result = executor.run("Analyze AAPL")
 
         self.assertFalse(result.success)
         self.assertIn("timed out", (result.error or "").lower())
@@ -573,7 +573,7 @@ class TestAgentExecutor(unittest.TestCase):
         adapter.call_with_tools.side_effect = _capture_timeout
 
         executor = AgentExecutor(registry, adapter, max_steps=2, timeout_seconds=1.0)
-        result = executor.run("Analyze 600519")
+        result = executor.run("Analyze AAPL")
 
         self.assertTrue(result.success)
         self.assertIsNotNone(captured.get("timeout"))
@@ -694,16 +694,16 @@ class TestBuildUserMessage(unittest.TestCase):
         )
 
     def test_basic_message(self):
-        msg = self.executor._build_user_message("Analyze 600519")
-        self.assertIn("Analyze 600519", msg)
+        msg = self.executor._build_user_message("Analyze AAPL")
+        self.assertIn("Analyze AAPL", msg)
         self.assertIn("决策仪表盘", msg)
 
     def test_message_with_context(self):
         msg = self.executor._build_user_message(
             "Analyze",
-            context={"stock_code": "600519", "report_type": "daily"},
+            context={"stock_code": "AAPL", "report_type": "daily"},
         )
-        self.assertIn("股票代码: 600519", msg)
+        self.assertIn("股票代码: AAPL", msg)
         self.assertIn("报告类型: daily", msg)
 
 

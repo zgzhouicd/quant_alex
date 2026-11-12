@@ -79,7 +79,7 @@ class TestAnalysisIntegration:
         assert kwargs["selection_source"] == "manual"
         assert kwargs["report_type"] == "detailed"
         assert kwargs["force_refresh"] is False
-        assert kwargs["notify"] is True
+        assert kwargs["notify"] is False
         assert kwargs["instruments_by_code"]["AAPL"]["asset_class"] == "us_equity"
 
     def test_trigger_analysis_batch_deduplication(self, client, mock_task_queue):

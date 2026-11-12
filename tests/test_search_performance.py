@@ -19,8 +19,8 @@ class TestSearchPerformance:
     def test_resolve_name_to_code_fast_path_throughput(self):
         """Benchmark the common fast paths without typo/fuzzy fallbacks dominating runtime."""
         inputs = [
-            "600519", "00700", "AAPL", "TSLA",
-            "贵州茅台", "腾讯控股", "阿里巴巴",
+            "AAPL", "MSFT", "AAPL", "TSLA",
+            "苹果公司", "微软", "阿里巴巴",
             "aaaaaaa", "1234567",
         ]
 

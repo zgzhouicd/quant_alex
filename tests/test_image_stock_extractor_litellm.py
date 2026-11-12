@@ -47,7 +47,7 @@ _OPENAI_KEY = "sk-openai-testkey-1234"
 def _cfg(**kwargs) -> Config:
     """Minimal Config for extractor tests."""
     defaults = dict(
-        stock_list=["600519"],
+        stock_list=["AAPL"],
         tushare_token=None,
         llm_model_list=[],
         llm_channels=[],
@@ -158,7 +158,7 @@ class TestGetApiKeysForModel:
 class TestCallLitellmVision:
     def _good_response(self):
         msg = MagicMock()
-        msg.content = '["600519"]'
+        msg.content = '["AAPL"]'
         choice = MagicMock()
         choice.message = msg
         resp = MagicMock()
@@ -171,7 +171,7 @@ class TestCallLitellmVision:
              patch("src.services.image_stock_extractor.litellm.completion",
                    return_value=self._good_response()) as mock_comp:
             result = _call_litellm_vision("base64data", "image/jpeg")
-            assert result == '["600519"]'
+            assert result == '["AAPL"]'
             mock_comp.assert_called_once()
             kwargs = mock_comp.call_args[1]
             assert kwargs["timeout"] == VISION_API_TIMEOUT
@@ -220,14 +220,14 @@ class TestCallLitellmVision:
 
 class TestParseCodesFromText:
     def test_parses_json_array(self):
-        text = '["600519", "300750", "AAPL"]'
-        assert _parse_codes_from_text(text) == ["600519", "300750", "AAPL"]
+        text = '["AAPL", "TSLA", "NVDA"]'
+        assert _parse_codes_from_text(text) == ["AAPL", "TSLA", "NVDA"]
 
     def test_parses_fallback_from_plain_text(self):
-        text = "关注 600519、300750 和 AAPL。"
+        text = "关注 AAPL、TSLA 和 AAPL。"
         codes = _parse_codes_from_text(text)
-        assert "600519" in codes
-        assert "300750" in codes
+        assert "AAPL" in codes
+        assert "TSLA" in codes
         assert "AAPL" in codes
 
     def test_filters_fake_codes_in_legacy_format(self):
@@ -245,19 +245,19 @@ class TestParseCodesFromText:
 
 class TestParseItemsFromText:
     def test_parses_new_format(self):
-        text = '[{"code":"600519","name":"贵州茅台","confidence":"high"},{"code":"00700","name":"腾讯控股","confidence":"medium"}]'
+        text = '[{"code":"AAPL","name":"苹果公司","confidence":"high"},{"code":"MSFT","name":"微软","confidence":"medium"}]'
         items = _parse_items_from_text(text)
         assert len(items) == 2
-        assert items[0] == ("600519", "贵州茅台", "high")
-        assert items[1] == ("00700", "腾讯控股", "medium")
+        assert items[0] == ("AAPL", "苹果公司", "high")
+        assert items[1] == ("MSFT", "微软", "medium")
 
     def test_fallback_to_legacy_format(self):
-        text = '["600519", "300750"]'
+        text = '["AAPL", "TSLA"]'
         items = _parse_items_from_text(text)
-        assert [(i[0], i[1], i[2]) for i in items] == [("600519", None, "medium"), ("300750", None, "medium")]
+        assert [(i[0], i[1], i[2]) for i in items] == [("AAPL", None, "medium"), ("TSLA", None, "medium")]
 
     def test_normalizes_invalid_confidence(self):
-        text = '[{"code":"600519","name":"茅台","confidence":"invalid"}]'
+        text = '[{"code":"AAPL","name":"苹果","confidence":"invalid"}]'
         items = _parse_items_from_text(text)
         assert items[0][2] == "medium"
 
@@ -282,9 +282,9 @@ class TestParseItemsFromText:
         assert items[1] == ("512880", "证券ETF", "high")
 
     def test_uses_json_repair_when_json_invalid(self):
-        text = '[{"code":"600519","name":"贵州茅台","confidence":"high"'
+        text = '[{"code":"AAPL","name":"苹果公司","confidence":"high"'
         items = _parse_items_from_text(text)
-        assert items == [("600519", "贵州茅台", "high")]
+        assert items == [("AAPL", "苹果公司", "high")]
 
 
 # ---------------------------------------------------------------------------
@@ -292,7 +292,7 @@ class TestParseItemsFromText:
 # ---------------------------------------------------------------------------
 
 class TestExtractStockCodesFromImage:
-    def _good_vision_response(self, codes='["600519", "300750"]'):
+    def _good_vision_response(self, codes='["AAPL", "TSLA"]'):
         msg = MagicMock()
         msg.content = codes
         choice = MagicMock()
@@ -309,8 +309,8 @@ class TestExtractStockCodesFromImage:
                    return_value=self._good_vision_response()):
             items, raw = extract_stock_codes_from_image(jpeg, "image/jpeg")
             codes = [i[0] for i in items]
-            assert "600519" in codes
-            assert "300750" in codes
+            assert "AAPL" in codes
+            assert "TSLA" in codes
             assert isinstance(raw, str)
 
     def test_rejects_unsupported_mime(self):

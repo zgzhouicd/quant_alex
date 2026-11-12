@@ -11,11 +11,11 @@ export type AssetType = 'stock' | 'index' | 'etf';
  * Stock index item (full format)
  */
 export interface StockIndexItem {
-  /** Canonical code: 600519.SH */
+  /** Canonical code: AAPL.US */
   canonicalCode: string;
-  /** Display code: 600519 */
+  /** Display code: AAPL */
   displayCode: string;
-  /** Chinese name: 贵州茅台 */
+  /** Chinese name: 苹果 */
   nameZh: string;
   /** English name: Kweichow Moutai */
   nameEn?: string;

@@ -33,8 +33,8 @@ class StockQuote(BaseModel):
     class Config:
         json_schema_extra = {
             "example": {
-                "stock_code": "600519",
-                "stock_name": "贵州茅台",
+                "stock_code": "AAPL",
+                "stock_name": "Apple Inc.",
                 "current_price": 1800.00,
                 "change": 15.00,
                 "change_percent": 0.84,
@@ -103,8 +103,8 @@ class StockHistoryResponse(BaseModel):
     class Config:
         json_schema_extra = {
             "example": {
-                "stock_code": "600519",
-                "stock_name": "贵州茅台",
+                "stock_code": "AAPL",
+                "stock_name": "Apple Inc.",
                 "period": "daily",
                 "data": []
             }

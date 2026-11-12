@@ -40,7 +40,7 @@ const mockStoreState = {
   sessions: [
     {
       session_id: 'session-1',
-      title: '请简要分析 600519',
+      title: '请简要分析 AAPL',
       message_count: 2,
       created_at: '2026-03-15T09:00:00Z',
       last_active: '2026-03-15T09:05:00Z',
@@ -126,7 +126,7 @@ beforeEach(() => {
   mockStoreState.sessions = [
     {
       session_id: 'session-1',
-      title: '请简要分析 600519',
+      title: '请简要分析 AAPL',
       message_count: 2,
       created_at: '2026-03-15T09:00:00Z',
       last_active: '2026-03-15T09:05:00Z',
@@ -165,7 +165,7 @@ describe('ChatPage', () => {
     );
 
     const sessionCard = await screen.findByRole('button', {
-      name: /切换到对话 请简要分析 600519/,
+      name: /切换到对话 请简要分析 AAPL/,
     });
 
     fireEvent.click(sessionCard);
@@ -181,7 +181,7 @@ describe('ChatPage', () => {
     );
 
     const deleteButton = await screen.findByRole('button', {
-      name: /删除对话 请简要分析 600519/,
+      name: /删除对话 请简要分析 AAPL/,
     });
 
     fireEvent.click(deleteButton);
@@ -204,7 +204,7 @@ describe('ChatPage', () => {
 
   it('exports the current session from the header action', async () => {
     mockStoreState.messages = [
-      { id: 'user-1', role: 'user', content: '请分析 600519' },
+      { id: 'user-1', role: 'user', content: '请分析 AAPL' },
       { id: 'assistant-1', role: 'assistant', content: '趋势偏强', skillName: '趋势分析' },
     ];
 
@@ -259,12 +259,12 @@ describe('ChatPage', () => {
     vi.mocked(historyApi.getDetail).mockImplementation(() => deferred.promise);
 
     render(
-      <MemoryRouter initialEntries={['/chat?stock=600519&name=%E8%B4%B5%E5%B7%9E%E8%8C%85%E5%8F%B0&recordId=1']}>
+      <MemoryRouter initialEntries={['/chat?stock=AAPL&name=Apple&recordId=1']}>
         <ChatPage />
       </MemoryRouter>
     );
 
-    expect(await screen.findByDisplayValue('请深入分析 贵州茅台(600519)')).toBeInTheDocument();
+    expect(await screen.findByDisplayValue('请深入分析 Apple(AAPL)')).toBeInTheDocument();
 
     const sendButton = screen.getByRole('button', { name: /发送|处理中\.\.\./ });
     expect(sendButton).not.toBeDisabled();
@@ -275,10 +275,10 @@ describe('ChatPage', () => {
     await waitFor(() => {
       expect(mockStartStream).toHaveBeenCalledWith(
         expect.objectContaining({
-          message: '请深入分析 贵州茅台(600519)',
+          message: '请深入分析 Apple(AAPL)',
           context: {
-            stock_code: '600519',
-            stock_name: '贵州茅台',
+            stock_code: 'AAPL',
+            stock_name: 'Apple',
           },
         }),
         expect.objectContaining({
@@ -291,8 +291,8 @@ describe('ChatPage', () => {
       meta: {
         id: 1,
         queryId: 'q-1',
-        stockCode: '600519',
-        stockName: '贵州茅台',
+        stockCode: 'AAPL',
+        stockName: 'Apple',
         reportType: 'detailed',
         createdAt: '2026-03-18T08:00:00Z',
         currentPrice: 1523.6,
@@ -313,7 +313,7 @@ describe('ChatPage', () => {
       expect(screen.queryByText('正在加载历史分析上下文；现在可直接发送追问。')).not.toBeInTheDocument();
     });
 
-    fireEvent.change(screen.getByPlaceholderText(/分析 600519/), {
+    fireEvent.change(screen.getByPlaceholderText(/例如：分析 NVDA/), {
       target: { value: '继续分析成交量' },
     });
     fireEvent.click(screen.getByRole('button', { name: '发送' }));
@@ -336,8 +336,8 @@ describe('ChatPage', () => {
       meta: {
         id: 1,
         queryId: 'q-1',
-        stockCode: '600519',
-        stockName: '贵州茅台',
+        stockCode: 'AAPL',
+        stockName: 'Apple',
         reportType: 'detailed',
         createdAt: '2026-03-18T08:00:00Z',
         currentPrice: 1523.6,
@@ -355,12 +355,12 @@ describe('ChatPage', () => {
     });
 
     render(
-      <MemoryRouter initialEntries={['/chat?stock=600519&name=%E8%B4%B5%E5%B7%9E%E8%8C%85%E5%8F%B0&recordId=1']}>
+      <MemoryRouter initialEntries={['/chat?stock=AAPL&name=Apple&recordId=1']}>
         <ChatPage />
       </MemoryRouter>
     );
 
-    expect(await screen.findByDisplayValue('请深入分析 贵州茅台(600519)')).toBeInTheDocument();
+    expect(await screen.findByDisplayValue('请深入分析 Apple(AAPL)')).toBeInTheDocument();
 
     await waitFor(() => {
       expect(screen.queryByText('正在加载历史分析上下文；现在可直接发送追问。')).not.toBeInTheDocument();
@@ -371,10 +371,10 @@ describe('ChatPage', () => {
     await waitFor(() => {
       expect(mockStartStream).toHaveBeenCalledWith(
         expect.objectContaining({
-          message: '请深入分析 贵州茅台(600519)',
+          message: '请深入分析 Apple(AAPL)',
           context: expect.objectContaining({
-            stock_code: '600519',
-            stock_name: '贵州茅台',
+            stock_code: 'AAPL',
+            stock_name: 'Apple',
             previous_price: 1523.6,
             previous_change_pct: 1.8,
             previous_strategy: expect.objectContaining({
@@ -425,7 +425,7 @@ describe('ChatPage', () => {
     );
 
     expect(await screen.findByRole('heading', { name: '问股' })).toBeInTheDocument();
-    expect(screen.getByPlaceholderText(/分析 600519/)).toHaveValue('');
+    expect(screen.getByPlaceholderText(/例如：分析 NVDA/)).toHaveValue('');
     expect(historyApi.getDetail).not.toHaveBeenCalled();
   });
 
@@ -440,13 +440,13 @@ describe('ChatPage', () => {
     const router = createMemoryRouter(
       [{ path: '/chat', element: <ChatPage /> }],
       {
-        initialEntries: ['/chat?stock=600519&name=%E8%B4%B5%E5%B7%9E%E8%8C%85%E5%8F%B0&recordId=1'],
+        initialEntries: ['/chat?stock=AAPL&name=Apple&recordId=1'],
       },
     );
 
     render(<RouterProvider router={router} />);
 
-    expect(await screen.findByDisplayValue('请深入分析 贵州茅台(600519)')).toBeInTheDocument();
+    expect(await screen.findByDisplayValue('请深入分析 Apple(AAPL)')).toBeInTheDocument();
     expect(screen.getByText('正在加载历史分析上下文；现在可直接发送追问。')).toBeInTheDocument();
 
     await router.navigate('/chat?stock=AAPL&name=Apple&recordId=2');
@@ -457,8 +457,8 @@ describe('ChatPage', () => {
       meta: {
         id: 1,
         queryId: 'q-1',
-        stockCode: '600519',
-        stockName: '贵州茅台',
+        stockCode: 'AAPL',
+        stockName: 'Apple',
         reportType: 'detailed',
         createdAt: '2026-03-18T08:00:00Z',
         currentPrice: 1523.6,
@@ -526,7 +526,7 @@ describe('ChatPage', () => {
 
   it('shows a jump-to-latest action when new content arrives while the user is away from bottom', async () => {
     mockStoreState.messages = [
-      { id: 'user-1', role: 'user', content: '请分析 600519' },
+      { id: 'user-1', role: 'user', content: '请分析 AAPL' },
       { id: 'assistant-1', role: 'assistant', content: '趋势偏强', skillName: '趋势分析' },
     ];
 

@@ -93,7 +93,7 @@ class TestCommandDispatcherAsync(unittest.IsolatedAsyncioTestCase):
 
     async def test_parse_intent_via_llm_offloads_to_thread(self):
         fake_response = SimpleNamespace(
-            content='{"intent":"analysis","codes":["600519"],"strategy":null}',
+            content='{"intent":"analysis","codes":["AAPL"],"strategy":null}',
             provider="gemini",
             usage={"total_tokens": 12},
         )
@@ -107,10 +107,10 @@ class TestCommandDispatcherAsync(unittest.IsolatedAsyncioTestCase):
                 adapter = MagicMock()
                 adapter.call_text.return_value = fake_response
                 adapter_cls.return_value = adapter
-                result = await CommandDispatcher._parse_intent_via_llm("分析600519", config)
+                result = await CommandDispatcher._parse_intent_via_llm("分析AAPL", config)
 
         self.assertEqual(result["intent"], "analysis")
-        self.assertEqual(result["codes"], ["600519"])
+        self.assertEqual(result["codes"], ["AAPL"])
         to_thread.assert_awaited_once()
         adapter.call_text.assert_called_once()
 
@@ -130,10 +130,10 @@ class TestCommandDispatcherAsync(unittest.IsolatedAsyncioTestCase):
         with patch("src.config.get_config", return_value=config):
             with patch.object(dispatcher, "_parse_intent_via_llm", new=AsyncMock(return_value={
                 "intent": "analysis",
-                "codes": ["600519"],
+                "codes": ["AAPL"],
                 "strategy": "缠论",
             })):
-                result = await dispatcher._try_nl_routing(_make_message("帮我分析600519", mentioned=True))
+                result = await dispatcher._try_nl_routing(_make_message("帮我分析AAPL", mentioned=True))
 
         self.assertIsNotNone(result)
         self.assertEqual(result.text, "ask-ok")
@@ -158,13 +158,13 @@ class TestCommandDispatcherAsync(unittest.IsolatedAsyncioTestCase):
                 "codes": [],
                 "strategy": None,
             })):
-                result = await dispatcher._try_nl_routing(_make_message("帮我分析茅台", mentioned=True))
+                result = await dispatcher._try_nl_routing(_make_message("帮我分析苹果", mentioned=True))
 
         self.assertIsNotNone(result)
         self.assertEqual(result.text, "ask-ok")
         ask_command.execute_async.assert_awaited_once()
         _, args = ask_command.execute_async.await_args.args
-        self.assertEqual(args, ["600519"])
+        self.assertEqual(args, ["AAPL"])
 
 
 class TestCommandDispatcherSyncCompatibility(unittest.TestCase):

@@ -1,8 +1,10 @@
 /**
  * Query Normalization Utility Functions
  *
- * For processing user input stock codes or names
+ * For processing user input stock codes or names (US-focused product scope).
  */
+
+import { looksLikeStockCode } from './validation';
 
 /**
  * Normalize query string
@@ -34,7 +36,7 @@ export function containsChinese(query: string): boolean {
 
 /**
  * Extract market suffix from stock code
- * Example: 600519.SH -> SH, 00700.HK -> HK
+ * Example: AAPL.US -> US, BRK.B -> null (dot is class share)
  */
 export function extractMarketSuffix(code: string): string | null {
   const match = code.match(/\.([A-Z]+)$/);
@@ -43,7 +45,7 @@ export function extractMarketSuffix(code: string): string | null {
 
 /**
  * Remove market suffix from stock code
- * Example: 600519.SH -> 600519, 00700.HK -> 00700
+ * Example: AAPL.US -> AAPL
  */
 export function removeMarketSuffix(code: string): string {
   return code.replace(/\.[A-Z]+$/, '');
@@ -60,13 +62,14 @@ export function normalizeStockCode(code: string): string {
 }
 
 /**
- * Check if query looks like a stock code
- * By detecting if it contains numbers or letter combinations
+ * Check if query looks like a supported ticker / contract symbol (not legacy A/HK numeric codes).
  */
 export function isStockCodeLike(query: string): boolean {
-  const normalized = normalizeQuery(query);
-  // Contains numbers and no Chinese, possibly a stock code
-  return /\d/.test(normalized) && !containsChinese(normalized);
+  const normalized = normalizeStockCode(query);
+  if (!normalized) {
+    return false;
+  }
+  return looksLikeStockCode(normalized);
 }
 
 /**

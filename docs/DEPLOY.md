@@ -401,13 +401,12 @@ git push -u origin main
 | `EMAIL_PASSWORD` | 邮箱授权码 | 可选* |
 | `SERVERCHAN3_SENDKEY` | Server酱³ Sendkey | 可选* |
 | `CUSTOM_WEBHOOK_URLS` | 自定义 Webhook（多个逗号分隔） | 可选* |
-| `STOCK_LIST` | 自选股列表，如 `600519,300750` | ✅ |
+| `STOCK_LIST` | 自选股列表，如 `AAPL,MSFT,NVDA` | ✅ |
 | `TAVILY_API_KEYS` | Tavily 搜索 API Key | 推荐 |
 | `MINIMAX_API_KEYS` | MiniMax Coding Plan Web Search | 可选 |
 | `SERPAPI_API_KEYS` | SerpAPI Key | 可选 |
 | `SEARXNG_BASE_URLS` | SearXNG 自建实例（无配额兜底，需在 settings.yml 启用 format: json）；留空时默认自动发现公共实例 | 可选 |
 | `SEARXNG_PUBLIC_INSTANCES_ENABLED` | 是否在 `SEARXNG_BASE_URLS` 为空时自动从 `searx.space` 获取公共实例（默认 `true`） | 可选 |
-| `TUSHARE_TOKEN` | Tushare Token | 可选 |
 | `GEMINI_MODEL` | 模型名称（默认 gemini-2.0-flash） | 可选 |
 
 > *注：通知渠道至少配置一个，支持多渠道同时推送

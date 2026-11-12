@@ -68,7 +68,7 @@ class TaskQueueConfigSyncTestCase(unittest.TestCase):
 
     def test_sync_max_workers_deferred_when_busy(self) -> None:
         queue = AnalysisTaskQueue(max_workers=3)
-        queue._analyzing_stocks["600519"] = "task1"
+        queue._analyzing_stocks["AAPL"] = "task1"
 
         result = queue.sync_max_workers(1)
         self.assertEqual(result, "deferred_busy")
@@ -91,7 +91,7 @@ class TaskQueueConfigSyncTestCase(unittest.TestCase):
 
     def test_get_task_queue_defers_sync_when_busy(self) -> None:
         queue = AnalysisTaskQueue(max_workers=3)
-        queue._analyzing_stocks["600519"] = "task1"
+        queue._analyzing_stocks["AAPL"] = "task1"
 
         with patch("src.config.get_config", return_value=SimpleNamespace(max_workers=1)):
             synced = get_task_queue()

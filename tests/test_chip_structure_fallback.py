@@ -84,7 +84,7 @@ class TestBuildChipStructureFromData(unittest.TestCase):
 
     def test_from_chip_distribution(self) -> None:
         chip = ChipDistribution(
-            code="600519",
+            code="AAPL",
             profit_ratio=0.567,
             avg_cost=1850.5,
             concentration_90=0.12,
@@ -111,7 +111,7 @@ class TestBuildChipStructureFromData(unittest.TestCase):
         self.assertEqual(out["concentration"], "15.00%")
 
     def test_avg_cost_zero_shows_na(self) -> None:
-        chip = ChipDistribution(code="600519", profit_ratio=0.5, avg_cost=0.0, concentration_90=0.1)
+        chip = ChipDistribution(code="AAPL", profit_ratio=0.5, avg_cost=0.0, concentration_90=0.1)
         out = _build_chip_structure_from_data(chip)
         self.assertEqual(out["avg_cost"], "N/A")
 
@@ -126,8 +126,8 @@ class TestFillChipStructureIfNeeded(unittest.TestCase):
 
     def _make_result(self, dashboard: dict = None) -> AnalysisResult:
         return AnalysisResult(
-            code="600519",
-            name="贵州茅台",
+            code="AAPL",
+            name="苹果公司",
             trend_prediction="看多",
             sentiment_score=70,
             operation_advice="持有",
@@ -138,7 +138,7 @@ class TestFillChipStructureIfNeeded(unittest.TestCase):
 
     def _make_chip(self) -> ChipDistribution:
         return ChipDistribution(
-            code="600519",
+            code="AAPL",
             profit_ratio=0.67,
             avg_cost=1850.0,
             concentration_90=0.11,

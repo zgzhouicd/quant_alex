@@ -18,7 +18,7 @@ from src.stock_analyzer import (
 
 
 def _make_result(
-    code: str = "000001",
+    code: str = "MSFT",
     trend_status: TrendStatus = TrendStatus.BULL,
     trend_strength: float = 50.0,
     bias_ma5: float = 0.0,

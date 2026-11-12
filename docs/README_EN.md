@@ -148,7 +148,7 @@ Go to your forked repo → `Settings` → `Secrets and variables` → `Actions` 
 
 | Secret Name | Description | Required |
 |------------|------|:----:|
-| `STOCK_LIST` | Watchlist codes, e.g., `600519,AAPL,hk00700` | ✅ |
+| `STOCK_LIST` | Watchlist codes, e.g., `AAPL,MSFT,NVDA` | ✅ |
 | `TAVILY_API_KEYS` | [Tavily](https://tavily.com/) Search API (for news) | Recommended |
 | `MINIMAX_API_KEYS` | [MiniMax](https://platform.minimaxi.com/) Coding Plan Web Search (structured search results) | Optional |
 | `BRAVE_API_KEYS` | [Brave Search](https://brave.com/search/api/) API (privacy-focused, US stocks optimized) | Optional |
@@ -156,9 +156,7 @@ Go to your forked repo → `Settings` → `Secrets and variables` → `Actions` 
 | `BOCHA_API_KEYS` | [Bocha Search](https://open.bocha.cn/) Web Search API (Chinese search optimized, supports AI summaries, multiple keys comma-separated) | Optional |
 | `SEARXNG_BASE_URLS` | SearXNG self-hosted instances (quota-free fallback, enable format: json in settings.yml); when empty the app auto-discovers public instances | Optional |
 | `SEARXNG_PUBLIC_INSTANCES_ENABLED` | Auto-discover public SearXNG instances from `searx.space` when `SEARXNG_BASE_URLS` is empty (default `true`) | Optional |
-| `TUSHARE_TOKEN` | [Tushare Pro](https://tushare.pro/weborder/#/login?reg=834638 ) Token | Optional |
-| `TICKFLOW_API_KEY` | [TickFlow](https://tickflow.org) API key (CN market review index enhancement; breadth also uses TickFlow when the plan supports universe queries) | Optional |
-| `LONGBRIDGE_APP_KEY` | [Longbridge OpenAPI](https://open.longbridge.com/) App Key (becomes primary US/HK data source when configured) | Optional |
+| `LONGBRIDGE_APP_KEY` | [Longbridge OpenAPI](https://open.longbridge.com/) App Key (optional US equity priority when configured) | Optional |
 | `LONGBRIDGE_APP_SECRET` | Longbridge App Secret | Optional |
 | `LONGBRIDGE_ACCESS_TOKEN` | Longbridge Access Token | Optional |
 | `LONGBRIDGE_STATIC_INFO_TTL_SECONDS` | In-process `static_info` cache TTL in seconds (default `86400`; `0` = no cache) | Optional |
@@ -180,10 +178,10 @@ Go to your forked repo → `Settings` → `Secrets and variables` → `Actions` 
 
 | Market | Format | Examples |
 |--------|--------|----------|
-| A-shares | 6-digit number | `600519`, `000001`, `300750` |
-| BSE (Beijing) | 8/4/92 prefix, 6-digit | `920748`, `838163`, `430047` |
-| HK Stocks | hk + 5-digit number | `hk00700`, `hk09988` |
-| US Stocks | 1-5 uppercase letters | `AAPL`, `TSLA`, `GOOGL` |
+| US Stocks | Letter ticker | `AAPL`, `TSLA`, `BRK.B` |
+| US futures | Yahoo style | `ES=F`, `NQ=F` |
+| Crypto perps | Configured pairs | `BTCUSDT`, `BTC-USD_PERP` |
+| **Not supported** | A-share / HK | Rejected at API |
 
 #### 3. Enable Actions
 
@@ -240,8 +238,8 @@ Configure the following:
 # AI Model (Choose one)
 GEMINI_API_KEY=your_gemini_api_key_here
 
-# Stock Watchlist (Mixed markets supported)
-STOCK_LIST=600519,AAPL,hk00700
+# Stock watchlist (US-focused)
+STOCK_LIST=AAPL,MSFT,NVDA
 
 # Notification Channel (Choose at least one)
 TELEGRAM_BOT_TOKEN=your_bot_token
@@ -360,7 +358,7 @@ Samples below assume **outbound notification channels** are configured. The Web 
 ## 📊 Analysis Summary
 
 🟢 **AAPL(Apple Inc.)**: Buy | Score 85 | Strong Bullish
-🟡 **600519(Kweichow Moutai)**: Hold | Score 65 | Bullish
+🟡 **MSFT(Microsoft)**: Hold | Score 65 | Bullish
 🔴 **TSLA(Tesla)**: Sell | Score 35 | Bearish
 
 ---
@@ -443,9 +441,6 @@ SCHEDULE_ENABLED=true          # Enable scheduled task
 SCHEDULE_TIME=18:00            # Daily run time (HH:MM, 24-hour format)
 MARKET_REVIEW_ENABLED=true     # Enable market review
 
-# === Optional: stock-list index (not primary market quotes) ===
-TUSHARE_TOKEN=your_token       # Tushare Pro — optional for fetching CSV lists → autocomplete index
-
 # === System ===
 MAX_WORKERS=3                  # Concurrent threads (3 recommended to avoid blocking)
 DEBUG=false                    # Enable debug logging
@@ -502,8 +497,8 @@ Enable the FastAPI service for configuration management and triggering analysis 
 
 The home analysis input now behaves more like a search box, reducing the need to memorize exact symbols.
 
-- **Multi-signal matching**: supports stock code, company name, pinyin abbreviation, and aliases (for example `gzmt` -> 贵州茅台, `tencent` -> 腾讯控股, `aapl` -> Apple Inc.).
-- **Multi-market coverage**: the index can cover **A-shares, HK, and US** depending on your CSV/mapping source; typical workflow is **Tushare CSV → `generate_index_from_csv.py`**, or `generate_stock_index.py` for MVP from built-in maps.
+- **Multi-signal matching**: supports US ticker, Chinese display name, pinyin abbreviation, and aliases (for example `aapl` -> Apple Inc., `苹果` -> AAPL).
+- **US-focused index**: shipped `stocks.index.json` is US MVP; refresh with `python3 scripts/generate_stock_index.py`.
 - **Graceful fallback**:
   - If the index is outdated, missing a newly listed symbol, or fails to load, the UI falls back to plain manual input without blocking analysis.
   - If no suggestion matches, pressing Enter still submits the original input directly.

@@ -40,7 +40,7 @@ class _DummyFetcher:
         return self._result
 
 
-def _make_quote(code: str = "600519", name: str = "贵州茅台") -> UnifiedRealtimeQuote:
+def _make_quote(code: str = "AAPL", name: str = "苹果公司") -> UnifiedRealtimeQuote:
     return UnifiedRealtimeQuote(
         code=code,
         name=name,
@@ -61,7 +61,7 @@ def _make_pipeline(enable_realtime_quote: bool, realtime_quote=None) -> StockAna
         report_language="zh",
     )
     pipeline.fetcher_manager = MagicMock()
-    pipeline.fetcher_manager.get_stock_name.return_value = "贵州茅台"
+    pipeline.fetcher_manager.get_stock_name.return_value = "苹果公司"
     pipeline.fetcher_manager.get_realtime_quote.return_value = realtime_quote
     pipeline.fetcher_manager.get_chip_distribution.return_value = None
     pipeline.fetcher_manager.get_fundamental_context.return_value = {
@@ -113,17 +113,17 @@ def test_pipeline_warns_once_when_all_realtime_sources_fail(caplog):
     pipeline = _make_pipeline(enable_realtime_quote=True, realtime_quote=None)
 
     with caplog.at_level(logging.INFO):
-        result = pipeline.analyze_stock("600519", ReportType.SIMPLE, "q1")
+        result = pipeline.analyze_stock("AAPL", ReportType.SIMPLE, "q1")
 
     assert result is None
-    pipeline.fetcher_manager.get_stock_name.assert_called_once_with("600519", allow_realtime=False)
-    pipeline.fetcher_manager.get_realtime_quote.assert_called_once_with("600519", log_final_failure=False)
+    pipeline.fetcher_manager.get_stock_name.assert_called_once_with("AAPL", allow_realtime=False)
+    pipeline.fetcher_manager.get_realtime_quote.assert_called_once_with("AAPL", log_final_failure=False)
     downgrade_logs = [
         record.message
         for record in caplog.records
         if "历史收盘价继续分析" in record.message
     ]
-    assert downgrade_logs == ["贵州茅台(600519) 所有实时行情数据源均不可用，已降级为历史收盘价继续分析"]
+    assert downgrade_logs == ["苹果公司(AAPL) 所有实时行情数据源均不可用，已降级为历史收盘价继续分析"]
 
 
 @patch("src.config.get_config")
@@ -159,14 +159,14 @@ def test_pipeline_logs_disabled_realtime_once_without_fetching_quote(caplog):
     pipeline = _make_pipeline(enable_realtime_quote=False, realtime_quote=_make_quote())
 
     with caplog.at_level(logging.INFO):
-        result = pipeline.analyze_stock("600519", ReportType.SIMPLE, "q1")
+        result = pipeline.analyze_stock("AAPL", ReportType.SIMPLE, "q1")
 
     assert result is None
-    pipeline.fetcher_manager.get_stock_name.assert_called_once_with("600519", allow_realtime=False)
+    pipeline.fetcher_manager.get_stock_name.assert_called_once_with("AAPL", allow_realtime=False)
     pipeline.fetcher_manager.get_realtime_quote.assert_not_called()
     downgrade_logs = [
         record.message
         for record in caplog.records
         if "历史收盘价继续分析" in record.message
     ]
-    assert downgrade_logs == ["贵州茅台(600519) 实时行情已禁用，使用历史收盘价继续分析"]
+    assert downgrade_logs == ["苹果公司(AAPL) 实时行情已禁用，使用历史收盘价继续分析"]

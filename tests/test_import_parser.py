@@ -8,6 +8,8 @@ Covers:
 - Name-to-code resolution (mocked)
 - No-header mode (col 0 = code, col 1 = name)
 - File size and text size limits
+
+Fixtures use US-ticker style symbols aligned with product scope (no A 股 / 港股形态).
 """
 
 import io
@@ -28,43 +30,42 @@ from src.services.import_parser import (
 
 class TestParseImportFromBytesCsv:
     def test_parses_csv_with_header(self):
-        data = "code,name\n600519,贵州茅台\n00700,腾讯控股".encode("utf-8")
+        data = "code,name\nAAPL,苹果公司\nMSFT,微软".encode("utf-8")
         result = parse_import_from_bytes(data, "a.csv")
         assert len(result) == 2
-        assert result[0] == ("600519", "贵州茅台", "medium")
-        assert result[1] == ("00700", "腾讯控股", "medium")
+        assert result[0] == ("AAPL", "苹果公司", "medium")
+        assert result[1] == ("MSFT", "微软", "medium")
 
     def test_parses_csv_chinese_column_names(self):
-        data = "股票代码,股票名称\n600519,贵州茅台".encode("utf-8")
+        data = "股票代码,股票名称\nAAPL,苹果公司".encode("utf-8")
         result = parse_import_from_bytes(data, "a.csv")
-        assert result[0] == ("600519", "贵州茅台", "medium")
+        assert result[0] == ("AAPL", "苹果公司", "medium")
 
     def test_parses_csv_no_header(self):
-        # Use 300750 instead of 00700 to avoid pandas stripping leading zeros
-        data = "600519,贵州茅台\n300750,宁德时代".encode("utf-8")
+        data = "AAPL,苹果公司\nNVDA,英伟达".encode("utf-8")
         result = parse_import_from_bytes(data, "a.csv")
         assert len(result) == 2
-        assert result[0] == ("600519", "贵州茅台", "medium")
-        assert result[1] == ("300750", "宁德时代", "medium")
+        assert result[0] == ("AAPL", "苹果公司", "medium")
+        assert result[1] == ("NVDA", "英伟达", "medium")
 
     def test_skips_empty_rows(self):
-        data = "code,name\n600519,贵州茅台\n\n00700,腾讯控股".encode("utf-8")
+        data = "code,name\nAAPL,苹果公司\n\nMSFT,微软".encode("utf-8")
         result = parse_import_from_bytes(data, "a.csv")
         assert len(result) == 2
 
     def test_tab_separated(self):
-        data = "code\tname\n600519\t贵州茅台".encode("utf-8")
+        data = "code\tname\nAAPL\t苹果公司".encode("utf-8")
         result = parse_import_from_bytes(data, "paste.txt")
-        assert result[0] == ("600519", "贵州茅台", "medium")
+        assert result[0] == ("AAPL", "苹果公司", "medium")
 
     @patch("src.services.import_parser.resolve_name_to_code")
     def test_resolves_name_when_code_empty(self, mock_resolve):
-        mock_resolve.return_value = "600519"
+        mock_resolve.return_value = "AAPL"
         # code column empty, name column has value
-        data = "code,name\n,贵州茅台".encode("utf-8")
+        data = "code,name\n,苹果公司".encode("utf-8")
         result = parse_import_from_bytes(data, "a.csv")
-        assert result[0] == ("600519", "贵州茅台", "medium")
-        mock_resolve.assert_called_with("贵州茅台")
+        assert result[0] == ("AAPL", "苹果公司", "medium")
+        mock_resolve.assert_called_with("苹果公司")
 
     @patch("src.services.import_parser.resolve_name_to_code")
     def test_returns_none_code_when_resolution_fails(self, mock_resolve):
@@ -88,16 +89,16 @@ class TestParseImportFromBytesExcel:
         wb = Workbook()
         ws = wb.active
         ws.append(["code", "name"])
-        ws.append(["600519", "贵州茅台"])
-        ws.append(["300750", "宁德时代"])
+        ws.append(["AAPL", "苹果公司"])
+        ws.append(["NVDA", "英伟达"])
         buf = io.BytesIO()
         wb.save(buf)
         buf.seek(0)
         data = buf.read()
         result = parse_import_from_bytes(data, "a.xlsx")
         assert len(result) == 2
-        assert result[0] == ("600519", "贵州茅台", "medium")
-        assert result[1] == ("300750", "宁德时代", "medium")
+        assert result[0] == ("AAPL", "苹果公司", "medium")
+        assert result[1] == ("NVDA", "英伟达", "medium")
 
     def test_parses_xlsx_without_header(self):
         """Header-less Excel: first data row must NOT be consumed as column names."""
@@ -108,8 +109,8 @@ class TestParseImportFromBytesExcel:
         from openpyxl import Workbook
         wb = Workbook()
         ws = wb.active
-        ws.append(["600519", "贵州茅台"])
-        ws.append(["00700", "腾讯控股"])
+        ws.append(["AAPL", "苹果公司"])
+        ws.append(["MSFT", "微软"])
         buf = io.BytesIO()
         wb.save(buf)
         buf.seek(0)
@@ -117,8 +118,8 @@ class TestParseImportFromBytesExcel:
         result = parse_import_from_bytes(data, "noheader.xlsx")
         assert len(result) == 2, f"Expected 2 rows, got {len(result)} — first row may have been eaten as header"
         codes = [r[0] for r in result]
-        assert "600519" in codes
-        assert "00700" in codes
+        assert "AAPL" in codes
+        assert "MSFT" in codes
 
     def test_rejects_xls(self):
         data = b"dummy"
@@ -152,7 +153,7 @@ class TestParseImportLimits:
 
     def test_csv_parser_error_raises_helpful_message(self):
         """Malformed CSV (e.g. unclosed quote) should raise with actionable hint."""
-        data = 'code,name\n600519,"贵州茅台'.encode("utf-8")
+        data = 'code,name\nAAPL,"苹果公司'.encode("utf-8")
         with pytest.raises(ValueError) as exc_info:
             parse_import_from_bytes(data, "a.csv")
         msg = str(exc_info.value)
@@ -161,11 +162,11 @@ class TestParseImportLimits:
 
     def test_accepts_gbk_encoded_csv(self):
         # Build CSV with Chinese in GBK encoding
-        data = ("code,name\n600519," + "贵州茅台").encode("gbk")
+        data = ("code,name\nAAPL," + "苹果公司").encode("gbk")
         result = parse_import_from_bytes(data, "a.csv")
         assert len(result) == 1
-        assert result[0][0] == "600519"
-        assert result[0][1] == "贵州茅台"
+        assert result[0][0] == "AAPL"
+        assert result[0][1] == "苹果公司"
 
 
 # ---------------------------------------------------------------------------
@@ -174,33 +175,36 @@ class TestParseImportLimits:
 
 class TestParseImportFromText:
     def test_parses_pasted_text(self):
-        text = "600519,贵州茅台\n300750,宁德时代"
+        text = "AAPL,苹果公司\nNVDA,英伟达"
         result = parse_import_from_text(text)
         assert len(result) == 2
-        assert result[0] == ("600519", "贵州茅台", "medium")
+        assert result[0] == ("AAPL", "苹果公司", "medium")
 
     def test_parses_single_column_codes(self):
-        text = "00700\n600519"
+        text = "MSFT\nAAPL"
         result = parse_import_from_text(text)
         assert len(result) == 2
-        assert result[0] == ("00700", None, "medium")
-        assert result[1] == ("600519", None, "medium")
+        assert result[0] == ("MSFT", None, "medium")
+        assert result[1] == ("AAPL", None, "medium")
 
     def test_parses_single_column_with_header(self):
-        text = "code\n00700"
+        text = "code\nAAPL"
         result = parse_import_from_text(text)
         assert len(result) == 1
-        assert result[0] == ("00700", None, "medium")
+        assert result[0] == ("AAPL", None, "medium")
 
     def test_parses_space_separated_code_name_lines(self):
-        text = "600519 贵州茅台\n00700 腾讯控股"
+        text = "AAPL 苹果公司\nMSFT 微软"
         result = parse_import_from_text(text)
         assert len(result) == 2
-        assert result[0] == ("600519", "贵州茅台", "medium")
-        assert result[1] == ("00700", "腾讯控股", "medium")
+        assert result[0] == ("AAPL", "苹果公司", "medium")
+        assert result[1] == ("MSFT", "微软", "medium")
 
-    def test_preserves_name_when_code_is_dirty(self):
-        data = "code,name\nINVALID,贵州茅台".encode("utf-8")
+    @patch("src.services.import_parser.resolve_name_to_code")
+    def test_preserves_name_when_code_is_dirty(self, mock_resolve):
+        mock_resolve.return_value = "AAPL"
+        # Numeric junk in code column is not US-ticker-like; name should drive resolution.
+        data = "code,name\n12345,苹果公司".encode("utf-8")
         result = parse_import_from_bytes(data, "a.csv")
         assert len(result) == 1
-        assert result[0] == ("600519", "贵州茅台", "medium")
+        assert result[0] == ("AAPL", "苹果公司", "medium")

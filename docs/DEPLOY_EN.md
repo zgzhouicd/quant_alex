@@ -359,11 +359,10 @@ Add these Secrets:
 | `EMAIL_PASSWORD` | Email authorization code | Optional* |
 | `SERVERCHAN3_SENDKEY` | ServerChan v3 Sendkey | Optional* |
 | `CUSTOM_WEBHOOK_URLS` | Custom Webhook (comma-separated for multiple) | Optional* |
-| `STOCK_LIST` | Watchlist, e.g., `600519,300750` | ✅ |
+| `STOCK_LIST` | Watchlist, e.g., `AAPL,MSFT,NVDA` | ✅ |
 | `TAVILY_API_KEYS` | Tavily Search API Key | Recommended |
 | `MINIMAX_API_KEYS` | MiniMax Coding Plan Web Search | Optional |
 | `SERPAPI_API_KEYS` | SerpAPI Key | Optional |
-| `TUSHARE_TOKEN` | Tushare Token | Optional |
 | `GEMINI_MODEL` | Model name (default gemini-2.0-flash) | Optional |
 
 > *Note: Configure at least one notification channel, multiple channels supported for simultaneous push

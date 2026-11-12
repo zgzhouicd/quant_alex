@@ -24,8 +24,8 @@ vi.mock('../../api/analysis', async () => {
 const historyItem = {
   id: 1,
   queryId: 'q-1',
-  stockCode: '600519',
-  stockName: '贵州茅台',
+  stockCode: 'AAPL',
+  stockName: 'Apple Inc.',
   sentimentScore: 82,
   operationAdvice: '买入',
   createdAt: '2026-03-18T08:00:00Z',
@@ -35,8 +35,8 @@ const historyReport = {
   meta: {
     id: 1,
     queryId: 'q-1',
-    stockCode: '600519',
-    stockName: '贵州茅台',
+    stockCode: 'AAPL',
+    stockName: 'Apple Inc.',
     reportType: 'detailed' as const,
     createdAt: '2026-03-18T08:00:00Z',
   },
@@ -77,7 +77,7 @@ describe('stockPoolStore', () => {
 
     const state = useStockPoolStore.getState();
     expect(state.historyItems).toHaveLength(1);
-    expect(state.selectedReport?.meta.stockCode).toBe('600519');
+    expect(state.selectedReport?.meta.stockCode).toBe('AAPL');
     expect(state.isLoadingHistory).toBe(false);
     expect(state.isLoadingReport).toBe(false);
   });
@@ -151,14 +151,14 @@ describe('stockPoolStore', () => {
 
   it('surfaces duplicate task errors without replacing the dashboard error state', async () => {
     vi.mocked(analysisApi.analyzeAsync).mockRejectedValue(
-      new DuplicateTaskError('600519', 'task-1', '股票 600519 正在分析中'),
+      new DuplicateTaskError('AAPL', 'task-1', '股票 AAPL 正在分析中'),
     );
 
-    useStockPoolStore.getState().setQuery('600519');
+    useStockPoolStore.getState().setQuery('AAPL');
     await useStockPoolStore.getState().submitAnalysis();
 
     const state = useStockPoolStore.getState();
-    expect(state.duplicateError).toContain('600519');
+    expect(state.duplicateError).toContain('AAPL');
     expect(state.error).toBeNull();
     expect(state.isAnalyzing).toBe(false);
   });
@@ -174,18 +174,18 @@ describe('stockPoolStore', () => {
     expect(analysisApi.analyzeAsync).not.toHaveBeenCalled();
   });
 
-  it('accepts HK suffix codes from autocomplete without local validation errors', async () => {
+  it('accepts US tickers from autocomplete without local validation errors', async () => {
     vi.mocked(analysisApi.analyzeAsync).mockResolvedValue({
-      taskId: 'task-hk-1',
-      stockCode: '00700.HK',
+      taskId: 'task-us-1',
+      stockCode: 'AAPL',
       status: 'pending',
       message: 'accepted',
     } as never);
 
     await useStockPoolStore.getState().submitAnalysis({
-      stockCode: '00700.HK',
-      stockName: '腾讯控股',
-      originalQuery: '00700',
+      stockCode: 'AAPL',
+      stockName: 'Apple Inc.',
+      originalQuery: 'AAPL',
       selectionSource: 'autocomplete',
     });
 
@@ -193,10 +193,10 @@ describe('stockPoolStore', () => {
     expect(state.inputError).toBeUndefined();
     expect(state.isAnalyzing).toBe(false);
     expect(analysisApi.analyzeAsync).toHaveBeenCalledWith({
-      stockCode: '00700.HK',
+      stockCode: 'AAPL',
       reportType: 'detailed',
-      stockName: '腾讯控股',
-      originalQuery: '00700',
+      stockName: 'Apple Inc.',
+      originalQuery: 'AAPL',
       selectionSource: 'autocomplete',
       notify: false,
     });
@@ -257,8 +257,8 @@ describe('stockPoolStore', () => {
   it('tracks task lifecycle updates and resets all dashboard state', () => {
     const pendingTask = {
       taskId: 'task-1',
-      stockCode: '600519',
-      stockName: '贵州茅台',
+      stockCode: 'AAPL',
+      stockName: 'Apple Inc.',
       status: 'pending' as const,
       progress: 0,
       reportType: 'detailed',
@@ -307,8 +307,8 @@ describe('stockPoolStore', () => {
   it('ignores late task updates after a task has been removed', () => {
     const pendingTask = {
       taskId: 'task-1',
-      stockCode: '600519',
-      stockName: '贵州茅台',
+      stockCode: 'AAPL',
+      stockName: 'Apple Inc.',
       status: 'pending' as const,
       progress: 0,
       reportType: 'detailed',
@@ -330,8 +330,8 @@ describe('stockPoolStore', () => {
   it('ignores unknown task updates after dashboard reset', () => {
     const pendingTask = {
       taskId: 'task-1',
-      stockCode: '600519',
-      stockName: '贵州茅台',
+      stockCode: 'AAPL',
+      stockName: 'Apple Inc.',
       status: 'pending' as const,
       progress: 0,
       reportType: 'detailed',

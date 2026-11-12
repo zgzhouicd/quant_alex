@@ -7,6 +7,7 @@
 """
 
 from .base import BaseFetcher, DataFetcherManager
+from .errors import DataFetchError, RateLimitError, DataSourceUnavailableError
 from .binance_public_fetcher import BinancePublicFetcher, binance_spot_symbol_for_intraday
 from .yfinance_fetcher import YfinanceFetcher
 from .longbridge_fetcher import LongbridgeFetcher
@@ -21,6 +22,9 @@ from .us_index_mapping import (
 __all__ = [
     'BaseFetcher',
     'DataFetcherManager',
+    'DataFetchError',
+    'RateLimitError',
+    'DataSourceUnavailableError',
     'BinancePublicFetcher',
     'binance_spot_symbol_for_intraday',
     'YfinanceFetcher',

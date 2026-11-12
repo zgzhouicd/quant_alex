@@ -360,7 +360,7 @@ class TestAgentResultConversion(unittest.TestCase):
         from src.enums import ReportType
 
         dashboard = {
-            "stock_name": "贵州茅台",
+            "stock_name": "苹果公司",
             "sentiment_score": 80,
             "trend_prediction": "看多",
             "operation_advice": "持有",
@@ -397,13 +397,13 @@ class TestAgentResultConversion(unittest.TestCase):
         )
 
         result = pipeline._agent_result_to_analysis_result(
-            agent_result, "600519", "贵州茅台", ReportType.SIMPLE, "q123"
+            agent_result, "AAPL", "苹果公司", ReportType.SIMPLE, "q123"
         )
 
         self.assertIsNotNone(result)
         self.assertTrue(result.success)
-        self.assertEqual(result.code, "600519")
-        self.assertEqual(result.name, "贵州茅台")
+        self.assertEqual(result.code, "AAPL")
+        self.assertEqual(result.name, "苹果公司")
         self.assertEqual(result.sentiment_score, 80)
         self.assertEqual(result.trend_prediction, "看多")
         self.assertEqual(result.decision_type, "hold")
@@ -425,7 +425,7 @@ class TestAgentResultConversion(unittest.TestCase):
         )
 
         result = pipeline._agent_result_to_analysis_result(
-            agent_result, "600519", "贵州茅台", ReportType.SIMPLE, "q123"
+            agent_result, "AAPL", "苹果公司", ReportType.SIMPLE, "q123"
         )
 
         self.assertIsNotNone(result)
@@ -480,9 +480,9 @@ class TestAgentResultConversion(unittest.TestCase):
         )
 
         result = pipeline._agent_result_to_analysis_result(
-            agent_result, "600519", "贵州茅台", ReportType.SIMPLE, "q-valid"
+            agent_result, "AAPL", "苹果公司", ReportType.SIMPLE, "q-valid"
         )
-        self.assertEqual(result.name, "贵州茅台")
+        self.assertEqual(result.name, "苹果公司")
 
 
 # ============================================================
@@ -557,12 +557,12 @@ class TestPipelineRouting(unittest.TestCase):
             # Mock _analyze_with_agent to verify it gets called
             pipeline._analyze_with_agent = MagicMock(return_value=None)
 
-            pipeline.analyze_stock("600519", ReportType.SIMPLE, "q1")
+            pipeline.analyze_stock("AAPL", ReportType.SIMPLE, "q1")
 
             pipeline._analyze_with_agent.assert_called_once()
             call_args = pipeline._analyze_with_agent.call_args
             # Positional args: code, report_type, query_id, stock_name, realtime_quote, chip_data, fundamental_context, trend_result
-            self.assertEqual(call_args[0][0], "600519")
+            self.assertEqual(call_args[0][0], "AAPL")
             self.assertEqual(call_args[0][1], ReportType.SIMPLE)
             self.assertEqual(call_args[0][2], "q1")
             # trend_result (8th arg) should be present (may be a TrendAnalysisResult or None)
@@ -610,7 +610,7 @@ class TestPipelineRouting(unittest.TestCase):
             # Mock analyzer
             pipeline.analyzer.analyze.return_value = None
 
-            result = pipeline.analyze_stock("600519", ReportType.SIMPLE, "q1")
+            result = pipeline.analyze_stock("AAPL", ReportType.SIMPLE, "q1")
 
             # _analyze_with_agent should NOT exist as a mock (it's the real method)
             # Instead, verify analyzer.analyze was called (legacy path)
@@ -1202,7 +1202,7 @@ class TestSkillActivation(unittest.TestCase):
             )
 
             result = pipeline._agent_result_to_analysis_result(
-                agent_result, "600519", "TestCo", ReportType.SIMPLE, "q1"
+                agent_result, "AAPL", "TestCo", ReportType.SIMPLE, "q1"
             )
             self.assertEqual(result.sentiment_score, 80)
 

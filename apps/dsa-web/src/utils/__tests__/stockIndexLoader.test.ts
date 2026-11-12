@@ -21,42 +21,6 @@ globalThis.fetch = mockFetch as unknown as typeof fetch;
 describe('stockIndexLoader', () => {
   const mockIndexData: StockIndexItem[] = [
     {
-      canonicalCode: '600519.SH',
-      displayCode: '600519',
-      nameZh: '贵州茅台',
-      pinyinFull: 'guizhoumaotai',
-      pinyinAbbr: 'gzmt',
-      aliases: ['茅台'],
-      market: 'CN',
-      assetType: 'stock',
-      active: true,
-      popularity: 100,
-    },
-    {
-      canonicalCode: '000001.SZ',
-      displayCode: '000001',
-      nameZh: '平安银行',
-      pinyinFull: 'pinganyinxing',
-      pinyinAbbr: 'payh',
-      aliases: ['平银'],
-      market: 'CN',
-      assetType: 'stock',
-      active: true,
-      popularity: 90,
-    },
-    {
-      canonicalCode: '00700.HK',
-      displayCode: '00700',
-      nameZh: '腾讯控股',
-      pinyinFull: 'tengxunkonggu',
-      pinyinAbbr: 'txkg',
-      aliases: ['腾讯'],
-      market: 'HK',
-      assetType: 'stock',
-      active: true,
-      popularity: 95,
-    },
-    {
       canonicalCode: 'AAPL.US',
       displayCode: 'AAPL',
       nameZh: '苹果',
@@ -66,16 +30,40 @@ describe('stockIndexLoader', () => {
       market: 'US',
       assetType: 'stock',
       active: true,
+      popularity: 100,
+    },
+    {
+      canonicalCode: 'NVDA.US',
+      displayCode: 'NVDA',
+      nameZh: '英伟达',
+      pinyinFull: 'yingweida',
+      pinyinAbbr: 'ywd',
+      aliases: ['NVIDIA'],
+      market: 'US',
+      assetType: 'stock',
+      active: true,
       popularity: 98,
     },
     {
-      canonicalCode: '600000.SH',
-      displayCode: '600000',
-      nameZh: '浦发银行',
-      pinyinFull: 'pufayinxing',
-      pinyinAbbr: 'pfyh',
-      aliases: ['浦发'],
-      market: 'CN',
+      canonicalCode: 'MSFT.US',
+      displayCode: 'MSFT',
+      nameZh: '微软',
+      pinyinFull: 'weiruan',
+      pinyinAbbr: 'wr',
+      aliases: [],
+      market: 'US',
+      assetType: 'stock',
+      active: true,
+      popularity: 95,
+    },
+    {
+      canonicalCode: 'ZZZZ.US',
+      displayCode: 'ZZZZ',
+      nameZh: '下架标的',
+      pinyinFull: 'xiajiabiaodi',
+      pinyinAbbr: 'xjbd',
+      aliases: [],
+      market: 'US',
       assetType: 'stock',
       active: false,
       popularity: 80,
@@ -103,8 +91,8 @@ describe('stockIndexLoader', () => {
 
     test('successfully loads compressed format index (tuple format)', async () => {
       const compressedData = [
-        ['600519.SH', '600519', '贵州茅台', 'guizhoumaotai', 'gzmt', ['茅台'], 'CN', 'stock', true, 100],
-        ['000001.SZ', '000001', '平安银行', 'pinganyinxing', 'payh', ['平银'], 'CN', 'stock', true, 90],
+        ['AAPL.US', 'AAPL', '苹果', 'pingguo', 'pg', [], 'US', 'stock', true, 100],
+        ['NVDA.US', 'NVDA', '英伟达', 'yingweida', 'ywd', ['NVIDIA'], 'US', 'stock', true, 98],
       ];
 
       mockFetch.mockResolvedValueOnce({
@@ -117,8 +105,8 @@ describe('stockIndexLoader', () => {
       expect(result.loaded).toBe(true);
       expect(result.fallback).toBe(false);
       expect(result.data).toHaveLength(2);
-      expect(result.data[0].canonicalCode).toBe('600519.SH');
-      expect(result.data[0].nameZh).toBe('贵州茅台');
+      expect(result.data[0].canonicalCode).toBe('AAPL.US');
+      expect(result.data[0].nameZh).toBe('苹果');
     });
 
     test('returns fallback mode on network error', async () => {
@@ -195,13 +183,13 @@ describe('stockIndexLoader', () => {
 
       expect(compressed).toHaveLength(mockIndexData.length);
       expect(compressed[0]).toEqual([
-        '600519.SH',
-        '600519',
-        '贵州茅台',
-        'guizhoumaotai',
-        'gzmt',
-        ['茅台'],
-        'CN',
+        'AAPL.US',
+        'AAPL',
+        '苹果',
+        'pingguo',
+        'pg',
+        [],
+        'US',
         'stock',
         true,
         100,
@@ -258,10 +246,10 @@ describe('stockIndexLoader', () => {
 
   describe('findStockInIndex - Find stock', () => {
     test('finds existing stock', () => {
-      const result = findStockInIndex('600519.SH', mockIndexData);
+      const result = findStockInIndex('AAPL.US', mockIndexData);
       expect(result).not.toBeNull();
-      expect(result?.canonicalCode).toBe('600519.SH');
-      expect(result?.nameZh).toBe('贵州茅台');
+      expect(result?.canonicalCode).toBe('AAPL.US');
+      expect(result?.nameZh).toBe('苹果');
     });
 
     test('returns null for non-existent stock', () => {
@@ -270,18 +258,18 @@ describe('stockIndexLoader', () => {
     });
 
     test('finds inactive stock', () => {
-      const result = findStockInIndex('600000.SH', mockIndexData);
+      const result = findStockInIndex('ZZZZ.US', mockIndexData);
       expect(result).not.toBeNull();
       expect(result?.active).toBe(false);
     });
 
     test('handles empty index', () => {
-      const result = findStockInIndex('600519.SH', []);
+      const result = findStockInIndex('AAPL.US', []);
       expect(result).toBeNull();
     });
 
     test('case-sensitive search', () => {
-      const result = findStockInIndex('600519.sh', mockIndexData);
+      const result = findStockInIndex('aapl.us', mockIndexData);
       expect(result).toBeNull();
     });
   });
@@ -291,15 +279,15 @@ describe('stockIndexLoader', () => {
       const result = getPopularStocks(mockIndexData, 3);
 
       expect(result).toHaveLength(3);
-      expect(result[0].canonicalCode).toBe('600519.SH'); // popularity: 100
-      expect(result[1].canonicalCode).toBe('AAPL.US');   // popularity: 98
-      expect(result[2].canonicalCode).toBe('00700.HK'); // popularity: 95
+      expect(result[0].canonicalCode).toBe('AAPL.US'); // popularity: 100
+      expect(result[1].canonicalCode).toBe('NVDA.US'); // popularity: 98
+      expect(result[2].canonicalCode).toBe('MSFT.US'); // popularity: 95
     });
 
     test('filters out inactive stocks', () => {
       const result = getPopularStocks(mockIndexData, 10);
 
-      // 600000.SH is inactive, should not appear
+      // ZZZZ.US is inactive, should not appear
       const hasInactive = result.some(item => !item.active);
       expect(hasInactive).toBe(false);
     });
@@ -378,17 +366,15 @@ describe('stockIndexLoader', () => {
     test('groups different markets correctly', () => {
       const result = groupStocksByMarket(mockIndexData);
 
-      expect(result.size).toBe(3); // CN, HK, US
-      expect(result.get('CN')).toHaveLength(2);
-      expect(result.get('HK')).toHaveLength(1);
-      expect(result.get('US')).toHaveLength(1);
+      expect(result.size).toBe(1); // US MVP index
+      expect(result.get('US')).toHaveLength(3);
     });
 
     test('filters out inactive stocks', () => {
       const result = groupStocksByMarket(mockIndexData);
 
-      const cnStocks = result.get('CN')!;
-      const allActive = cnStocks.every(item => item.active);
+      const usStocks = result.get('US')!;
+      const allActive = usStocks.every(item => item.active);
       expect(allActive).toBe(true);
     });
 
@@ -420,24 +406,24 @@ describe('stockIndexLoader', () => {
     test('returns independent arrays for groups', () => {
       const result = groupStocksByMarket(mockIndexData);
 
-      const cnStocks = result.get('CN')!;
-      const originalLength = cnStocks.length;
+      const usStocks = result.get('US')!;
+      const originalLength = usStocks.length;
 
       // Modifying returned array should not affect original data
-      cnStocks.pop();
+      usStocks.pop();
 
       const result2 = groupStocksByMarket(mockIndexData);
-      const cnStocks2 = result2.get('CN')!;
+      const usStocks2 = result2.get('US')!;
 
-      expect(cnStocks2.length).toBe(originalLength);
+      expect(usStocks2.length).toBe(originalLength);
     });
 
     test('maintains order within groups', () => {
       const result = groupStocksByMarket(mockIndexData);
 
-      const cnStocks = result.get('CN')!;
-      expect(cnStocks[0].canonicalCode).toBe('600519.SH');
-      expect(cnStocks[1].canonicalCode).toBe('000001.SZ');
+      const usStocks = result.get('US')!;
+      expect(usStocks[0].canonicalCode).toBe('AAPL.US');
+      expect(usStocks[1].canonicalCode).toBe('NVDA.US');
     });
   });
 

@@ -4,8 +4,8 @@
 
 | 当前模块 | 约略职责 | 建议子模块（示例） |
 |----------|----------|-------------------|
-| `src/config.py` | 环境解析、校验、LLM 渠道 | `config/env_loader.py`, `config/llm_channels.py`, `config/data_sources.py`；公开 `Config` / `get_config` 留在包 `__init__` |
-| `src/search_service.py` | 多引擎搜索 | `search/providers/`, `search/formatting.py`, `search_service.py` facade |
-| `data_provider/base.py` | Fetcher 抽象与管理器 | `base/types.py`, `base/fetcher.py`, `base/manager.py`（`DataFetcherManager` 已与限流等绑定） |
+| `src/config.py` | 环境解析、校验、LLM 渠道 | **进行中**：`src/config_parsers.py`、`src/config_llm_channels.py` 已拆出；`Config` / `get_config` 仍留在 `config.py` |
+| `src/search_service.py` | 多引擎搜索 | **进行中**：`search_models` / `search_http` / `search_base` 已拆出；后续 `search/providers/` + facade |
+| `data_provider/base.py` | Fetcher 抽象与管理器 | **进行中**：`base_fetcher.py`、`fetcher_manager.py`、`errors.py`、`symbol_normalize.py`；`base.py` 为兼容 re-export |
 
 实施时每子 PR 保持 `pytest -m "not network"` 通过，并更新本文件勾选进度。

@@ -12,6 +12,7 @@
 | [small-scale-operations.md](./small-scale-operations.md) | 小流量部署边界与「不必做」项 |
 | [timezone-policy.md](./timezone-policy.md) | 时区与 `utc_now` 约定 |
 | [web-workspace.md](./web-workspace.md) | Web 路由、决策台、页面内推送与 notify 默认 |
+| [entrypoints-guide.md](./entrypoints-guide.md) | CLI / Web / Bot / Actions 入口选型与队列边界 |
 
 ---
 

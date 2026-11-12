@@ -133,7 +133,7 @@
 
 | Secret 名稱 | 說明 | 必填 |
 |------------|------|:----:|
-| `STOCK_LIST` | 自選股代碼，如 `600519,hk00700,AAPL,TSLA` | ✅ |
+| `STOCK_LIST` | 自選股代碼，如 `AAPL,MSFT,NVDA` | ✅ |
 | `TAVILY_API_KEYS` | [Tavily](https://tavily.com/) 搜索 API（新聞搜索） | 推薦 |
 | `MINIMAX_API_KEYS` | [MiniMax](https://platform.minimaxi.com/) Coding Plan Web Search（結構化搜索結果） | 可選 |
 | `BOCHA_API_KEYS` | [博查搜索](https://open.bocha.cn/) Web Search API（中文搜索優化，支持AI摘要，多個key用逗號分隔） | 可選 |
@@ -184,7 +184,7 @@
 📊 2026-01-10 決策儀表盤
 3隻股票 | 🟢買入:1 🟡觀望:2 🔴賣出:0
 
-🟢 買入 | 貴州茅台(600519)
+🟢 買入 | Apple Inc.(AAPL)
 📌 縮量回踩MA5支撐，乖離率1.2%處於最佳買點
 💰 狙擊: 買入1800 | 止損1750 | 目標1900
 ✅多頭排列 ✅乖離安全 ✅量能配合

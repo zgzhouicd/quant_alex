@@ -138,11 +138,11 @@ class TestExtractStockCode(unittest.TestCase):
     def test_common_word_trend(self):
         self.assertEqual(_extract_stock_code("the TREND is up"), "")
 
-    # --- Priority: A-share > HK > US ---
+    # --- Priority: US > legacy CN/HK (product scope) ---
 
-    def test_a_share_takes_priority_over_us(self):
-        """When both A-share code and US ticker appear, A-share wins."""
-        self.assertEqual(_extract_stock_code("600519 vs AAPL"), "600519")
+    def test_us_takes_priority_over_legacy_cn(self):
+        """When both legacy A-share code and US ticker appear, US wins."""
+        self.assertEqual(_extract_stock_code("600519 vs AAPL"), "AAPL")
 
     # --- Empty / irrelevant ---
 

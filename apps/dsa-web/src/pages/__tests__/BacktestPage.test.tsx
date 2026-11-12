@@ -59,8 +59,8 @@ beforeEach(() => {
     items: [
       {
         analysisHistoryId: 101,
-        code: '600519',
-        stockName: '贵州茅台',
+        code: 'AAPL',
+        stockName: 'Apple Inc.',
         analysisDate: '2026-03-20',
         evalWindowDays: 10,
         engineVersion: 'test-engine',
@@ -99,8 +99,8 @@ describe('BacktestPage', () => {
 
     expect(await screen.findByText('WIN')).toBeInTheDocument();
     expect(screen.getByText('completed')).toBeInTheDocument();
-    expect(screen.getByText('600519')).toBeInTheDocument();
-    expect(screen.getByText('贵州茅台')).toBeInTheDocument();
+    expect(screen.getByText('AAPL')).toBeInTheDocument();
+    expect(screen.getByText('Apple Inc.')).toBeInTheDocument();
     expect(screen.getByText('震荡偏多')).toBeInTheDocument();
     expect(screen.getByText('UP')).toBeInTheDocument();
     expect(screen.getByText('Window Return')).toBeInTheDocument();

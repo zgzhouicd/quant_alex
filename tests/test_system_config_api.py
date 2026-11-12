@@ -34,7 +34,7 @@ class SystemConfigApiTestCase(unittest.TestCase):
         self.env_path.write_text(
             "\n".join(
                 [
-                    "STOCK_LIST=600519,000001",
+                    "STOCK_LIST=AAPL,MSFT",
                     "GEMINI_API_KEY=secret-key-value",
                     "SCHEDULE_TIME=18:00",
                     "LOG_LEVEL=INFO",
@@ -72,7 +72,7 @@ class SystemConfigApiTestCase(unittest.TestCase):
                 reload_now=False,
                 items=[
                     {"key": "GEMINI_API_KEY", "value": "new-secret-value"},
-                    {"key": "STOCK_LIST", "value": "600519,300750"},
+                    {"key": "STOCK_LIST", "value": "AAPL,TSLA"},
                 ],
             ),
             service=self.service,
@@ -82,7 +82,7 @@ class SystemConfigApiTestCase(unittest.TestCase):
         self.assertEqual(payload["skipped_masked_count"], 0)
 
         env_content = self.env_path.read_text(encoding="utf-8")
-        self.assertIn("STOCK_LIST=600519,300750", env_content)
+        self.assertIn("STOCK_LIST=AAPL,TSLA", env_content)
         self.assertIn("GEMINI_API_KEY=new-secret-value", env_content)
 
     def test_put_config_returns_conflict_when_version_is_stale(self) -> None:
@@ -90,7 +90,7 @@ class SystemConfigApiTestCase(unittest.TestCase):
             system_config.update_system_config(
                 request=UpdateSystemConfigRequest(
                     config_version="stale-version",
-                    items=[{"key": "STOCK_LIST", "value": "600519"}],
+                    items=[{"key": "STOCK_LIST", "value": "AAPL"}],
                 ),
                 service=self.service,
             )
@@ -103,7 +103,7 @@ class SystemConfigApiTestCase(unittest.TestCase):
             "\n".join(
                 [
                     "# Base settings",
-                    "STOCK_LIST=600519,000001",
+                    "STOCK_LIST=AAPL,MSFT",
                     "",
                     "# Secrets",
                     "GEMINI_API_KEY=secret-key-value",
@@ -120,7 +120,7 @@ class SystemConfigApiTestCase(unittest.TestCase):
                 config_version=current["config_version"],
                 mask_token="******",
                 reload_now=False,
-                items=[{"key": "STOCK_LIST", "value": "600519,300750"}],
+                items=[{"key": "STOCK_LIST", "value": "AAPL,TSLA"}],
             ),
             service=self.service,
         ).model_dump()
@@ -129,7 +129,7 @@ class SystemConfigApiTestCase(unittest.TestCase):
         env_content = self.env_path.read_text(encoding="utf-8")
         self.assertIn("# Base settings\n", env_content)
         self.assertIn("\n\n# Secrets\n", env_content)
-        self.assertIn("STOCK_LIST=600519,300750\n", env_content)
+        self.assertIn("STOCK_LIST=AAPL,TSLA\n", env_content)
 
     def test_put_config_returns_startup_only_schedule_warning(self) -> None:
         current = system_config.get_system_config(include_schema=False, service=self.service).model_dump()
@@ -165,7 +165,7 @@ class SystemConfigApiTestCase(unittest.TestCase):
 
     def test_export_desktop_system_config_returns_raw_env_content(self) -> None:
         self.env_path.write_text(
-            "# Desktop config\nSTOCK_LIST=600519,000001\nGEMINI_API_KEY=secret-key-value\n",
+            "# Desktop config\nSTOCK_LIST=AAPL,MSFT\nGEMINI_API_KEY=secret-key-value\n",
             encoding="utf-8",
         )
 
@@ -173,7 +173,7 @@ class SystemConfigApiTestCase(unittest.TestCase):
 
         self.assertEqual(
             payload["content"],
-            "# Desktop config\nSTOCK_LIST=600519,000001\nGEMINI_API_KEY=secret-key-value\n",
+            "# Desktop config\nSTOCK_LIST=AAPL,MSFT\nGEMINI_API_KEY=secret-key-value\n",
         )
         self.assertEqual(payload["config_version"], self.manager.get_config_version())
 
@@ -183,7 +183,7 @@ class SystemConfigApiTestCase(unittest.TestCase):
         payload = system_config.import_desktop_system_config(
             request=ImportSystemConfigRequest(
                 config_version=current["config_version"],
-                content="STOCK_LIST=300750\nCUSTOM_NOTE=desktop backup\n",
+                content="STOCK_LIST=TSLA\nCUSTOM_NOTE=desktop backup\n",
                 reload_now=False,
             ),
             service=self.service,
@@ -191,7 +191,7 @@ class SystemConfigApiTestCase(unittest.TestCase):
 
         self.assertTrue(payload["success"])
         env_content = self.env_path.read_text(encoding="utf-8")
-        self.assertIn("STOCK_LIST=300750\n", env_content)
+        self.assertIn("STOCK_LIST=TSLA\n", env_content)
         self.assertIn("CUSTOM_NOTE=desktop backup\n", env_content)
         self.assertIn("GEMINI_API_KEY=secret-key-value\n", env_content)
 
@@ -200,7 +200,7 @@ class SystemConfigApiTestCase(unittest.TestCase):
             system_config.import_desktop_system_config(
                 request=ImportSystemConfigRequest(
                     config_version="stale-version",
-                    content="STOCK_LIST=300750\n",
+                    content="STOCK_LIST=TSLA\n",
                     reload_now=False,
                 ),
                 service=self.service,
@@ -251,7 +251,7 @@ class SystemConfigApiTestCase(unittest.TestCase):
             system_config.import_desktop_system_config(
                 request=ImportSystemConfigRequest(
                     config_version=current["config_version"],
-                    content="STOCK_LIST=300750\n",
+                    content="STOCK_LIST=TSLA\n",
                     reload_now=False,
                 ),
                 service=self.service,

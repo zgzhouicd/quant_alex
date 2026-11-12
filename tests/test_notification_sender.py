@@ -246,7 +246,7 @@ class TestEmailSender(unittest.TestCase):
         )
         sender = EmailSender(cfg)
         self.assertEqual(
-            sender.get_receivers_for_stocks(["000001"]),
+            sender.get_receivers_for_stocks(["MSFT"]),
             ["b@qq.com", "c@qq.com"],
         )
 
@@ -255,11 +255,11 @@ class TestEmailSender(unittest.TestCase):
             email_sender="a@qq.com",
             email_password="p",
             email_receivers=["default@qq.com"],
-            stock_email_groups=[(["000001", "600519"], ["group1@qq.com"])],
+            stock_email_groups=[(["MSFT", "AAPL"], ["group1@qq.com"])],
         )
         sender = EmailSender(cfg)
         self.assertEqual(
-            sender.get_receivers_for_stocks(["000001"]),
+            sender.get_receivers_for_stocks(["MSFT"]),
             ["group1@qq.com"],
         )
 
@@ -268,7 +268,7 @@ class TestEmailSender(unittest.TestCase):
             email_sender="a@qq.com",
             email_password="p",
             email_receivers=["default@qq.com"],
-            stock_email_groups=[(["000001"], ["group@qq.com"])],
+            stock_email_groups=[(["MSFT"], ["group@qq.com"])],
         )
         sender = EmailSender(cfg)
         self.assertEqual(
@@ -282,8 +282,8 @@ class TestEmailSender(unittest.TestCase):
             email_password="p",
             email_receivers=["default@qq.com"],
             stock_email_groups=[
-                (["000001"], ["g1@qq.com"]),
-                (["600519"], ["g2@qq.com"]),
+                (["MSFT"], ["g1@qq.com"]),
+                (["AAPL"], ["g2@qq.com"]),
             ],
         )
         sender = EmailSender(cfg)

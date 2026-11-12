@@ -22,7 +22,7 @@ class ConfigEnvCompatibilityTestCase(unittest.TestCase):
         with patch.dict(
             os.environ,
             {
-                "STOCK_LIST": "600519",
+                "STOCK_LIST": "AAPL",
                 "TICKFLOW_API_KEY": "tf-secret",
             },
             clear=True,
@@ -39,7 +39,7 @@ class ConfigEnvCompatibilityTestCase(unittest.TestCase):
         with patch.dict(
             os.environ,
             {
-                "STOCK_LIST": "600519",
+                "STOCK_LIST": "AAPL",
             },
             clear=True,
         ):
@@ -131,7 +131,7 @@ class ConfigEnvCompatibilityTestCase(unittest.TestCase):
             env_path.write_text(
                 "\n".join(
                     [
-                        "STOCK_LIST=600519",
+                        "STOCK_LIST=AAPL",
                         "SCHEDULE_TIME=",
                     ]
                 )
@@ -205,7 +205,7 @@ class ConfigEnvCompatibilityTestCase(unittest.TestCase):
             env_path.write_text(
                 "\n".join(
                     [
-                        "STOCK_LIST=600519",
+                        "STOCK_LIST=AAPL",
                         "SCHEDULE_ENABLED=false",
                         "SCHEDULE_TIME=18:00",
                         "RUN_IMMEDIATELY=true",
@@ -220,7 +220,7 @@ class ConfigEnvCompatibilityTestCase(unittest.TestCase):
                 os.environ,
                 {
                     "ENV_FILE": str(env_path),
-                    "STOCK_LIST": "600519",
+                    "STOCK_LIST": "AAPL",
                     "SCHEDULE_ENABLED": "false",
                     "SCHEDULE_TIME": "18:00",
                     "RUN_IMMEDIATELY": "true",
@@ -232,7 +232,7 @@ class ConfigEnvCompatibilityTestCase(unittest.TestCase):
                 env_path.write_text(
                     "\n".join(
                         [
-                            "STOCK_LIST=300750,TSLA",
+                            "STOCK_LIST=TSLA,TSLA",
                             "SCHEDULE_ENABLED=true",
                             "SCHEDULE_TIME=09:30",
                             "RUN_IMMEDIATELY=false",
@@ -246,7 +246,7 @@ class ConfigEnvCompatibilityTestCase(unittest.TestCase):
                 setup_env(override=True)
                 config = Config._load_from_env()
 
-        self.assertEqual(config.stock_list, ["300750", "TSLA"])
+        self.assertEqual(config.stock_list, ["TSLA", "TSLA"])
         self.assertTrue(config.schedule_enabled)
         self.assertEqual(config.schedule_time, "09:30")
         self.assertFalse(config.run_immediately)
@@ -267,7 +267,7 @@ class ConfigEnvCompatibilityTestCase(unittest.TestCase):
             env_path.write_text(
                 "\n".join(
                     [
-                        "STOCK_LIST=300750,TSLA",
+                        "STOCK_LIST=TSLA,TSLA",
                         "SCHEDULE_ENABLED=true",
                         "SCHEDULE_TIME=09:30",
                         "RUN_IMMEDIATELY=false",
@@ -282,7 +282,7 @@ class ConfigEnvCompatibilityTestCase(unittest.TestCase):
                 os.environ,
                 {
                     "ENV_FILE": str(env_path),
-                    "STOCK_LIST": "600519,000001",
+                    "STOCK_LIST": "AAPL,MSFT",
                     "SCHEDULE_ENABLED": "false",
                     "SCHEDULE_TIME": "18:00",
                     "RUN_IMMEDIATELY": "true",
@@ -293,7 +293,7 @@ class ConfigEnvCompatibilityTestCase(unittest.TestCase):
                 config = Config._load_from_env()
 
         # Explicit process env overrides win when values differ from .env
-        self.assertEqual(config.stock_list, ["600519", "000001"])
+        self.assertEqual(config.stock_list, ["AAPL", "MSFT"])
         self.assertFalse(config.schedule_enabled)
         self.assertEqual(config.schedule_time, "18:00")
         self.assertTrue(config.run_immediately)
@@ -316,13 +316,13 @@ class ConfigEnvCompatibilityTestCase(unittest.TestCase):
                 os.environ,
                 {
                     "ENV_FILE": str(env_path),
-                    "STOCK_LIST": "600519,000001",
+                    "STOCK_LIST": "AAPL,MSFT",
                 },
                 clear=True,
             ):
                 config = Config._load_from_env()
 
-        self.assertEqual(config.stock_list, ["600519", "000001"])
+        self.assertEqual(config.stock_list, ["AAPL", "MSFT"])
 
     def test_parse_report_language_accepts_known_alias_without_warning(self) -> None:
         with self.assertNoLogs("src.config", level="WARNING"):
@@ -360,10 +360,10 @@ class ConfigEnvCompatibilityTestCase(unittest.TestCase):
         _mock_setup_env,
     ) -> None:
         env = {
-            "STOCK_LIST": "600519,300750",
-            "Stock_Group_1": "600519",
+            "STOCK_LIST": "AAPL,TSLA",
+            "Stock_Group_1": "AAPL",
             "Email_Group_1": "user1@example.com",
-            "stock_group_2": "300750",
+            "stock_group_2": "TSLA",
             "email_group_2": "user2@example.com",
         }
 
@@ -373,8 +373,8 @@ class ConfigEnvCompatibilityTestCase(unittest.TestCase):
         self.assertEqual(
             config.stock_email_groups,
             [
-                (["600519"], ["user1@example.com"]),
-                (["300750"], ["user2@example.com"]),
+                (["AAPL"], ["user1@example.com"]),
+                (["TSLA"], ["user2@example.com"]),
             ],
         )
 
@@ -389,8 +389,8 @@ class ConfigEnvCompatibilityTestCase(unittest.TestCase):
         runtime email routing matches the same equivalence used in
         validate_structured()."""
         env = {
-            "STOCK_LIST": "600519,HK00700",
-            "STOCK_GROUP_1": "SH600519,1810.HK",
+            "STOCK_LIST": "AAPL,MSFT",
+            "STOCK_GROUP_1": " AAPL , MSFT",
             "EMAIL_GROUP_1": "user@example.com",
         }
 
@@ -398,7 +398,7 @@ class ConfigEnvCompatibilityTestCase(unittest.TestCase):
             config = Config._load_from_env()
 
         stocks, emails = config.stock_email_groups[0]
-        self.assertEqual(stocks, ["600519", "HK01810"])
+        self.assertEqual(stocks, ["AAPL", "MSFT"])
         self.assertEqual(emails, ["user@example.com"])
 
 

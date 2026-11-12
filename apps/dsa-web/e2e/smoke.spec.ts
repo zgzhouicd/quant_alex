@@ -57,13 +57,13 @@ test.describe('web smoke', () => {
   test('home page shows analysis entry and history panel after login', async ({ page }) => {
     await login(page);
 
-    const stockInput = page.getByPlaceholder('输入股票代码或名称，如 600519、贵州茅台、AAPL');
+    const stockInput = page.getByPlaceholder('输入美股代码或名称，如 AAPL、苹果、NVDA');
     await expect(stockInput).toBeVisible({ timeout: 10_000 });
     await expect(page.getByRole('link', { name: '首页' })).toBeVisible();
     await expect(page.getByRole('link', { name: '问股' })).toBeVisible();
     await expect(page.getByText('历史分析')).toBeVisible();
 
-    await stockInput.fill('600519');
+    await stockInput.fill('AAPL');
     const analyzeButton = page.getByRole('button', { name: '分析', exact: true });
     await expect(analyzeButton).toBeVisible();
   });
@@ -80,11 +80,11 @@ test.describe('web smoke', () => {
     await expect(page.getByTestId('chat-session-list-scroll')).toBeVisible();
     await expect(page.getByTestId('chat-message-scroll')).toBeVisible();
 
-    const input = page.getByPlaceholder(/分析 600519/);
+    const input = page.getByPlaceholder(/例如：分析 NVDA/);
     await expect(input).toBeVisible({ timeout: 5000 });
     await expect(page.getByText('策略', { exact: true })).toBeVisible();
 
-    const prompt = '请简要分析 600519';
+    const prompt = '请简要分析 AAPL';
     await input.fill(prompt);
     await page.getByRole('button', { name: '发送' }).click();
 
@@ -98,7 +98,7 @@ test.describe('web smoke', () => {
     await page.waitForLoadState('domcontentloaded');
 
     const sendButton = page.getByRole('button', { name: '发送' });
-    const composer = page.getByPlaceholder(/分析 600519/);
+    const composer = page.getByPlaceholder(/例如：分析 NVDA/);
 
     await expect(page.getByTestId('chat-workspace')).toBeVisible({ timeout: 10_000 });
     await expect(sendButton).toBeVisible({ timeout: 10_000 });

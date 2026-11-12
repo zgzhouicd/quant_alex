@@ -32,8 +32,8 @@ def _make_realtime_quote(
     change_pct: float = 0.96,
 ) -> UnifiedRealtimeQuote:
     return UnifiedRealtimeQuote(
-        code="600519",
-        name="贵州茅台",
+        code="AAPL",
+        name="苹果公司",
         source=RealtimeSource.TENCENT,
         price=price,
         open_price=open_price,
@@ -54,7 +54,7 @@ def _make_historical_df(days: int = 25, last_date: date = None) -> pd.DataFrame:
     for i, d in enumerate(dates):
         close = base + i * 0.5
         data.append({
-            "code": "600519",
+            "code": "AAPL",
             "date": d,
             "open": close - 0.2,
             "high": close + 0.3,
@@ -87,30 +87,30 @@ class TestAugmentHistoricalWithRealtime(unittest.TestCase):
 
     def test_returns_unchanged_when_realtime_none(self) -> None:
         df = _make_historical_df()
-        result = self.pipeline._augment_historical_with_realtime(df, None, "600519")
+        result = self.pipeline._augment_historical_with_realtime(df, None, "AAPL")
         self.assertIs(result, df)
         self.assertEqual(len(result), len(df))
 
     def test_returns_unchanged_when_price_invalid(self) -> None:
         df = _make_historical_df()
         quote = _make_realtime_quote(price=0)
-        result = self.pipeline._augment_historical_with_realtime(df, quote, "600519")
+        result = self.pipeline._augment_historical_with_realtime(df, quote, "AAPL")
         self.assertEqual(len(result), len(df))
         quote2 = MagicMock()
         quote2.price = None
-        result2 = self.pipeline._augment_historical_with_realtime(df, quote2, "600519")
+        result2 = self.pipeline._augment_historical_with_realtime(df, quote2, "AAPL")
         self.assertEqual(len(result2), len(df))
 
     def test_returns_unchanged_when_df_empty(self) -> None:
         df = pd.DataFrame()
         quote = _make_realtime_quote()
-        result = self.pipeline._augment_historical_with_realtime(df, quote, "600519")
+        result = self.pipeline._augment_historical_with_realtime(df, quote, "AAPL")
         self.assertTrue(result.empty)
 
     def test_returns_unchanged_when_df_missing_close(self) -> None:
         df = pd.DataFrame({"date": [date.today()], "open": [100]})
         quote = _make_realtime_quote()
-        result = self.pipeline._augment_historical_with_realtime(df, quote, "600519")
+        result = self.pipeline._augment_historical_with_realtime(df, quote, "AAPL")
         self.assertEqual(len(result), 1)
         self.assertNotIn("close", result.columns)
 
@@ -128,7 +128,7 @@ class TestAugmentHistoricalWithRealtime(unittest.TestCase):
         )
         df = _make_historical_df(last_date=today - timedelta(days=1))
         quote = _make_realtime_quote(price=15.72)
-        result = self.pipeline._augment_historical_with_realtime(df, quote, "600519")
+        result = self.pipeline._augment_historical_with_realtime(df, quote, "AAPL")
         self.assertEqual(len(result), len(df) + 1)
         last = result.iloc[-1]
         self.assertEqual(last["close"], 15.72)
@@ -149,7 +149,7 @@ class TestAugmentHistoricalWithRealtime(unittest.TestCase):
         df = _make_historical_df(last_date=today, days=25)
         df.loc[df.index[-1], "date"] = today
         quote = _make_realtime_quote(price=16.0)
-        result = self.pipeline._augment_historical_with_realtime(df, quote, "600519")
+        result = self.pipeline._augment_historical_with_realtime(df, quote, "AAPL")
         self.assertEqual(len(result), len(df))
         self.assertEqual(result.iloc[-1]["close"], 16.0)
 
@@ -196,21 +196,21 @@ class TestEnhanceContextRealtimeOverride(unittest.TestCase):
             today.year, today.month, today.day, 10, 0, tzinfo=timezone.utc
         )
         context = {
-            "code": "600519",
+            "code": "AAPL",
             "date": (today - timedelta(days=1)).isoformat(),
             "today": {"close": 15.0, "ma5": 14.8, "ma10": 14.5},
             "yesterday": {"close": 14.5, "volume": 1000000},
         }
         quote = _make_realtime_quote(price=15.72, volume=2000000)
         trend = TrendAnalysisResult(
-            code="600519",
+            code="AAPL",
             trend_status=TrendStatus.BULL,
             ma5=15.5,
             ma10=15.2,
             ma20=14.9,
         )
         enhanced = self.pipeline._enhance_context(
-            context, quote, None, trend, "贵州茅台"
+            context, quote, None, trend, "苹果公司"
         )
         self.assertEqual(enhanced["today"]["close"], 15.72)
         self.assertEqual(enhanced["today"]["ma5"], 15.5)
@@ -222,9 +222,9 @@ class TestEnhanceContextRealtimeOverride(unittest.TestCase):
         self.assertIn("volume_change_ratio", enhanced)
 
     def test_enhance_context_injects_runtime_news_window_days(self) -> None:
-        context = {"code": "600519", "today": {"close": 15.0}}
+        context = {"code": "AAPL", "today": {"close": 15.0}}
         enhanced = self.pipeline._enhance_context(
-            context, None, None, None, "贵州茅台"
+            context, None, None, None, "苹果公司"
         )
         self.assertEqual(
             enhanced["news_window_days"],
@@ -232,28 +232,28 @@ class TestEnhanceContextRealtimeOverride(unittest.TestCase):
         )
 
     def test_today_not_overridden_when_trend_missing(self) -> None:
-        context = {"code": "600519", "today": {"close": 15.0}}
+        context = {"code": "AAPL", "today": {"close": 15.0}}
         quote = _make_realtime_quote(price=15.72)
         enhanced = self.pipeline._enhance_context(
-            context, quote, None, None, "贵州茅台"
+            context, quote, None, None, "苹果公司"
         )
         self.assertEqual(enhanced["today"]["close"], 15.0)
 
     def test_today_not_overridden_when_realtime_missing(self) -> None:
-        context = {"code": "600519", "today": {"close": 15.0}}
-        trend = TrendAnalysisResult(code="600519", ma5=15.0, ma10=14.8, ma20=14.5)
+        context = {"code": "AAPL", "today": {"close": 15.0}}
+        trend = TrendAnalysisResult(code="AAPL", ma5=15.0, ma10=14.8, ma20=14.5)
         enhanced = self.pipeline._enhance_context(
-            context, None, None, trend, "贵州茅台"
+            context, None, None, trend, "苹果公司"
         )
         self.assertEqual(enhanced["today"]["close"], 15.0)
 
     def test_today_not_overridden_when_trend_ma_zero(self) -> None:
         """When StockTrendAnalyzer returns early (data insufficient), ma5=0.0. Must not override."""
-        context = {"code": "600519", "today": {"close": 15.0, "ma5": 14.8}}
+        context = {"code": "AAPL", "today": {"close": 15.0, "ma5": 14.8}}
         quote = _make_realtime_quote(price=15.72)
-        trend = TrendAnalysisResult(code="600519")  # defaults: ma5=ma10=ma20=0.0
+        trend = TrendAnalysisResult(code="AAPL")  # defaults: ma5=ma10=ma20=0.0
         enhanced = self.pipeline._enhance_context(
-            context, quote, None, trend, "贵州茅台"
+            context, quote, None, trend, "苹果公司"
         )
         self.assertEqual(enhanced["today"]["close"], 15.0)
         self.assertEqual(enhanced["today"]["ma5"], 14.8)

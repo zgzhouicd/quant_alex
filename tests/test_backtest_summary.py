@@ -33,7 +33,7 @@ class BacktestSummaryTestCase(unittest.TestCase):
         summary = BacktestEngine.compute_summary(
             results=rows,
             scope="stock",
-            code="600519",
+            code="AAPL",
             eval_window_days=3,
             engine_version="v1",
         )

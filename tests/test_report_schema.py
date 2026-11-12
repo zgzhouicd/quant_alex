@@ -29,7 +29,7 @@ class TestAnalysisReportSchema(unittest.TestCase):
     def test_valid_dashboard_parses(self) -> None:
         """Valid LLM-like JSON parses successfully."""
         data = {
-            "stock_name": "贵州茅台",
+            "stock_name": "苹果公司",
             "sentiment_score": 75,
             "trend_prediction": "看多",
             "operation_advice": "持有",
@@ -43,7 +43,7 @@ class TestAnalysisReportSchema(unittest.TestCase):
             "analysis_summary": "基本面稳健",
         }
         schema = AnalysisReportSchema.model_validate(data)
-        self.assertEqual(schema.stock_name, "贵州茅台")
+        self.assertEqual(schema.stock_name, "苹果公司")
         self.assertEqual(schema.sentiment_score, 75)
         self.assertIsNotNone(schema.dashboard)
 
@@ -102,15 +102,15 @@ class TestAnalyzerSchemaFallback(unittest.TestCase):
         """When schema validation fails, analyzer continues with raw dict."""
         analyzer = GeminiAnalyzer()
         response = json.dumps({
-            "stock_name": "贵州茅台",
+            "stock_name": "苹果公司",
             "sentiment_score": 150,  # invalid for schema
             "trend_prediction": "看多",
             "operation_advice": "持有",
             "analysis_summary": "测试摘要",
         })
-        result = analyzer._parse_response(response, "600519", "贵州茅台")
+        result = analyzer._parse_response(response, "AAPL", "苹果公司")
         self.assertIsInstance(result, AnalysisResult)
-        self.assertEqual(result.code, "600519")
+        self.assertEqual(result.code, "AAPL")
         self.assertEqual(result.sentiment_score, 150)  # from raw dict
         self.assertTrue(result.success)
 
@@ -118,7 +118,7 @@ class TestAnalyzerSchemaFallback(unittest.TestCase):
         """Valid JSON produces correct AnalysisResult."""
         analyzer = GeminiAnalyzer()
         response = json.dumps({
-            "stock_name": "贵州茅台",
+            "stock_name": "苹果公司",
             "sentiment_score": 72,
             "trend_prediction": "看多",
             "operation_advice": "持有",
@@ -126,9 +126,9 @@ class TestAnalyzerSchemaFallback(unittest.TestCase):
             "confidence_level": "高",
             "analysis_summary": "技术面向好",
         })
-        result = analyzer._parse_response(response, "600519", "股票600519")
+        result = analyzer._parse_response(response, "AAPL", "股票AAPL")
         self.assertIsInstance(result, AnalysisResult)
-        self.assertEqual(result.name, "贵州茅台")
+        self.assertEqual(result.name, "苹果公司")
         self.assertEqual(result.sentiment_score, 72)
         self.assertEqual(result.analysis_summary, "技术面向好")
 

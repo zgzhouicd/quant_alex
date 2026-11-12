@@ -67,7 +67,7 @@ class SearchNewsFreshnessTestCase(unittest.TestCase):
             news_max_age_days=3,
             news_strategy_profile="medium",  # 7
         )
-        service.search_stock_news("600519", "贵州茅台", max_results=5)
+        service.search_stock_news("AAPL", "苹果公司", max_results=5)
         kwargs = mock_search.call_args[1]
         self.assertEqual(kwargs["days"], 3)
 
@@ -77,7 +77,7 @@ class SearchNewsFreshnessTestCase(unittest.TestCase):
             news_max_age_days=30,
             news_strategy_profile="invalid_profile",
         )
-        service.search_stock_news("600519", "贵州茅台", max_results=5)
+        service.search_stock_news("AAPL", "苹果公司", max_results=5)
         kwargs = mock_search.call_args[1]
         self.assertEqual(kwargs["days"], 3)
 
@@ -103,7 +103,7 @@ class SearchNewsFreshnessTestCase(unittest.TestCase):
             ),
         )
 
-        resp = service.search_stock_news("600519", "贵州茅台", max_results=5)
+        resp = service.search_stock_news("AAPL", "苹果公司", max_results=5)
         titles = [r.title for r in resp.results]
         self.assertEqual(titles, ["future_1", "fresh"])
         for item in resp.results:
@@ -115,7 +115,7 @@ class SearchNewsFreshnessTestCase(unittest.TestCase):
             news_max_age_days=3,
             news_strategy_profile="short",
         )
-        service.search_stock_news("600519", "贵州茅台", max_results=4)
+        service.search_stock_news("AAPL", "苹果公司", max_results=4)
         args, kwargs = mock_search.call_args
         requested = kwargs.get("max_results")
         if requested is None:
@@ -147,7 +147,7 @@ class SearchNewsFreshnessTestCase(unittest.TestCase):
         )
         service._providers = [p1, p2]
 
-        resp = service.search_stock_news("600519", "贵州茅台", max_results=3)
+        resp = service.search_stock_news("AAPL", "苹果公司", max_results=3)
         self.assertEqual([r.title for r in resp.results], ["fresh"])
         p1.search.assert_called_once()
         p2.search.assert_called_once()
@@ -181,7 +181,7 @@ class SearchNewsFreshnessTestCase(unittest.TestCase):
         )
         service._providers = [p1, p2]
 
-        resp = service.search_stock_news("600519", "贵州茅台", max_results=3)
+        resp = service.search_stock_news("AAPL", "苹果公司", max_results=3)
         self.assertEqual([r.title for r in resp.results], ["中文资讯"])
         p1.search.assert_called_once()
         p2.search.assert_called_once()
@@ -211,7 +211,7 @@ class SearchNewsFreshnessTestCase(unittest.TestCase):
         )
         service._providers = [mixed_provider]
 
-        resp = service.search_stock_news("600519", "贵州茅台", max_results=3)
+        resp = service.search_stock_news("AAPL", "苹果公司", max_results=3)
         self.assertEqual(
             [r.title for r in resp.results],
             ["中文快讯", "English headline", "Second English headline"],
@@ -246,7 +246,7 @@ class SearchNewsFreshnessTestCase(unittest.TestCase):
         )
         service._providers = [p1, p2]
 
-        resp = service.search_stock_news("600519", "贵州茅台", max_results=1)
+        resp = service.search_stock_news("AAPL", "苹果公司", max_results=1)
         self.assertEqual([r.title for r in resp.results], ["中文快讯"])
         p1.search.assert_called_once()
         p2.search.assert_not_called()
@@ -284,7 +284,7 @@ class SearchNewsFreshnessTestCase(unittest.TestCase):
         fresh_iso = fresh_dt.strftime("%Y-%m-%dT%H:%M:%SZ")
 
         for stock_code, stock_name, expected_lang, expected_country, title, description in (
-            ("600519", "贵州茅台", "zh-hans", "CN", "中文资讯", "中文摘要"),
+            ("AAPL", "苹果公司", "zh-hans", "CN", "中文资讯", "中文摘要"),
             ("AAPL", "Apple", "en", "US", "Apple earnings beat", "English summary"),
         ):
             with self.subTest(stock_code=stock_code):
@@ -336,8 +336,8 @@ class SearchNewsFreshnessTestCase(unittest.TestCase):
         ]
         with patch("src.search_service.time.sleep"):
             intel = service.search_comprehensive_intel(
-                stock_code="600519",
-                stock_name="贵州茅台",
+                stock_code="AAPL",
+                stock_name="苹果公司",
                 max_searches=2,
             )
 
@@ -402,8 +402,8 @@ class SearchNewsFreshnessTestCase(unittest.TestCase):
 
         with patch("src.search_service.time.sleep"):
             intel = service.search_comprehensive_intel(
-                stock_code="600519",
-                stock_name="贵州茅台",
+                stock_code="AAPL",
+                stock_name="苹果公司",
                 max_searches=3,
             )
 
@@ -413,7 +413,7 @@ class SearchNewsFreshnessTestCase(unittest.TestCase):
         self.assertEqual(intel["risk_check"].results, [])
 
     def test_announcements_dimension_included_within_max_searches_5(self) -> None:
-        """announcements is now at index 3 so it is processed when max_searches>=4."""
+        """US names use foreign dimension list; index 3 is earnings when max_searches>=4."""
         fresh_dt = datetime.now(timezone.utc).replace(microsecond=0)
         fresh_text = fresh_dt.strftime("%Y-%m-%dT%H:%M:%SZ")
 
@@ -425,24 +425,24 @@ class SearchNewsFreshnessTestCase(unittest.TestCase):
             _response([_result("latest_news", fresh_text)]),
             _response([_result("market_analysis", None)]),
             _response([_result("risk_check", fresh_text)]),
-            _response([_result("announcement_item", fresh_text)]),
+            _response([_result("earnings_item", fresh_text)]),
         ]
 
         with patch("src.search_service.time.sleep"):
             intel = service.search_comprehensive_intel(
-                stock_code="600519",
-                stock_name="贵州茅台",
+                stock_code="AAPL",
+                stock_name="苹果公司",
                 max_searches=4,
             )
 
-        self.assertIn("announcements", intel)
+        self.assertIn("earnings", intel)
         self.assertEqual(
-            [item.title for item in intel["announcements"].results],
-            ["announcement_item"],
+            [item.title for item in intel["earnings"].results],
+            ["earnings_item"],
         )
 
     def test_announcements_dimension_uses_news_topic_and_strict_filter(self) -> None:
-        """announcements uses tavily_topic='news' and strict_freshness=True."""
+        """US tickers: 4th comprehensive dimension is earnings (non-strict freshness)."""
         fresh_dt = datetime.now(timezone.utc).replace(microsecond=0)
         fresh_text = fresh_dt.strftime("%Y-%m-%dT%H:%M:%SZ")
         old = (datetime.now().date() - timedelta(days=30)).isoformat()
@@ -455,21 +455,20 @@ class SearchNewsFreshnessTestCase(unittest.TestCase):
             _response([_result("latest_news", fresh_text)]),
             _response([_result("market_analysis", None)]),
             _response([_result("risk_check", fresh_text)]),
-            _response([_result("old_announcement", old), _result("fresh_announcement", fresh_text)]),
+            _response([_result("old_earnings", old), _result("fresh_earnings", fresh_text)]),
         ]
 
         with patch("src.search_service.time.sleep"):
             intel = service.search_comprehensive_intel(
-                stock_code="600519",
-                stock_name="贵州茅台",
+                stock_code="AAPL",
+                stock_name="苹果公司",
                 max_searches=4,
             )
 
-        self.assertIn("announcements", intel)
-        # strict_freshness=True: stale result is filtered out
-        titles = [item.title for item in intel["announcements"].results]
-        self.assertNotIn("old_announcement", titles)
-        self.assertIn("fresh_announcement", titles)
+        self.assertIn("earnings", intel)
+        titles = [item.title for item in intel["earnings"].results]
+        self.assertIn("old_earnings", titles)
+        self.assertIn("fresh_earnings", titles)
 
     def test_announcements_etf_is_not_strict(self) -> None:
         """For ETF, announcements dimension also uses tavily_topic='news' and strict_freshness=True."""

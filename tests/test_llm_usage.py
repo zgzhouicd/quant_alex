@@ -32,7 +32,7 @@ class TestRecordLLMUsage(unittest.TestCase):
             prompt_tokens=100,
             completion_tokens=200,
             total_tokens=300,
-            stock_code="600519",
+            stock_code="AAPL",
         )
         with self.db.session_scope() as session:
             rows = session.query(LLMUsage).all()
@@ -40,7 +40,7 @@ class TestRecordLLMUsage(unittest.TestCase):
             row = rows[0]
             self.assertEqual(row.call_type, "analysis")
             self.assertEqual(row.model, "gemini/gemini-2.5-flash")
-            self.assertEqual(row.stock_code, "600519")
+            self.assertEqual(row.stock_code, "AAPL")
             self.assertEqual(row.prompt_tokens, 100)
             self.assertEqual(row.completion_tokens, 200)
             self.assertEqual(row.total_tokens, 300)
@@ -171,7 +171,7 @@ class TestPersistUsageHelper(unittest.TestCase):
             {"prompt_tokens": 10, "completion_tokens": 20, "total_tokens": 30},
             "gemini/gemini-2.5-flash",
             call_type="analysis",
-            stock_code="000001",
+            stock_code="MSFT",
         )
         with self.db.session_scope() as session:
             rows = session.query(LLMUsage).all()

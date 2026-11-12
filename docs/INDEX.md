@@ -4,6 +4,7 @@
 |------|------|
 | [../README.md](../README.md) | 入门、功能、Secrets、Web 启动 |
 | [web-workspace.md](./web-workspace.md) | **Web 产品面真源**：`/decision`、路由、notify、已移除能力 |
+| [entrypoints-guide.md](./entrypoints-guide.md) | CLI / Web / Bot / Actions 入口与队列边界 |
 | [api-v1-surface.md](./api-v1-surface.md) | REST 与 `dsa-web/src/api/*.ts` 对照 |
 | [intraday-refactor-plan.md](./intraday-refactor-plan.md) | 日线默认 `1d`、后端与决策台文件表 |
 | [architecture-detailed-guide.md](./architecture-detailed-guide.md) | 主链路、流程图、辅助交易边界 |

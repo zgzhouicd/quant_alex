@@ -24,7 +24,7 @@ class AnalyzerNewsPromptTestCase(unittest.TestCase):
             default_skill_policy="",
         )
         with patch("src.agent.factory.resolve_skill_prompt_state", return_value=fake_state):
-            prompt = analyzer._get_analysis_system_prompt("zh", stock_code="600519")
+            prompt = analyzer._get_analysis_system_prompt("zh", stock_code="AAPL")
 
         self.assertIn("### 技能 1: 波段低吸", prompt)
         self.assertNotIn("专注于趋势交易", prompt)
@@ -36,7 +36,7 @@ class AnalyzerNewsPromptTestCase(unittest.TestCase):
                 default_skill_policy="",
             )
 
-        prompt = analyzer._get_analysis_system_prompt("zh", stock_code="600519")
+        prompt = analyzer._get_analysis_system_prompt("zh", stock_code="AAPL")
 
         self.assertIn("### 技能 1: 缠论", prompt)
         self.assertNotIn("专注于趋势交易", prompt)
@@ -50,7 +50,7 @@ class AnalyzerNewsPromptTestCase(unittest.TestCase):
                 use_legacy_default_prompt=True,
             )
 
-        prompt = analyzer._get_analysis_system_prompt("zh", stock_code="600519")
+        prompt = analyzer._get_analysis_system_prompt("zh", stock_code="AAPL")
 
         self.assertIn("专注于趋势交易", prompt)
         self.assertIn("多头排列必须条件", prompt)
@@ -61,8 +61,8 @@ class AnalyzerNewsPromptTestCase(unittest.TestCase):
             analyzer = GeminiAnalyzer()
 
         context = {
-            "code": "600519",
-            "stock_name": "贵州茅台",
+            "code": "AAPL",
+            "stock_name": "苹果公司",
             "date": "2026-03-16",
             "today": {},
             "fundamental_context": {
@@ -79,7 +79,7 @@ class AnalyzerNewsPromptTestCase(unittest.TestCase):
             news_strategy_profile="medium",  # 7 days
         )
         with patch("src.analyzer.get_config", return_value=fake_cfg):
-            prompt = analyzer._format_prompt(context, "贵州茅台", news_context="news")
+            prompt = analyzer._format_prompt(context, "苹果公司", news_context="news")
 
         self.assertIn("近7日的新闻搜索结果", prompt)
         self.assertIn("每一条都必须带具体日期（YYYY-MM-DD）", prompt)
@@ -93,8 +93,8 @@ class AnalyzerNewsPromptTestCase(unittest.TestCase):
             analyzer = GeminiAnalyzer()
 
         context = {
-            "code": "600519",
-            "stock_name": "贵州茅台",
+            "code": "AAPL",
+            "stock_name": "苹果公司",
             "date": "2026-03-16",
             "today": {},
             "news_window_days": 1,
@@ -104,7 +104,7 @@ class AnalyzerNewsPromptTestCase(unittest.TestCase):
             news_strategy_profile="long",  # 30 days if fallback is used
         )
         with patch("src.analyzer.get_config", return_value=fake_cfg):
-            prompt = analyzer._format_prompt(context, "贵州茅台", news_context="news")
+            prompt = analyzer._format_prompt(context, "苹果公司", news_context="news")
 
         self.assertIn("近1日的新闻搜索结果", prompt)
         self.assertIn("超出近1日窗口的新闻一律忽略", prompt)
@@ -118,8 +118,8 @@ class AnalyzerNewsPromptTestCase(unittest.TestCase):
             )
 
         context = {
-            "code": "600519",
-            "stock_name": "贵州茅台",
+            "code": "AAPL",
+            "stock_name": "苹果公司",
             "date": "2026-03-16",
             "today": {"close": 100, "ma5": 99, "ma10": 98, "ma20": 97},
             "trend_analysis": {
@@ -136,7 +136,7 @@ class AnalyzerNewsPromptTestCase(unittest.TestCase):
                 "risk_factors": ["无背驰确认"],
             },
         }
-        prompt = analyzer._format_prompt(context, "贵州茅台", news_context=None)
+        prompt = analyzer._format_prompt(context, "苹果公司", news_context=None)
 
         self.assertIn("当前结构是否满足激活技能的关键触发条件", prompt)
         self.assertNotIn("是否满足 MA5>MA10>MA20 多头排列", prompt)

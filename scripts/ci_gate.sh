@@ -4,8 +4,8 @@ set -euo pipefail
 
 syntax_check() {
   echo "==> backend-gate: Python syntax check"
-  python -m py_compile main.py src/config.py src/auth.py src/analyzer.py src/notification.py
-  python -m py_compile src/storage.py src/scheduler.py src/search_service.py
+  python -m py_compile main.py src/config.py src/config_parsers.py src/config_llm_channels.py src/auth.py src/analyzer.py src/notification.py
+  python -m py_compile src/storage.py src/scheduler.py src/search_service.py src/search_models.py src/search_http.py src/search_base.py
   python -m py_compile src/market_analyzer.py src/stock_analyzer.py
   python -m py_compile data_provider/*.py
 }
@@ -17,6 +17,7 @@ flake8_checks() {
 
 deterministic_checks() {
   echo "==> backend-gate: local deterministic checks"
+  LEGACY_SYMBOL_STRICT_TESTS=1 python scripts/check_legacy_cn_symbols_in_tests.py
   ./test.sh code
   ./test.sh yfinance
 }

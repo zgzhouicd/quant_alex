@@ -181,8 +181,8 @@ class TestNotificationServiceReportGeneration(unittest.TestCase):
         mock_get_config.return_value = _make_config()
         service = NotificationService()
         result = AnalysisResult(
-            code="600519",
-            name="贵州茅台",
+            code="AAPL",
+            name="苹果公司",
             sentiment_score=72,
             trend_prediction="看多",
             operation_advice="持有",
@@ -205,8 +205,8 @@ class TestNotificationServiceReportGeneration(unittest.TestCase):
         mock_get_config.return_value = _make_config(report_renderer_enabled=True)
         service = NotificationService()
         result = AnalysisResult(
-            code="600519",
-            name="贵州茅台",
+            code="AAPL",
+            name="苹果公司",
             sentiment_score=72,
             trend_prediction="看多",
             operation_advice="持有",
@@ -217,8 +217,8 @@ class TestNotificationServiceReportGeneration(unittest.TestCase):
             out = service.generate_single_stock_report(result)
 
         mock_render.assert_not_called()
-        self.assertIn("贵州茅台", out)
-        self.assertIn("600519", out)
+        self.assertIn("苹果公司", out)
+        self.assertIn("AAPL", out)
 
     @mock.patch("src.notification.get_config")
     def test_generate_dashboard_report_localizes_english_fallback(self, mock_get_config: mock.MagicMock):
@@ -327,8 +327,8 @@ class TestNotificationServiceReportGeneration(unittest.TestCase):
         mock_get_config.return_value = _make_config(report_history_compare_n=3)
         service = NotificationService()
         result = AnalysisResult(
-            code="600519",
-            name="贵州茅台",
+            code="AAPL",
+            name="苹果公司",
             sentiment_score=72,
             trend_prediction="看多",
             operation_advice="持有",
@@ -338,13 +338,13 @@ class TestNotificationServiceReportGeneration(unittest.TestCase):
 
         with mock.patch(
             "src.services.history_comparison_service.get_signal_changes_batch",
-            return_value={"600519": []},
+            return_value={"AAPL": []},
         ) as mock_batch:
             first = service._get_history_compare_context([result])
             second = service._get_history_compare_context([result])
 
-        self.assertEqual(first, {"history_by_code": {"600519": []}})
-        self.assertEqual(second, {"history_by_code": {"600519": []}})
+        self.assertEqual(first, {"history_by_code": {"AAPL": []}})
+        self.assertEqual(second, {"history_by_code": {"AAPL": []}})
         mock_batch.assert_called_once()
 
     @mock.patch("src.notification.get_config")
@@ -377,7 +377,7 @@ class TestNotificationServiceReportGeneration(unittest.TestCase):
             email_sender="user@qq.com",
             email_password="PASS",
             email_receivers=["default@example.com"],
-            stock_email_groups=[(["000001", "600519"], ["group@example.com"])],
+            stock_email_groups=[(["MSFT", "AAPL"], ["group@example.com"])],
         )
         mock_get_config.return_value = cfg
 
@@ -386,7 +386,7 @@ class TestNotificationServiceReportGeneration(unittest.TestCase):
 
         server = mock_smtp_ssl.return_value
 
-        ok = service.send("content", email_stock_codes=["000001"])
+        ok = service.send("content", email_stock_codes=["MSFT"])
 
         self.assertTrue(ok)
         mock_smtp_ssl.assert_called_once()

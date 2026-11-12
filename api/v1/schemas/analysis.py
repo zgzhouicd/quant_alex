@@ -52,12 +52,12 @@ class AnalyzeRequest(BaseModel):
     stock_code: Optional[str] = Field(
         None, 
         description="单只股票代码（兼容旧字段）", 
-        example="600519"
+        example="AAPL"
     )
     stock_codes: Optional[List[str]] = Field(
         None, 
         description="多只股票代码（兼容旧字段）",
-        example=["600519", "000858"]
+        example=["AAPL", "NVDA"]
     )
     report_type: str = Field(
         "detailed",
@@ -75,12 +75,12 @@ class AnalyzeRequest(BaseModel):
     stock_name: Optional[str] = Field(
         None,
         description="用户选中的股票名称（自动补全时提供）",
-        example="贵州茅台"
+        example="Apple Inc."
     )
     original_query: Optional[str] = Field(
         None,
-        description="用户原始输入（如茅台、gzmt、600519）",
-        example="茅台"
+        description="用户原始输入（如苹果、AAPL、apple）",
+        example="苹果"
     )
     selection_source: Optional[str] = Field(
         None,
@@ -123,8 +123,8 @@ class AnalysisResultResponse(BaseModel):
         json_schema_extra = {
             "example": {
                 "query_id": "abc123def456",
-                "stock_code": "600519",
-                "stock_name": "贵州茅台",
+                "stock_code": "AAPL",
+                "stock_name": "Apple Inc.",
                 "report": {
                     "summary": {
                         "sentiment_score": 75,
@@ -173,9 +173,9 @@ class BatchTaskAcceptedItem(BaseModel):
         json_schema_extra = {
             "example": {
                 "task_id": "task_abc123",
-                "stock_code": "600519",
+                "stock_code": "AAPL",
                 "status": "pending",
-                "message": "分析任务已加入队列: 600519"
+                "message": "分析任务已加入队列: AAPL"
             }
         }
 
@@ -190,9 +190,9 @@ class BatchDuplicateTaskItem(BaseModel):
     class Config:
         json_schema_extra = {
             "example": {
-                "stock_code": "600519",
+                "stock_code": "AAPL",
                 "existing_task_id": "task_existing_123",
-                "message": "股票 600519 正在分析中 (task_id: task_existing_123)"
+                "message": "股票 AAPL 正在分析中 (task_id: task_existing_123)"
             }
         }
 
@@ -210,16 +210,16 @@ class BatchTaskAcceptedResponse(BaseModel):
                 "accepted": [
                     {
                         "task_id": "task_abc123",
-                        "stock_code": "600519",
+                        "stock_code": "AAPL",
                         "status": "pending",
-                        "message": "分析任务已加入队列: 600519"
+                        "message": "分析任务已加入队列: AAPL"
                     }
                 ],
                 "duplicates": [
                     {
-                        "stock_code": "000858",
+                        "stock_code": "NVDA",
                         "existing_task_id": "task_existing_456",
-                        "message": "股票 000858 正在分析中 (task_id: task_existing_456)"
+                        "message": "股票 NVDA 正在分析中 (task_id: task_existing_456)"
                     }
                 ],
                 "message": "已提交 1 个任务，1 个重复跳过"
@@ -267,8 +267,8 @@ class TaskStatus(BaseModel):
                 "progress": 100,
                 "result": None,
                 "error": None,
-                "stock_name": "贵州茅台",
-                "original_query": "茅台",
+                "stock_name": "Apple Inc.",
+                "original_query": "苹果",
                 "selection_source": "autocomplete",
                 "instrument": None
             }
@@ -305,8 +305,8 @@ class TaskInfo(BaseModel):
         json_schema_extra = {
             "example": {
                 "task_id": "abc123def456",
-                "stock_code": "600519",
-                "stock_name": "贵州茅台",
+                "stock_code": "AAPL",
+                "stock_name": "Apple Inc.",
                 "status": "processing",
                 "progress": 50,
                 "message": "正在分析中...",
@@ -315,7 +315,7 @@ class TaskInfo(BaseModel):
                 "started_at": "2026-02-05T10:30:01",
                 "completed_at": None,
                 "error": None,
-                "original_query": "茅台",
+                "original_query": "苹果",
                 "selection_source": "autocomplete",
                 "instrument": None
             }
@@ -353,8 +353,8 @@ class DuplicateTaskErrorResponse(BaseModel):
         json_schema_extra = {
             "example": {
                 "error": "duplicate_task",
-                "message": "股票 600519 正在分析中",
-                "stock_code": "600519",
+                "message": "股票 AAPL 正在分析中",
+                "stock_code": "AAPL",
                 "existing_task_id": "abc123def456"
             }
         }

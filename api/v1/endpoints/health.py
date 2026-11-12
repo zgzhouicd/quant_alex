@@ -14,6 +14,7 @@ from datetime import datetime
 from fastapi import APIRouter
 
 from api.v1.schemas.common import HealthResponse
+from src.product_capabilities import get_product_capabilities
 
 router = APIRouter()
 
@@ -30,5 +31,6 @@ async def health_check() -> HealthResponse:
     """
     return HealthResponse(
         status="ok",
-        timestamp=datetime.now().isoformat()
+        timestamp=datetime.now().isoformat(),
+        capabilities=get_product_capabilities(),
     )

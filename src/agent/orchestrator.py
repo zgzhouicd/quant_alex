@@ -1385,40 +1385,48 @@ _LOWERCASE_TICKER_HINTS = re.compile(
 )
 
 
+def _ticker_match_followed_by_digit(text: str, end: int) -> bool:
+    """True when match is immediately followed by a digit (e.g. hk00700 → hk, not a ticker)."""
+    return end < len(text) and text[end].isdigit()
+
+
 def _extract_stock_code(text: str) -> str:
-    """Best-effort stock code extraction from free text."""
-    # A-share 6-digit — use lookarounds instead of \b because Python's \b
-    # does not fire at Chinese-character / digit boundaries.
-    m = re.search(r'(?<!\d)((?:[03648]\d{5}|92\d{4}))(?!\d)', text)
-    if m:
-        return m.group(1)
-    # HK — same lookaround approach
-    m = re.search(r'(?<![a-zA-Z])(hk\d{5})(?!\d)', text, re.IGNORECASE)
-    if m:
-        return m.group(1).upper()
-    # US ticker — require 2+ uppercase letters bounded by non-alpha chars.
-    m = re.search(r'(?<![a-zA-Z])([A-Z]{2,5}(?:\.[A-Z]{1,2})?)(?![a-zA-Z])', text)
-    if m:
+    """Best-effort stock code extraction from free text (US tickers preferred)."""
+    stripped = (text or "").strip()
+    us_pattern = re.compile(r'(?<![a-zA-Z])([A-Z]{2,5}(?:\.[A-Z]{1,2})?)(?![a-zA-Z])')
+    us_pattern_ci = re.compile(r'(?<![a-zA-Z])([A-Za-z]{2,5}(?:\.[A-Za-z]{1,2})?)(?![a-zA-Z])')
+
+    # US ticker — bounded uppercase tokens (product primary scope).
+    for m in us_pattern.finditer(text):
+        if _ticker_match_followed_by_digit(text, m.end()):
+            continue
         candidate = m.group(1)
         if candidate not in _COMMON_WORDS:
             return candidate
 
-    stripped = (text or "").strip()
     bare_match = re.fullmatch(r'([A-Za-z]{2,5}(?:\.[A-Za-z]{1,2})?)', stripped)
     if bare_match:
         candidate = bare_match.group(1).upper()
         if candidate not in _COMMON_WORDS:
             return candidate
 
-    if not _LOWERCASE_TICKER_HINTS.search(stripped):
-        return ""
+    if _LOWERCASE_TICKER_HINTS.search(stripped):
+        for match in us_pattern_ci.finditer(text):
+            if _ticker_match_followed_by_digit(text, match.end()):
+                continue
+            raw_candidate = match.group(1)
+            candidate = raw_candidate.upper()
+            if candidate in _COMMON_WORDS:
+                continue
+            return candidate
 
-    for match in re.finditer(r'(?<![a-zA-Z])([A-Za-z]{2,5}(?:\.[A-Za-z]{1,2})?)(?![a-zA-Z])', text):
-        raw_candidate = match.group(1)
-        candidate = raw_candidate.upper()
-        if candidate in _COMMON_WORDS:
-            continue
-        return candidate
+    # Legacy CN/HK patterns — still parsed for routing hints; downstream may reject.
+    m = re.search(r'(?<!\d)((?:[03648]\d{5}|92\d{4}))(?!\d)', text)
+    if m:
+        return m.group(1)
+    m = re.search(r'(?<![a-zA-Z])(hk\d{5})(?!\d)', text, re.IGNORECASE)
+    if m:
+        return m.group(1).upper()
     return ""
 
 

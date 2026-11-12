@@ -17,7 +17,7 @@ class TestFundamentalContext(unittest.TestCase):
         manager = DataFetcherManager(fetchers=[])
         cfg = SimpleNamespace(enable_fundamental_pipeline=True)
         with patch("src.config.get_config", return_value=cfg):
-            for sym in ("AAPL", "600519", "HK00700"):
+            for sym in ("AAPL", "AAPL", "MSFT"):
                 ctx = manager.get_fundamental_context(sym)
                 self.assertIn(ctx["status"], ("not_supported", "partial"))
                 self.assertEqual(ctx["coverage"].get("growth"), "not_supported")

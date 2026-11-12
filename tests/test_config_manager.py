@@ -27,7 +27,7 @@ class ConfigManagerTestCase(unittest.TestCase):
             "\n".join(
                 [
                     "# Core settings",
-                    "STOCK_LIST=600519,000001",
+                    "STOCK_LIST=AAPL,MSFT",
                     "",
                     "export SHOULD_STAY_UNCHANGED",
                     "# Secrets",
@@ -39,7 +39,7 @@ class ConfigManagerTestCase(unittest.TestCase):
         )
 
         self.manager.apply_updates(
-            updates=[("STOCK_LIST", "600519,300750")],
+            updates=[("STOCK_LIST", "AAPL,TSLA")],
             sensitive_keys=set(),
             mask_token="******",
         )
@@ -48,15 +48,15 @@ class ConfigManagerTestCase(unittest.TestCase):
         self.assertIn("# Core settings\n", env_content)
         self.assertIn("\n\nexport SHOULD_STAY_UNCHANGED\n", env_content)
         self.assertIn("# Secrets\nGEMINI_API_KEY=secret-key\n", env_content)
-        self.assertIn("STOCK_LIST=600519,300750\n", env_content)
+        self.assertIn("STOCK_LIST=AAPL,TSLA\n", env_content)
 
     def test_apply_updates_only_rewrites_last_duplicate_assignment(self) -> None:
         self.env_path.write_text(
             "\n".join(
                 [
-                    "STOCK_LIST=600519",
+                    "STOCK_LIST=AAPL",
                     "# Keep the legacy duplicate for audit history",
-                    "STOCK_LIST=000001",
+                    "STOCK_LIST=MSFT",
                 ]
             )
             + "\n",
@@ -64,27 +64,27 @@ class ConfigManagerTestCase(unittest.TestCase):
         )
 
         self.manager.apply_updates(
-            updates=[("STOCK_LIST", "300750")],
+            updates=[("STOCK_LIST", "TSLA")],
             sensitive_keys=set(),
             mask_token="******",
         )
 
         env_lines = self.env_path.read_text(encoding="utf-8").splitlines()
-        self.assertEqual(env_lines[0], "STOCK_LIST=600519")
+        self.assertEqual(env_lines[0], "STOCK_LIST=AAPL")
         self.assertEqual(env_lines[1], "# Keep the legacy duplicate for audit history")
-        self.assertEqual(env_lines[2], "STOCK_LIST=300750")
+        self.assertEqual(env_lines[2], "STOCK_LIST=TSLA")
 
     def test_apply_updates_falls_back_to_in_place_rewrite(self) -> None:
-        self.env_path.write_text("STOCK_LIST=600519\n", encoding="utf-8")
+        self.env_path.write_text("STOCK_LIST=AAPL\n", encoding="utf-8")
 
         with patch("src.core.config_manager.os.replace", side_effect=OSError(errno.EXDEV, "cross-device")):
             self.manager.apply_updates(
-                updates=[("STOCK_LIST", "000001")],
+                updates=[("STOCK_LIST", "MSFT")],
                 sensitive_keys=set(),
                 mask_token="******",
             )
 
-        self.assertEqual(self.env_path.read_text(encoding="utf-8"), "STOCK_LIST=000001\n")
+        self.assertEqual(self.env_path.read_text(encoding="utf-8"), "STOCK_LIST=MSFT\n")
 
 
 if __name__ == "__main__":

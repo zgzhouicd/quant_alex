@@ -128,8 +128,7 @@ daily_stock_analysis/
 | `SERPAPI_API_KEYS` | [SerpAPI](https://serpapi.com/baidu-search-api?utm_source=github_daily_stock_analysis) 备用搜索 | 可选 |
 | `SEARXNG_BASE_URLS` | SearXNG 自建实例（无配额兜底，需在 settings.yml 启用 format: json）；留空时默认自动发现公共实例 | 可选 |
 | `SEARXNG_PUBLIC_INSTANCES_ENABLED` | 是否在 `SEARXNG_BASE_URLS` 为空时自动从 `searx.space` 获取公共实例（默认 `true`） | 可选 |
-| `TUSHARE_TOKEN` | [Tushare Pro](https://tushare.pro/weborder/#/login?reg=834638 ) Token | 可选 |
-| `LONGBRIDGE_APP_KEY` | [Longbridge OpenAPI](https://open.longbridge.com/) App Key（美股/港股量比、换手率、PE 兜底） | 可选 |
+| `LONGBRIDGE_APP_KEY` | [Longbridge OpenAPI](https://open.longbridge.com/) App Key（美股量比、换手率、PE 增强） | 可选 |
 | `LONGBRIDGE_APP_SECRET` | Longbridge App Secret | 可选 |
 | `LONGBRIDGE_ACCESS_TOKEN` | Longbridge Access Token | 可选 |
 | `LONGBRIDGE_STATIC_INFO_TTL_SECONDS` | 长桥 `static_info` 进程内缓存秒数（默认 86400，0=不缓存） | 可选 |
@@ -274,11 +273,11 @@ daily_stock_analysis/
 
 ### 数据源配置
 
+> 默认数据层为 **yfinance + 可选 Longbridge**（见 `data_provider/__init__.py`）。`TUSHARE_TOKEN`、`TICKFLOW_API_KEY` 等仅为历史 `.env` 兼容项，Web 设置页已隐藏，无内置 fetcher 消费。
+
 | 变量名 | 说明 | 默认值 | 必填 |
 |--------|------|--------|:----:|
-| `TUSHARE_TOKEN` | Tushare Pro Token | - | 可选 |
-| `TICKFLOW_API_KEY` | TickFlow API Key；配置后 A 股大盘复盘指数优先尝试 TickFlow，若套餐支持标的池查询则市场统计也会优先尝试 TickFlow | - | 可选 |
-| `LONGBRIDGE_APP_KEY` | [Longbridge OpenAPI](https://open.longbridge.com/) App Key；配置后美股/港股的量比、换手率、PE 等 YFinance 缺失字段会自动从长桥补充 | - | 可选 |
+| `LONGBRIDGE_APP_KEY` | [Longbridge OpenAPI](https://open.longbridge.com/) App Key；配置后美股的量比、换手率、PE 等 YFinance 缺失字段可从长桥补充 | - | 可选 |
 | `LONGBRIDGE_APP_SECRET` | Longbridge App Secret | - | 可选 |
 | `LONGBRIDGE_ACCESS_TOKEN` | Longbridge Access Token | - | 可选 |
 | `LONGBRIDGE_*`（可选） | 见官方 [环境变量](https://open.longbridge.com/zh-CN/docs/getting-started#环境变量)；另有 `LONGBRIDGE_STATIC_INFO_TTL_SECONDS` | - | 可选 |
@@ -293,29 +292,11 @@ daily_stock_analysis/
 | `FUNDAMENTAL_CACHE_TTL_SECONDS` | 基本面聚合缓存 TTL（秒），短缓存减轻重复拉取 | `120` | 可选 |
 | `FUNDAMENTAL_CACHE_MAX_ENTRIES` | 基本面缓存最大条目数（TTL 内按时间淘汰） | `256` | 可选 |
 
-> 行为说明：
-> - A 股：按 `valuation/growth/earnings/institution/capital_flow/dragon_tiger/boards` 聚合能力返回；
-> - ETF：返回可得项，缺失能力标记为 `not_supported`，整体不影响原流程；
-> - 美股/港股：返回 `not_supported` 兜底块；
-> - 任何异常走 fail-open，仅记录错误，不影响技术面/新闻/筹码主链路。
-> - 配置 `TICKFLOW_API_KEY` 后，仅 A 股大盘复盘会额外优先尝试 TickFlow 的主要指数行情；若当前套餐支持标的池查询，市场涨跌统计也会优先尝试 TickFlow。个股链路和实时行情优先级不变。
-> - TickFlow 能力按套餐权限分层：有限权限套餐仍可使用主指数查询；支持 `CN_Equity_A` 标的池查询的套餐才会启用 TickFlow 市场统计。
-> - 官方 quickstart 已文档化 `quotes.get(universes=["CN_Equity_A"])`，但线上 smoke test 进一步确认：`TICKFLOW_API_KEY` 不等于一定具备该权限，且 `quotes.get(symbols=[...])` 单次存在标的数量限制。
-> - TickFlow 实际返回的 `change_pct` / `amplitude` 为比例值；系统已在接入层统一转换为百分比值，确保与现有数据源字段语义一致。
-> - 字段契约：
->   - `fundamental_context.belong_boards` = 个股关联板块列表（当前仅 A 股写入；无数据时为 `[]`）；
->   - `fundamental_context.boards.data` = `sector_rankings`（板块涨跌榜，结构 `{top, bottom}`）；
->   - `fundamental_context.earnings.data.financial_report` = 财报摘要（报告期、营收、归母净利润、经营现金流、ROE）；
->   - `fundamental_context.earnings.data.dividend` = 分红指标（仅现金分红税前口径，含 `events`、`ttm_cash_dividend_per_share`、`ttm_dividend_yield_pct`）；
->   - `get_stock_info.belong_boards` = 个股所属板块列表；
->   - `get_stock_info.boards` 为兼容别名，值与 `belong_boards` 相同（未来仅在大版本考虑移除）；
->   - `get_stock_info.sector_rankings` 与 `fundamental_context.boards.data` 保持一致。
->   - `AnalysisReport.details.belong_boards` = 结构化报告详情中的关联板块列表；
->   - `AnalysisReport.details.sector_rankings` = 结构化报告详情中的板块涨跌榜（用于前端板块联动展示）。
-> - 板块涨跌榜使用数据源顺序：与全局 priority 一致。
-> - 超时控制为 `best-effort` 软超时：阶段会按预算快速降级继续执行，但不保证硬中断底层三方调用。
-> - `FUNDAMENTAL_STAGE_TIMEOUT_SECONDS=1.5` 表示新增基本面阶段的目标预算，不是严格硬 SLA。
-> - 若要硬 SLA，请在后续版本升级为子进程隔离执行并在超时后强制终止。
+> **行为说明（美股产品范围）**：
+> - Web/API/CLI **不接受** A 股 / 港股标的；与 AkShare/Tushare 绑定的深度基本面块（龙虎榜、板块涨跌榜等）在默认构建中返回 `not_supported`。
+> - 美股可通过 yfinance / 可选 Longbridge 与新闻搜索得到部分估值与业绩上下文；`fundamental_context` 中不可用项以 `not_supported` 或空结构 fail-open。
+> - 任何异常走 fail-open，不阻塞技术面 / 舆情 / 主分析链路。
+> - 超时为 `best-effort` 软预算：`FUNDAMENTAL_STAGE_TIMEOUT_SECONDS` 非硬 SLA。
 
 ### 其他配置
 
@@ -550,12 +531,9 @@ docker run -e SCHEDULE_ENABLED=true -e SCHEDULE_RUN_IMMEDIATELY=false ...
 
 #### 交易日判断（Issue #373）
 
-默认根据自选股市场（A 股 / 港股 / 美股）和 `MARKET_REVIEW_REGION` 判断是否为交易日：
-- 使用 `exchange-calendars` 区分 A 股 / 港股 / 美股各自的交易日历（含节假日）
-- 混合持仓时，每只股票只在其市场开市日分析，休市股票当日跳过
-- 全部相关市场均为非交易日时，整体跳过执行（不启动 pipeline、不发推送）
-- 断点续传和 `--dry-run` 的“数据已存在”判断共用同一套“最新可复用交易日”解析逻辑，不再直接使用服务器自然日
-- `最新可复用交易日` 会按股票所属市场的本地时区解析：A 股使用 `Asia/Shanghai`，港股使用 `Asia/Hong_Kong`，美股使用 `America/New_York`
+默认按 **美股（及配置的美期货/加密永续）** 与 `MARKET_REVIEW_REGION=us` 判断交易日：
+- 使用 `exchange-calendars` 的 **美股** 交易日历（含节假日）；`MARKET_REVIEW_REGION` 仅支持 `us`
+- 断点续传与 `--dry-run` 的「数据已存在」判断共用「最新可复用交易日」逻辑，时区为 `America/New_York`
 - 非交易日（周末 / 节假日）运行时，会回退到最近一个交易日检查本地数据；若该交易日数据已存在，则跳过重复抓取，否则继续补数
 - 交易日盘中或收盘前运行时，会以上一个已完成交易日作为复用目标；交易日收盘后运行时，当日数据已存在则可直接跳过，不存在则继续抓取
 - 覆盖方式：`TRADING_DAY_CHECK_ENABLED=false` 或 命令行 `--force-run`
@@ -636,8 +614,8 @@ FEISHU_WEBHOOK_URL=https://open.feishu.cn/open-apis/bot/v2/hook/your_hook_token
 > GitHub Actions 限制：截至 2026-03-29，仓库自带 `daily_analysis.yml` 不会自动导入任意编号的 `STOCK_GROUP_N` / `EMAIL_GROUP_N`。因此如果你只在仓库 Secrets / Variables 中新增这些变量，而没有修改 workflow 显式映射，它们不会进入运行进程，看起来就像“分组配置不生效”。
 
 ```bash
-STOCK_LIST=600519,300750,002594,AAPL
-STOCK_GROUP_1=600519,300750
+STOCK_LIST=AAPL,MSFT,NVDA
+STOCK_GROUP_1=AAPL,MSFT
 EMAIL_GROUP_1=user1@example.com
 STOCK_GROUP_2=002594,AAPL
 EMAIL_GROUP_2=user2@example.com
@@ -765,7 +743,7 @@ PUSHOVER_API_TOKEN=your_api_token
 ### Yahoo Finance（yfinance）
 - 免费，无需 API Key
 - 国际标的常用形态的历史 K 线与实时行情
-- A 股等市场若以 6 位代码等形式传入，会在 fetcher 内映射为 Yahoo 符号（如 `.SS` / `.SZ`）
+- **仅**接受美股 ticker、美期货（如 `ES=F`）及配置的加密永续符号；A 股 / 港股形态在入口层拒收
 
 ### Longbridge（长桥）
 - 在已配置 App Key / Secret / Access Token 时，作为 **Yahoo 的补充**：量比、换手率、PE 等
@@ -787,17 +765,9 @@ PUSHOVER_API_TOKEN=your_api_token
 
 ## 高级功能
 
-### 港股支持
-
-使用 `hk` 前缀指定港股代码：
-
-```bash
-STOCK_LIST=600519,hk00700,hk01810
-```
-
 ### ETF 与指数分析
 
-针对指数跟踪型 ETF 和美股指数（如 VOO、QQQ、SPY、510050、SPX、DJI、IXIC），分析仅关注**指数走势、跟踪误差、市场流动性**，不纳入基金管理人/发行方的公司层面风险（诉讼、声誉、高管变动等）。风险警报与业绩预期均基于指数成分股整体表现，避免将基金公司新闻误判为标的本身利空。详见 Issue #274。
+针对美股指数 ETF 与指数（如 VOO、QQQ、SPY、SPX、DJI、IXIC），分析关注**指数走势、跟踪误差、市场流动性**，不纳入基金管理人公司层面风险。详见 Issue #274。
 
 ### 多模型切换
 
@@ -983,7 +953,7 @@ curl http://127.0.0.1:8000/api/health
 # 触发分析（A股）
 curl -X POST http://127.0.0.1:8000/api/v1/analysis/analyze \
   -H 'Content-Type: application/json' \
-  -d '{"stock_code": "600519"}'
+  -d '{"stock_code": "AAPL", "notify": false}'
 
 # 查询任务状态
 curl http://127.0.0.1:8000/api/v1/analysis/status/<task_id>
@@ -996,13 +966,13 @@ curl -X POST http://127.0.0.1:8000/api/v1/backtest/run \
 # 触发回测（指定股票）
 curl -X POST http://127.0.0.1:8000/api/v1/backtest/run \
   -H 'Content-Type: application/json' \
-  -d '{"code": "600519", "force": false}'
+  -d '{"code": "AAPL", "force": false}'
 
 # 查询整体回测表现
 curl http://127.0.0.1:8000/api/v1/backtest/performance
 
 # 查询单股回测表现
-curl http://127.0.0.1:8000/api/v1/backtest/performance/600519
+curl http://127.0.0.1:8000/api/v1/backtest/performance/AAPL
 
 # 分页查询回测结果
 curl "http://127.0.0.1:8000/api/v1/backtest/results?page=1&limit=20"
@@ -1020,11 +990,11 @@ python main.py --serve-only --host 0.0.0.0 --port 8888
 
 | 类型 | 格式 | 示例 |
 |------|------|------|
-| A股 | 6位数字 | `600519`、`000001`、`300750` |
-| 北交所 | 8/4/92 开头 6 位 | `920748`、`838163`、`430047` |
-| 港股 | hk + 5位数字 | `hk00700`、`hk09988` |
-| 美股 | 1-5 字母（可选 .X 后缀） | `AAPL`、`TSLA`、`BRK.B` |
-| 美股指数 | SPX/DJI/IXIC 等 | `SPX`、`DJI`、`NASDAQ`、`VIX` |
+| 美股 | 字母 ticker（可选 `.B` 等） | `AAPL`、`TSLA`、`BRK.B` |
+| 美期货 | Yahoo 风格 | `ES=F`、`NQ=F` |
+| 加密永续 | 交易对 / PERP 后缀 | `BTCUSDT`、`BTC-USD_PERP` |
+| 美股指数 | 代码或 `^` 前缀 | `SPX`、`^GSPC`、`VIX` |
+| **不支持** | A 股 / 港股数字代码 | 入口层返回 400 或校验失败 |
 
 ### 注意事项
 

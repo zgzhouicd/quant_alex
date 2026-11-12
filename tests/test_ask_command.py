@@ -42,7 +42,7 @@ class AskCommandSkillSelectionTestCase(unittest.TestCase):
         ]
 
         with patch.object(AskCommand, "_load_skills", return_value=skills):
-            self.assertEqual(command._parse_skill(["600519"]), "wave_theory")
+            self.assertEqual(command._parse_skill(["AAPL"]), "wave_theory")
 
     def test_parse_skill_matches_alias_before_default(self) -> None:
         command = AskCommand()
@@ -67,7 +67,7 @@ class AskCommandSkillSelectionTestCase(unittest.TestCase):
         ]
 
         with patch.object(AskCommand, "_load_skills", return_value=skills):
-            self.assertEqual(command._parse_skill(["600519", "请", "用缠论分析"]), "chan_theory")
+            self.assertEqual(command._parse_skill(["AAPL", "请", "用缠论分析"]), "chan_theory")
 
 
 class TestAskCommandMultiStock(unittest.TestCase):
@@ -82,7 +82,7 @@ class TestAskCommandMultiStock(unittest.TestCase):
             user_name="tester",
             chat_id="chat-1",
             chat_type=ChatType.PRIVATE,
-            content="/ask 600519,000858",
+            content="/ask AAPL,NVDA",
         )
 
     @staticmethod
@@ -122,12 +122,12 @@ class TestAskCommandMultiStock(unittest.TestCase):
         with patch("src.agent.factory.build_agent_executor", return_value=FakeExecutor()):
             with patch.object(command, "_build_portfolio_section", return_value="## 组合视角\n组合摘要"):
                 with patch("src.agent.conversation.conversation_manager"):
-                    response = command._analyze_multi(config, message, ["600519", "000858"], None, "")
+                    response = command._analyze_multi(config, message, ["AAPL", "NVDA"], None, "")
 
         self.assertTrue(response.markdown)
         self.assertIn("## 组合视角", response.text)
-        self.assertIn("| 600519 | buy | 72% |", response.text)
-        self.assertIn("### 000858", response.text)
+        self.assertIn("| AAPL | buy | 72% |", response.text)
+        self.assertIn("### NVDA", response.text)
 
     def test_merge_code_args_keeps_skill_token_outside_stock_list(self):
         command = AskCommand()
@@ -141,22 +141,22 @@ class TestAskCommandMultiStock(unittest.TestCase):
     def test_merge_code_args_keeps_comma_split_multi_stock_support(self):
         command = AskCommand()
 
-        raw_code_str, remaining_args = command._merge_code_args(["600519,", "000858", "波浪理论"])
+        raw_code_str, remaining_args = command._merge_code_args(["AAPL,", "NVDA", "波浪理论"])
 
-        self.assertEqual(raw_code_str, "600519,000858")
+        self.assertEqual(raw_code_str, "AAPL,NVDA")
         self.assertEqual(remaining_args, ["波浪理论"])
 
     def test_build_portfolio_section_reads_assessment(self):
         command = AskCommand()
         results = {
-            "600519": {
+            "AAPL": {
                 "signal": "buy",
                 "confidence": 0.8,
-                "summary": "茅台 summary",
-                "stock_name": "贵州茅台",
+                "summary": "苹果 summary",
+                "stock_name": "苹果公司",
                 "risk_flags": [{"category": "portfolio_input", "description": "估值偏高", "severity": "medium"}],
             },
-            "000858": {
+            "NVDA": {
                 "signal": "hold",
                 "confidence": 0.6,
                 "summary": "五粮液 summary",
@@ -170,11 +170,11 @@ class TestAskCommandMultiStock(unittest.TestCase):
                 "summary": "组合偏消费集中，建议控制仓位。",
                 "portfolio_risk_score": 7,
                 "sector_warnings": ["白酒板块集中度过高"],
-                "correlation_warnings": ["600519 与 000858 相关性偏高"],
+                "correlation_warnings": ["AAPL 与 NVDA 相关性偏高"],
                 "rebalance_suggestions": ["降低单一行业暴露"],
                 "positions": [
-                    {"code": "600519", "suggested_weight": 0.4, "signal": "buy"},
-                    {"code": "000858", "suggested_weight": 0.2, "signal": "hold"},
+                    {"code": "AAPL", "suggested_weight": 0.4, "signal": "buy"},
+                    {"code": "NVDA", "suggested_weight": 0.2, "signal": "hold"},
                 ],
             }
             return SimpleNamespace(success=True)
@@ -182,7 +182,7 @@ class TestAskCommandMultiStock(unittest.TestCase):
         with patch("src.agent.factory.get_tool_registry", return_value=MagicMock()):
             with patch("src.agent.llm_adapter.LLMToolAdapter", return_value=MagicMock()):
                 with patch("src.agent.agents.portfolio_agent.PortfolioAgent.run", new=fake_run):
-                    text = command._build_portfolio_section(SimpleNamespace(), ["600519", "000858"], results)
+                    text = command._build_portfolio_section(SimpleNamespace(), ["AAPL", "NVDA"], results)
 
         self.assertIn("## 组合视角", text)
         self.assertIn("组合偏消费集中", text)
@@ -191,14 +191,14 @@ class TestAskCommandMultiStock(unittest.TestCase):
     def test_build_portfolio_section_returns_quickly_on_timeout(self):
         command = AskCommand()
         results = {
-            "600519": {
+            "AAPL": {
                 "signal": "buy",
                 "confidence": 0.8,
-                "summary": "茅台 summary",
-                "stock_name": "贵州茅台",
+                "summary": "苹果 summary",
+                "stock_name": "苹果公司",
                 "risk_flags": [],
             },
-            "000858": {
+            "NVDA": {
                 "signal": "hold",
                 "confidence": 0.6,
                 "summary": "五粮液 summary",
@@ -218,7 +218,7 @@ class TestAskCommandMultiStock(unittest.TestCase):
                 with patch("src.agent.agents.portfolio_agent.PortfolioAgent.run", new=slow_run):
                     text = command._build_portfolio_section(
                         SimpleNamespace(),
-                        ["600519", "000858"],
+                        ["AAPL", "NVDA"],
                         results,
                         timeout_s=0.01,
                     )
@@ -245,9 +245,9 @@ class TestAskCommandMultiStock(unittest.TestCase):
         with patch("src.agent.factory.build_agent_executor", return_value=FakeExecutor()):
             with patch.object(command, "_build_portfolio_section", return_value=""):
                 with patch("src.agent.conversation.conversation_manager"):
-                    response = command._analyze_multi(config, message, ["600519", "000858"], None, "")
+                    response = command._analyze_multi(config, message, ["AAPL", "NVDA"], None, "")
 
-        self.assertIn("600519 自由文本分析", response.text)
+        self.assertIn("AAPL 自由文本分析", response.text)
         self.assertNotIn("⚠️ 分析失败: Failed to parse dashboard JSON", response.text)
 
     def test_analyze_multi_persists_formatted_history_instead_of_raw_json(self):
@@ -267,7 +267,7 @@ class TestAskCommandMultiStock(unittest.TestCase):
         with patch("src.agent.factory.build_agent_executor", return_value=FakeExecutor()):
             with patch.object(command, "_build_portfolio_section", return_value=""):
                 with patch("src.agent.conversation.conversation_manager") as mock_cm:
-                    command._analyze_multi(config, message, ["600519", "000858"], None, "")
+                    command._analyze_multi(config, message, ["AAPL", "NVDA"], None, "")
 
         assistant_messages = [
             call.args[2]
@@ -298,14 +298,14 @@ class TestAskCommandMultiStock(unittest.TestCase):
                 with patch.object(command, "_build_portfolio_section", return_value=""):
                     with patch("src.agent.conversation.conversation_manager") as mock_cm:
                         mock_cm.add_message.side_effect = lambda *args, **kwargs: call_order.append("history")
-                        command._analyze_multi(config, message, ["600519", "000858"], None, "")
+                        command._analyze_multi(config, message, ["AAPL", "NVDA"], None, "")
 
         mock_get_db.assert_called_once_with()
         self.assertTrue(call_order)
         self.assertEqual(call_order[0], "db")
 
     def test_format_stock_result_renders_numeric_sniper_points(self):
-        dashboard = self._dashboard("600519")
+        dashboard = self._dashboard("AAPL")
         dashboard["dashboard"]["battle_plan"]["sniper_points"] = {
             "ideal_buy": 10.0,
             "secondary_buy": 9.8,
@@ -313,7 +313,7 @@ class TestAskCommandMultiStock(unittest.TestCase):
             "take_profit": 11.6,
         }
 
-        text = AskCommand._format_stock_result("600519", dashboard, "raw content")
+        text = AskCommand._format_stock_result("AAPL", dashboard, "raw content")
 
         self.assertIn("**关键点位**", text)
         self.assertIn("ideal_buy=10.0", text)
@@ -336,10 +336,10 @@ class TestAskCommandMultiStock(unittest.TestCase):
 
         with patch("src.agent.factory.build_agent_executor", return_value=FakeExecutor()):
             with patch.object(command, "_resolve_skill_name", return_value="缠论"):
-                response = command._analyze_single(config, message, "600519", "chan_theory", "")
+                response = command._analyze_single(config, message, "AAPL", "chan_theory", "")
 
         self.assertIn("analysis ok", response.text)
-        self.assertEqual(captured["context"]["stock_code"], "600519")
+        self.assertEqual(captured["context"]["stock_code"], "AAPL")
         self.assertEqual(captured["context"]["skills"], ["chan_theory"])
         self.assertEqual(captured["context"]["strategies"], ["chan_theory"])
 

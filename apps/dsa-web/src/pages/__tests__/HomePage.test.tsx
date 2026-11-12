@@ -5,6 +5,7 @@ import { analysisApi, DuplicateTaskError } from '../../api/analysis';
 import { historyApi } from '../../api/history';
 import { useStockPoolStore } from '../../stores';
 import { getReportText, normalizeReportLanguage } from '../../utils/reportLanguage';
+import { STOCK_INPUT_PLACEHOLDER } from '../../constants/stockInputPlaceholder';
 import HomePage from '../HomePage';
 
 const navigateMock = vi.fn();
@@ -44,8 +45,8 @@ vi.mock('../../hooks/useTaskStream', () => ({
 const historyItem = {
   id: 1,
   queryId: 'q-1',
-  stockCode: '600519',
-  stockName: '贵州茅台',
+  stockCode: 'AAPL',
+  stockName: 'Apple Inc.',
   sentimentScore: 82,
   operationAdvice: '买入',
   createdAt: '2026-03-18T08:00:00Z',
@@ -55,8 +56,8 @@ const historyReport = {
   meta: {
     id: 1,
     queryId: 'q-1',
-    stockCode: '600519',
-    stockName: '贵州茅台',
+    stockCode: 'AAPL',
+    stockName: 'Apple Inc.',
     reportType: 'detailed' as const,
     reportLanguage: 'zh' as const,
     createdAt: '2026-03-18T08:00:00Z',
@@ -101,7 +102,7 @@ describe('HomePage', () => {
     expect(dashboard.className).toContain('lg:h-[calc(100vh-2rem)]');
     expect(dashboard.firstElementChild?.className).toContain('min-h-0');
     expect(dashboard.querySelector('.flex-1.flex.min-h-0.overflow-hidden')).toBeTruthy();
-    expect(screen.getByPlaceholderText('输入股票代码或名称，如 600519、贵州茅台、AAPL')).toBeInTheDocument();
+    expect(screen.getByPlaceholderText(STOCK_INPUT_PLACEHOLDER)).toBeInTheDocument();
     expect(await screen.findByText('趋势维持强势')).toBeInTheDocument();
     expect(
       screen.getByRole('button', {
@@ -138,7 +139,7 @@ describe('HomePage', () => {
       items: [],
     });
     vi.mocked(analysisApi.analyzeAsync).mockRejectedValue(
-      new DuplicateTaskError('600519', 'task-1', '股票 600519 正在分析中'),
+      new DuplicateTaskError('AAPL', 'task-1', '股票 AAPL 正在分析中'),
     );
 
     render(
@@ -147,14 +148,14 @@ describe('HomePage', () => {
       </MemoryRouter>,
     );
 
-    const input = await screen.findByPlaceholderText('输入股票代码或名称，如 600519、贵州茅台、AAPL');
-    fireEvent.change(input, { target: { value: '600519' } });
+    const input = await screen.findByPlaceholderText(STOCK_INPUT_PLACEHOLDER);
+    fireEvent.change(input, { target: { value: 'AAPL' } });
     fireEvent.click(screen.getByRole('button', { name: '分析' }));
 
     await waitFor(() => {
-      expect(screen.getByText(/股票 600519 正在分析中/)).toBeInTheDocument();
+      expect(screen.getByText(/股票 AAPL 正在分析中/)).toBeInTheDocument();
     });
-    expect(screen.getByText(/股票 600519 正在分析中/).closest('[role="alert"]')).toBeInTheDocument();
+    expect(screen.getByText(/股票 AAPL 正在分析中/).closest('[role="alert"]')).toBeInTheDocument();
   });
 
   it('navigates to chat with report context when asking a follow-up question', async () => {
@@ -176,7 +177,7 @@ describe('HomePage', () => {
     fireEvent.click(followUpButton);
 
     expect(navigateMock).toHaveBeenCalledWith(
-      '/chat?stock=600519&name=%E8%B4%B5%E5%B7%9E%E8%8C%85%E5%8F%B0&recordId=1',
+      '/chat?stock=AAPL&name=Apple%20Inc.&recordId=1',
     );
   });
 
@@ -254,8 +255,8 @@ describe('HomePage', () => {
       activeTasks: [
         {
           taskId: 'task-1',
-          stockCode: '600519',
-          stockName: '贵州茅台',
+          stockCode: 'AAPL',
+          stockName: 'Apple Inc.',
           status: 'processing',
           progress: 45,
           message: '正在抓取最新行情',

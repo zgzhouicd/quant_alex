@@ -43,10 +43,10 @@ class AnalysisApiContractTestCase(unittest.TestCase):
 
         with patch("src.config.get_config", return_value=SimpleNamespace()), \
              patch("src.core.pipeline.StockAnalysisPipeline", return_value=pipeline_instance), \
-             patch.object(AnalysisService, "_build_analysis_response", return_value={"stock_code": "600519"}):
-            result = AnalysisService.analyze_stock(service, "600519", report_type="full", query_id="q1")
+             patch.object(AnalysisService, "_build_analysis_response", return_value={"stock_code": "AAPL"}):
+            result = AnalysisService.analyze_stock(service, "AAPL", report_type="full", query_id="q1")
 
-        self.assertEqual(result, {"stock_code": "600519"})
+        self.assertEqual(result, {"stock_code": "AAPL"})
         self.assertEqual(
             pipeline_instance.process_single_stock.call_args.kwargs["report_type"],
             ReportType.FULL,
@@ -57,8 +57,8 @@ class AnalysisApiContractTestCase(unittest.TestCase):
         service = AnalysisService()
         pipeline_instance = MagicMock()
         pipeline_instance.process_single_stock.return_value = SimpleNamespace(
-            code="600519",
-            name="贵州茅台",
+            code="AAPL",
+            name="苹果公司",
             current_price=1234.56,
             change_pct=1.23,
             model_used="test-model",
@@ -75,7 +75,7 @@ class AnalysisApiContractTestCase(unittest.TestCase):
 
         with patch("src.config.get_config", return_value=SimpleNamespace()), \
              patch("src.core.pipeline.StockAnalysisPipeline", return_value=pipeline_instance):
-            result = service.analyze_stock("600519", report_type="full", query_id="q1", send_notification=False)
+            result = service.analyze_stock("AAPL", report_type="full", query_id="q1", send_notification=False)
 
         self.assertEqual(result["report"]["meta"]["report_type"], "full")
 
@@ -89,7 +89,7 @@ class AnalysisApiContractTestCase(unittest.TestCase):
 
         with patch("src.config.get_config", return_value=SimpleNamespace()), \
              patch("src.core.pipeline.StockAnalysisPipeline", return_value=pipeline_instance):
-            result = service.analyze_stock("600519", report_type="detailed", query_id="q1", send_notification=False)
+            result = service.analyze_stock("AAPL", report_type="detailed", query_id="q1", send_notification=False)
 
         self.assertIsNone(result)
         self.assertEqual(service.last_error, "LLM stream interrupted")
@@ -105,7 +105,7 @@ class AnalysisApiContractTestCase(unittest.TestCase):
         with patch("src.services.analysis_service.AnalysisService", return_value=service_instance):
             with self.assertRaises(Exception) as ctx:
                 _handle_sync_analysis(
-                    "600519",
+                    "AAPL",
                     SimpleNamespace(
                         report_type="detailed",
                         force_refresh=False,
@@ -161,8 +161,8 @@ class AnalysisApiContractTestCase(unittest.TestCase):
                 "details": {"news_summary": "news"},
             },
             query_id="q1",
-            stock_code="600519",
-            stock_name="贵州茅台",
+            stock_code="AAPL",
+            stock_name="苹果公司",
             context_snapshot={
                 "enhanced_context": {
                     "fundamental_context": {
@@ -193,8 +193,8 @@ class AnalysisApiContractTestCase(unittest.TestCase):
                 "details": {},
             },
             query_id="q1",
-            stock_code="600519",
-            stock_name="贵州茅台",
+            stock_code="AAPL",
+            stock_name="苹果公司",
             context_snapshot={
                 "enhanced_context": {
                     "fundamental_context": {
@@ -227,8 +227,8 @@ class AnalysisApiContractTestCase(unittest.TestCase):
                 "details": {},
             },
             query_id="q1",
-            stock_code="600519",
-            stock_name="贵州茅台",
+            stock_code="AAPL",
+            stock_name="苹果公司",
             context_snapshot={
                 "enhanced_context": {
                     "fundamental_context": {
@@ -277,8 +277,8 @@ class AnalysisApiContractTestCase(unittest.TestCase):
                 "details": {},
             },
             query_id="q1",
-            stock_code="600519",
-            stock_name="贵州茅台",
+            stock_code="AAPL",
+            stock_name="苹果公司",
             context_snapshot={
                 "enhanced_context": {
                     "fundamental_context": {
@@ -335,19 +335,19 @@ class AnalysisApiContractTestCase(unittest.TestCase):
         with patch("src.storage.DatabaseManager.get_instance", return_value=mock_db):
             context_snapshot, fundamental_snapshot = _load_sync_fundamental_sources(
                 query_id="q_sync_001",
-                stock_code="600519",
+                stock_code="AAPL",
             )
 
         self.assertIsNone(context_snapshot)
         self.assertEqual(fundamental_snapshot, fallback_payload)
         mock_db.get_analysis_history.assert_called_once_with(
             query_id="q_sync_001",
-            code="600519",
+            code="AAPL",
             limit=1,
         )
         mock_db.get_latest_fundamental_snapshot.assert_called_once_with(
             query_id="q_sync_001",
-            code="600519",
+            code="AAPL",
         )
 
     def test_openapi_declares_single_and_batch_async_202_payloads(self) -> None:
@@ -617,7 +617,7 @@ class AnalysisApiContractTestCase(unittest.TestCase):
                         stock_code="贵州茅台",
                         stock_codes=None,
                         stock_name=None,
-                        original_query="贵州茅台",
+                        original_query="茅台",
                         selection_source="manual",
                         report_type="detailed",
                         force_refresh=False,
@@ -893,7 +893,7 @@ class BatchTaskQueueContractTestCase(unittest.TestCase):
         queue._executor = FailingExecutor()
 
         with self.assertRaisesRegex(RuntimeError, "executor down"):
-            queue.submit_tasks_batch(["600519", "000858"], report_type="detailed")
+            queue.submit_tasks_batch(["AAPL", "NVDA"], report_type="detailed")
 
         self.assertEqual(queue._tasks, {})
         self.assertEqual(queue._analyzing_stocks, {})
@@ -903,28 +903,28 @@ class BatchTaskQueueContractTestCase(unittest.TestCase):
         queue = AnalysisTaskQueue(max_workers=1)
         queue._executor = type("ExecutorStub", (), {"submit": lambda self, *args, **kwargs: Future()})()
 
-        accepted, duplicates = queue.submit_tasks_batch(["600519", "   "], report_type="detailed")
+        accepted, duplicates = queue.submit_tasks_batch(["AAPL", "   "], report_type="detailed")
 
-        self.assertEqual([task.stock_code for task in accepted], ["600519"])
+        self.assertEqual([task.stock_code for task in accepted], ["AAPL"])
         self.assertEqual(duplicates, [])
-        self.assertEqual(sorted(task.stock_code for task in queue._tasks.values()), ["600519"])
+        self.assertEqual(sorted(task.stock_code for task in queue._tasks.values()), ["AAPL"])
 
     def test_batch_submit_deduplicates_equivalent_stock_code_shapes(self) -> None:
         queue = AnalysisTaskQueue(max_workers=1)
         queue._executor = type("ExecutorStub", (), {"submit": lambda self, *args, **kwargs: Future()})()
 
-        accepted, duplicates = queue.submit_tasks_batch(["600519"], report_type="detailed")
+        accepted, duplicates = queue.submit_tasks_batch(["AAPL"], report_type="detailed")
 
         self.assertEqual(len(accepted), 1)
         self.assertEqual(duplicates, [])
-        self.assertTrue(queue.is_analyzing("600519.SH"))
-        self.assertEqual(queue.get_analyzing_task_id("600519.SH"), accepted[0].task_id)
+        self.assertTrue(queue.is_analyzing("AAPL"))
+        self.assertEqual(queue.get_analyzing_task_id("AAPL"), accepted[0].task_id)
 
-        accepted_again, duplicates_again = queue.submit_tasks_batch(["600519.SH"], report_type="detailed")
+        accepted_again, duplicates_again = queue.submit_tasks_batch(["AAPL"], report_type="detailed")
 
         self.assertEqual(accepted_again, [])
         self.assertEqual(len(duplicates_again), 1)
-        self.assertEqual(duplicates_again[0].stock_code, "600519.SH")
+        self.assertEqual(duplicates_again[0].stock_code, "AAPL")
         self.assertEqual(duplicates_again[0].existing_task_id, accepted[0].task_id)
 
     def test_submit_task_rejects_blank_stock_code(self) -> None:
@@ -949,7 +949,7 @@ class BatchTaskQueueContractTestCase(unittest.TestCase):
 
         queue._broadcast_event = record_broadcast
 
-        accepted, duplicates = queue.submit_tasks_batch(["600519", "000858"], report_type="detailed")
+        accepted, duplicates = queue.submit_tasks_batch(["AAPL", "NVDA"], report_type="detailed")
 
         self.assertEqual(len(accepted), 2)
         self.assertEqual(duplicates, [])
@@ -958,7 +958,7 @@ class BatchTaskQueueContractTestCase(unittest.TestCase):
     def test_update_task_progress_broadcasts_task_progress_event(self) -> None:
         queue = AnalysisTaskQueue(max_workers=1)
         queue._executor = type("ExecutorStub", (), {"submit": lambda self, *args, **kwargs: Future()})()
-        accepted, _ = queue.submit_tasks_batch(["600519"], report_type="detailed")
+        accepted, _ = queue.submit_tasks_batch(["AAPL"], report_type="detailed")
 
         events = []
         queue._broadcast_event = lambda event_type, data: events.append((event_type, data))
@@ -990,7 +990,7 @@ class ImageStockExtractorContractTestCase(unittest.TestCase):
             openai_base_url=None,
         )
         msg = MagicMock()
-        msg.content = '["600519"]'
+        msg.content = '["AAPL"]'
         choice = MagicMock()
         choice.message = msg
         response = MagicMock()
@@ -1000,7 +1000,7 @@ class ImageStockExtractorContractTestCase(unittest.TestCase):
              patch("src.services.image_stock_extractor.litellm.completion", return_value=response) as mock_completion:
             result = _call_litellm_vision("base64data", "image/jpeg")
 
-        self.assertEqual(result, '["600519"]')
+        self.assertEqual(result, '["AAPL"]')
         mock_completion.assert_called_once()
 
 

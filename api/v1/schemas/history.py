@@ -35,8 +35,8 @@ class HistoryItem(BaseModel):
             "example": {
                 "id": 1234,
                 "query_id": "abc123",
-                "stock_code": "600519",
-                "stock_name": "贵州茅台",
+                "stock_code": "AAPL",
+                "stock_name": "Apple Inc.",
                 "report_type": "detailed",
                 "sentiment_score": 75,
                 "operation_advice": "持有",
@@ -174,8 +174,8 @@ class AnalysisReport(BaseModel):
             "example": {
                 "meta": {
                     "query_id": "abc123",
-                    "stock_code": "600519",
-                    "stock_name": "贵州茅台",
+                    "stock_code": "AAPL",
+                    "stock_name": "Apple Inc.",
                     "report_type": "detailed",
                     "report_language": "zh",
                     "created_at": "2024-01-01T12:00:00"
@@ -206,6 +206,6 @@ class MarkdownReportResponse(BaseModel):
     class Config:
         json_schema_extra = {
             "example": {
-                "content": "# 📊 贵州茅台 (600519) 分析报告\n\n> 分析日期：**2024-01-01**\n\n..."
+                "content": "# 📊 Apple Inc. (AAPL) 分析报告\n\n> 分析日期：**2024-01-01**\n\n..."
             }
         }

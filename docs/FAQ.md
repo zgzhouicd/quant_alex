@@ -1,6 +1,6 @@
 # ❓ 常见问题解答 (FAQ)
 
-本文档整理了用户在使用过程中遇到的常见问题及解决方案。
+本文档整理了用户在使用过程中遇到的常见问题及解决方案。产品入口与队列边界见 [entrypoints-guide.md](./entrypoints-guide.md)。
 
 ---
 
@@ -42,14 +42,15 @@
 
 ---
 
-### Q3: Tushare 获取数据失败，提示 Token 不对？
+### Q3: 行情或历史 K 线拉取失败？
 
-**现象**：日志显示 `Tushare 获取数据失败: 您的token不对，请确认`
+**现象**：日志出现 yfinance / Longbridge 超时、空数据或 `DataFetchError`。
 
 **解决方案**：
-1. **无 Tushare 账号**：无需配置 `TUSHARE_TOKEN`，系统会自动使用免费数据源（AkShare、Efinance）
-2. **有 Tushare 账号**：确认 Token 是否正确，可在 [Tushare Pro](https://tushare.pro/weborder/#/login?reg=834638 ) 个人中心查看
-3. 本项目所有核心功能均可在无 Tushare 的情况下正常运行
+1. **无需 Tushare**：Web/API/CLI 主路径为 **Yahoo Finance（yfinance）**；可选配置 **Longbridge** 作为美股优先源（见 `.env.example`）
+2. 检查网络与代理；必要时为行情域名配置 `NO_PROXY` 或合规 HTTP 代理
+3. 降低并发：`DATA_FETCH_MAX_IN_FLIGHT`、`MAX_WORKERS` 调小后重试
+4. 标的须在 **美股 / 美期货 / 加密永续** 范围内；A 股 / 港股代码会被拒收
 
 ---
 
@@ -57,7 +58,7 @@
 
 **现象**：日志显示 `熔断器触发` 或数据返回 `None`，或出现 `RemoteDisconnected`、`push2his.eastmoney.com` 连接被关闭等
 
-**原因**：免费数据源（东方财富、新浪等）有反爬机制，短时间大量请求会被限流。
+**原因**：公共行情接口（如 Yahoo）存在频率与地域限制，短时间大量请求可能失败。
 
 **解决方案**：
 1. 系统已内置熔断保护与失败降级（fail-open）

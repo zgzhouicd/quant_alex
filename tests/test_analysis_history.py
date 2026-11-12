@@ -60,8 +60,8 @@ class AnalysisHistoryTestCase(unittest.TestCase):
     def _build_result(self) -> AnalysisResult:
         """构造分析结果"""
         return AnalysisResult(
-            code="600519",
-            name="贵州茅台",
+            code="AAPL",
+            name="苹果公司",
             sentiment_score=78,
             trend_prediction="看多",
             operation_advice="持有",
@@ -100,7 +100,7 @@ class AnalysisHistoryTestCase(unittest.TestCase):
                 }
             }
         }
-        context_snapshot = {"enhanced_context": {"code": "600519"}}
+        context_snapshot = {"enhanced_context": {"code": "AAPL"}}
 
         saved = self.db.save_analysis_history(
             result=result,
@@ -113,7 +113,7 @@ class AnalysisHistoryTestCase(unittest.TestCase):
 
         self.assertEqual(saved, 1)
 
-        history = self.db.get_analysis_history(code="600519", days=7, limit=10)
+        history = self.db.get_analysis_history(code="AAPL", days=7, limit=10)
         self.assertEqual(len(history), 1)
 
         with self.db.get_session() as session:
@@ -313,7 +313,7 @@ class AnalysisHistoryTestCase(unittest.TestCase):
 
         self.db.save_fundamental_snapshot(
             query_id=query_id,
-            code="600519",
+            code="AAPL",
             payload={
                 "belong_boards": [{"name": "白酒", "type": "行业"}],
                 "boards": {
@@ -368,7 +368,7 @@ class AnalysisHistoryTestCase(unittest.TestCase):
         }
         saved_snapshot = self.db.save_fundamental_snapshot(
             query_id=query_id,
-            code="600519",
+            code="AAPL",
             payload=fallback_fundamental,
         )
         self.assertEqual(saved_snapshot, 1)
@@ -599,7 +599,7 @@ class AnalysisHistoryTestCase(unittest.TestCase):
         with self.db.session_scope() as session:
             session.add(BacktestResult(
                 analysis_history_id=record_id,
-                code="600519",
+                code="AAPL",
                 analysis_date=None,
                 eval_window_days=10,
                 engine_version="v1",
@@ -663,7 +663,7 @@ class HistoryItemSchemaNegativeSentimentTest(unittest.TestCase):
         if self.HistoryItem is None:
             self.skipTest("fastapi / pydantic not installed in this test environment")
 
-        item = self.HistoryItem(query_id="q1", stock_code="600519", sentiment_score=-22)
+        item = self.HistoryItem(query_id="q1", stock_code="AAPL", sentiment_score=-22)
         self.assertEqual(item.sentiment_score, -22)
 
     def test_out_of_range_high_sentiment_score_does_not_raise(self) -> None:
@@ -671,7 +671,7 @@ class HistoryItemSchemaNegativeSentimentTest(unittest.TestCase):
         if self.HistoryItem is None:
             self.skipTest("fastapi / pydantic not installed in this test environment")
 
-        item = self.HistoryItem(query_id="q2", stock_code="600519", sentiment_score=150)
+        item = self.HistoryItem(query_id="q2", stock_code="AAPL", sentiment_score=150)
         self.assertEqual(item.sentiment_score, 150)
 
     def test_none_sentiment_score_is_allowed(self) -> None:
@@ -679,7 +679,7 @@ class HistoryItemSchemaNegativeSentimentTest(unittest.TestCase):
         if self.HistoryItem is None:
             self.skipTest("fastapi / pydantic not installed in this test environment")
 
-        item = self.HistoryItem(query_id="q3", stock_code="600519", sentiment_score=None)
+        item = self.HistoryItem(query_id="q3", stock_code="AAPL", sentiment_score=None)
         self.assertIsNone(item.sentiment_score)
 
     def test_report_summary_negative_sentiment_score_does_not_raise(self) -> None:

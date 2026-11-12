@@ -74,8 +74,8 @@ def create_app(static_dir: Optional[Path] = None) -> FastAPI:
     app = FastAPI(
         title="Daily Stock Analysis API",
         description=(
-            "股票智能分析系统 API（默认产品范围：美股 / 美期货 / 加密永续等；"
-            "部分能力与遗留路径仍可能涉及其他市场符号）\n\n"
+            "美股辅助决策 API（接受美股 / 美期货 / 加密永续；拒 A 股 / 港股形态）。"
+            "分析默认 notify=false，以外部 IM 推送需在请求中显式开启。\n\n"
             "## 功能模块\n"
             "- 股票分析：触发 AI 智能分析\n"
             "- 历史记录：查询历史分析报告\n"

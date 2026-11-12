@@ -21,8 +21,8 @@ from src.services.report_renderer import render
 
 
 def _make_result(
-    code: str = "600519",
-    name: str = "贵州茅台",
+    code: str = "AAPL",
+    name: str = "苹果公司",
     sentiment_score: int = 72,
     operation_advice: str = "持有",
     analysis_summary: str = "稳健",
@@ -58,7 +58,7 @@ class TestReportRenderer(unittest.TestCase):
         out = render("markdown", [r], summary_only=True)
         self.assertIsNotNone(out)
         self.assertIn("决策仪表盘", out)
-        self.assertIn("贵州茅台", out)
+        self.assertIn("苹果公司", out)
         self.assertIn("持有", out)
 
     def test_render_markdown_full(self) -> None:
@@ -74,7 +74,7 @@ class TestReportRenderer(unittest.TestCase):
         r = _make_result()
         out = render("wechat", [r])
         self.assertIsNotNone(out)
-        self.assertIn("贵州茅台", out)
+        self.assertIn("苹果公司", out)
 
     def test_render_brief(self) -> None:
         """Brief platform renders 3-5 sentence summary."""
@@ -82,7 +82,7 @@ class TestReportRenderer(unittest.TestCase):
         out = render("brief", [r])
         self.assertIsNotNone(out)
         self.assertIn("决策简报", out)
-        self.assertIn("贵州茅台", out)
+        self.assertIn("苹果公司", out)
 
     def test_render_markdown_in_english(self) -> None:
         """Markdown renderer switches headings and summary labels for English reports."""

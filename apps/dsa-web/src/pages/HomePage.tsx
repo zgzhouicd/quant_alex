@@ -8,6 +8,7 @@ import { HistoryList } from '../components/history';
 import { ReportMarkdown, ReportSummary } from '../components/report';
 import { TaskPanel } from '../components/tasks';
 import { useDashboardLifecycle, useHomeDashboardState } from '../hooks';
+import { STOCK_INPUT_PLACEHOLDER } from '../constants/stockInputPlaceholder';
 import { getReportText, normalizeReportLanguage } from '../utils/reportLanguage';
 
 const HomePage: React.FC = () => {
@@ -163,7 +164,7 @@ const HomePage: React.FC = () => {
                 onSubmit={(stockCode, stockName, selectionSource) => {
                   handleSubmitAnalysis(stockCode, stockName, selectionSource);
                 }}
-                placeholder="输入美股代码或名称，如 AAPL、苹果、NVDA"
+                placeholder={STOCK_INPUT_PLACEHOLDER}
                 disabled={isAnalyzing}
                 className={inputError ? 'border-danger/50' : undefined}
               />

@@ -13,6 +13,7 @@ import { useStockIndex } from '../../hooks/useStockIndex';
 import { useAutocomplete } from '../../hooks/useAutocomplete';
 import { SuggestionsList } from './SuggestionsList';
 import { cn } from '../../utils/cn';
+import { STOCK_INPUT_PLACEHOLDER } from '../../constants/stockInputPlaceholder';
 
 const AUTOCOMPLETE_INPUT_CLASS =
   'input-surface input-focus-glow h-11 w-full rounded-xl border bg-transparent px-4 text-sm transition-all focus:outline-none disabled:cursor-not-allowed disabled:opacity-60';
@@ -37,7 +38,7 @@ function FallbackInput({
   onChange,
   onSubmit,
   disabled = false,
-  placeholder = '输入股票代码或名称',
+  placeholder = STOCK_INPUT_PLACEHOLDER,
   className,
 }: StockAutocompleteProps) {
   return (
@@ -96,7 +97,7 @@ function StockAutocompleteInner({
   onChange,
   onSubmit,
   disabled = false,
-  placeholder = '输入股票代码或名称',
+  placeholder = STOCK_INPUT_PLACEHOLDER,
   className,
 }: StockAutocompleteProps) {
   const { index, loading, fallback } = useStockIndex();

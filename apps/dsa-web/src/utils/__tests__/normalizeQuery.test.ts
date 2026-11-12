@@ -178,41 +178,22 @@ describe('normalizeQuery', () => {
     });
   });
 
-  describe('isStockCodeLike - Check if looks like stock code', () => {
-    test('identifies A-share codes', () => {
-      expect(isStockCodeLike('600519')).toBe(true);
-      expect(isStockCodeLike('000001')).toBe(true);
-      expect(isStockCodeLike('300001')).toBe(true);
+  describe('isStockCodeLike - US-focused ticker detection', () => {
+    test('accepts US tickers and futures', () => {
+      expect(isStockCodeLike('AAPL')).toBe(true);
+      expect(isStockCodeLike('BRK.B')).toBe(true);
+      expect(isStockCodeLike('ES=F')).toBe(true);
     });
 
-    test('identifies codes with market suffix', () => {
-      expect(isStockCodeLike('600519.SH')).toBe(true);
-      expect(isStockCodeLike('00700.HK')).toBe(true);
-      // US stock codes without numbers return false for isStockCodeLike
-      expect(isStockCodeLike('AAPL.US')).toBe(false);
-    });
-
-    test('handles US stock codes', () => {
-      // US stock codes without numbers, isStockCodeLike designed for A-share numeric codes
-      expect(isStockCodeLike('AAPL')).toBe(false);
-      expect(isStockCodeLike('TSLA')).toBe(false);
-      // But pure letters should be identified as pinyin
-      expect(isPinyinLike('AAPL')).toBe(true);
-      expect(isPinyinLike('TSLA')).toBe(true);
+    test('rejects legacy A/HK numeric codes', () => {
+      expect(isStockCodeLike('600519')).toBe(false);
+      expect(isStockCodeLike('600519.SH')).toBe(false);
+      expect(isStockCodeLike('00700.HK')).toBe(false);
     });
 
     test('rejects Chinese names', () => {
       expect(isStockCodeLike('贵州茅台')).toBe(false);
-      expect(isStockCodeLike('腾讯')).toBe(false);
-    });
-
-    test('rejects pinyin', () => {
-      expect(isStockCodeLike('gzmt')).toBe(false);
-      expect(isStockCodeLike('maotai')).toBe(false);
-    });
-
-    test('identifies pure numbers', () => {
-      expect(isStockCodeLike('12345')).toBe(true);
+      expect(isStockNameLike('贵州茅台')).toBe(true);
     });
 
     test('handles empty strings', () => {

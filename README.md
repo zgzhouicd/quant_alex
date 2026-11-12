@@ -16,7 +16,7 @@
 
 > 🤖 基于 AI 大模型的**美股**智能分析系统：**行情与 K 线主路径为 Yahoo Finance（yfinance）**，可选配置 **Longbridge** 作为美股优先源；**`main.py` CLI 与 Web/API 均仅接受美股、美期货、加密货币合约**（拒收 A 股 / 港股）。日常以 **Web 内报告 + 决策台提醒流** 为主；分析任务默认 `notify=false`。可选在 `.env` 或 GitHub Actions 中配置企微/飞书/Telegram 等外部推送（Web 设置页不展示通知渠道表单）。
 
-[**功能特性**](#-功能特性) · [**快速开始**](#-快速开始) · [**推送效果**](#-推送效果) · [**Web 工作台**](docs/web-workspace.md) · [**架构详解（流程图）**](docs/architecture-detailed-guide.md) · [**Intraday / 分钟决策方案**](docs/intraday-refactor-plan.md) · [**完整指南**](docs/full-guide.md) · [**小流量运行边界**](docs/small-scale-operations.md) · [**常见问题**](docs/FAQ.md) · [**更新日志**](docs/CHANGELOG.md)
+[**功能特性**](#-功能特性) · [**快速开始**](#-快速开始) · [**推送效果**](#-推送效果) · [**Web 工作台**](docs/web-workspace.md) · [**入口选型**](docs/entrypoints-guide.md) · [**架构详解（流程图）**](docs/architecture-detailed-guide.md) · [**Intraday / 分钟决策方案**](docs/intraday-refactor-plan.md) · [**完整指南**](docs/full-guide.md) · [**小流量运行边界**](docs/small-scale-operations.md) · [**常见问题**](docs/FAQ.md) · [**更新日志**](docs/CHANGELOG.md)
 
 简体中文 | [English](docs/README_EN.md) | [繁體中文](docs/README_CHT.md)
 
@@ -393,7 +393,7 @@ LITELLM_MODEL=openai/deepseek-chat
 
 首页分析输入框已升级为”类搜索引擎”补全框，显著降低记忆负担：
 
-- **多维匹配**：支持输入股票代码、中文名、拼音缩写或别名（如 `gzmt` -> 贵州茅台、`tencent` -> 腾讯控股、`aapl` -> Apple Inc.）。
+- **多维匹配**：支持输入美股 ticker、中文/英文公司名、拼音或别名（如 `aapl` / `苹果` -> AAPL、`nvda` / `英伟达` -> NVDA）。
 - **美股覆盖**：索引基于 `STOCK_NAME_MAP` 与 `scripts/generate_stock_index.py` 生成 MVP 列表；可按需扩展映射后重新生成索引。
 - **自动降级逻辑**：
   - **新股/异常**：若索引未及时更新或加载失败，系统将无缝退回普通输入模式，确保分析链路 100% 可用。
@@ -429,7 +429,7 @@ LITELLM_MODEL=openai/deepseek-chat
 - **Bot 命令**：`/ask` 技能分析（支持多股对比）、`/chat` 自由对话、`/history` 会话历史、`/strategies` 策略/技能列表、`/research` 深度研究
 - **自定义策略（Skill）**：在 `strategies/` 目录下新建 YAML 文件或在自定义 skill 目录中放入 `SKILL.md` bundle，即可添加新的交易策略，无需写代码
 - **多 Agent 架构**（实验性）：设置 `AGENT_ARCH=multi` 启用 Technical → Intel → Risk → Specialist → Decision 多 Agent 级联编排，通过 `AGENT_ORCHESTRATOR_MODE` 控制深度（quick/standard/full/specialist）。其中 `strategy` / `skill` 仍作为旧值兼容并会自动归一化到 `specialist`。超时或中间阶段 JSON 解析失败时，系统会优先保留已完成阶段结果并降级生成最小可用仪表盘，避免整份报告直接退回默认占位。详见 [完整配置指南](docs/full-guide.md)
-- **Intel 增强字段兼容说明**：`capital_flow_signal` 为新增扩展字段（`inflow/outflow/neutral/not_available`），用于描述 A 股资金流方向，未返回时不会影响后续阶段；下游解析建议以 `risk_alerts` 与 `positive_catalysts` 为主，新增字段可忽略，兼容历史客户端。
+- **Intel 增强字段兼容说明**：`capital_flow_signal` 为可选扩展字段（`inflow/outflow/neutral/not_available`）；美股构建中常返回 `not_available`，未返回时不影响后续阶段。下游解析以 `risk_alerts` 与 `positive_catalysts` 为主。
 
 > **注意**：配置了任意 AI API Key 后，Agent 对话功能自动可用，无需手动设置 `AGENT_MODE=true`。如需显式关闭可设置 `AGENT_MODE=false`。每次对话会产生 LLM API 调用费用。若你手动修改了 `.env` 中的主模型 / Agent 主模型 / 备选模型 / 模型渠道配置（如 `LITELLM_MODEL` / `AGENT_LITELLM_MODEL` / `LITELLM_FALLBACK_MODELS` / `LLM_CHANNELS`），需要重启服务或触发配置重载后，新进程才会按新模型生效。
 

@@ -5,7 +5,7 @@
 ## 概述
 
 - **集成方式**：openclaw Skill 通过 HTTP 调用 daily_stock_analysis（DSA）REST API
-- **适用场景**：已部署 DSA API 服务，希望在 openclaw 对话中触发分析（如「帮我分析茅台」「analyze AAPL」）
+- **适用场景**：已部署 DSA API 服务，希望在 openclaw 对话中触发分析（如「analyze AAPL」「帮我看看 NVDA」）
 
 ## 前置条件
 
@@ -26,10 +26,11 @@
 
 ```json
 {
-  "stock_code": "600519",
+  "stock_code": "AAPL",
   "report_type": "detailed",
   "force_refresh": true,
-  "async_mode": false
+  "async_mode": false,
+  "notify": false
 }
 ```
 
@@ -45,8 +46,8 @@
 ```json
 {
   "query_id": "abc123def456",
-  "stock_code": "600519",
-  "stock_name": "贵州茅台",
+  "stock_code": "AAPL",
+  "stock_name": "Apple Inc.",
   "report": {
     "summary": {
       "analysis_summary": "...",
@@ -55,9 +56,9 @@
       "sentiment_score": 75
     },
     "strategy": {
-      "ideal_buy": "1850",
-      "stop_loss": "1780",
-      "take_profit": "1950"
+      "ideal_buy": "210",
+      "stop_loss": "195",
+      "take_profit": "230"
     }
   },
   "created_at": "2026-03-13T10:00:00"
@@ -66,7 +67,7 @@
 
 ## 重要限制与说明
 
-- **仅支持股票代码**：API 不接受中文名称（如「茅台」），需在 Skill 侧解析或提示用户提供代码（如 600519、AAPL）
+- **美股代码**：Web/API/CLI 仅接受美股、美期货与配置的加密永续；A 股/港股拒收。API 不接受纯中文名，需用户提供 ticker（如 `AAPL`）或由 Skill 解析英文名/简称。
 - **同步模式耗时**：`async_mode: false` 时，单次分析约 2–5 分钟，需确保 openclaw 或 HTTP 客户端超时足够
 - **异步模式**：`async_mode: true` 返回 202 + `task_id`，需轮询 `GET /api/v1/analysis/status/{task_id}` 直至 `status: completed`
 
@@ -74,11 +75,11 @@
 
 | 类型 | 格式 | 示例 |
 |------|------|------|
-| A股 | 6位数字 | `600519`、`000001`、`300750` |
-| 北交所 | 8/4/92 开头 6 位 | `920748`、`838163`、`430047` |
-| 港股 | hk + 5位数字 | `hk00700`、`hk09988` |
-| 美股 | 1-5 字母（可选 .X 后缀） | `AAPL`、`TSLA`、`BRK.B` |
-| 美股指数 | SPX/DJI/IXIC 等 | `SPX`、`DJI`、`NASDAQ`、`VIX` |
+| 美股 | 字母 ticker | `AAPL`、`TSLA`、`BRK.B` |
+| 美期货 | Yahoo 风格 | `ES=F`、`NQ=F` |
+| 加密永续 | 交易对 | `BTCUSDT` |
+| 美股指数 | SPX / `^` 前缀 | `SPX`、`^GSPC` |
+| **不支持** | A 股 / 港股 | 入口层 400 |
 
 ## 配置方式
 
@@ -118,21 +119,21 @@
 ```markdown
 ---
 name: daily-stock-analysis
-description: 调用 daily_stock_analysis API 进行股票智能分析。当用户询问「分析茅台」「analyze AAPL」「帮我看看 600519」等时使用。仅支持股票代码，不支持中文名称。
+description: 调用 daily_stock_analysis API 进行美股智能分析。当用户询问「analyze AAPL」「分析 NVDA」「帮我看看苹果股票」等时使用。仅支持美股 ticker，A 股/港股拒收。
 metadata:
   {"openclaw": {"requires": {"env": ["DSA_BASE_URL"]}, "primaryEnv": "DSA_BASE_URL"}}
 ---
 
 ## 触发条件
 
-当用户请求分析某只股票时（如「分析茅台」「analyze AAPL」「帮我看看 600519」），使用本 Skill。
+当用户请求分析某只美股时（如「analyze AAPL」「分析 NVDA」），使用本 Skill。
 
 ## 工作流程
 
-1. **提取股票代码**：从用户消息中识别股票代码（如 600519、AAPL、hk00700）。若用户仅提供中文名称（如「茅台」），需提示用户提供股票代码，或使用常见映射（茅台→600519）。
+1. **提取 ticker**：识别美股代码（如 AAPL、NVDA、BRK.B）。若用户仅给公司名，可映射常见简称（苹果→AAPL、英伟达→NVDA）；无法映射时提示用户提供 ticker。
 2. **调用 API**：向 `{DSA_BASE_URL}/api/v1/analysis/analyze` 发送 POST 请求，请求体：
    ```json
-   {"stock_code": "<提取的代码>", "report_type": "detailed", "force_refresh": true, "async_mode": false}
+   {"stock_code": "<ticker>", "report_type": "detailed", "force_refresh": true, "async_mode": false, "notify": false}
    ```
 3. **等待响应**：同步模式下分析约需 2–5 分钟，请确保 HTTP 客户端超时足够（建议 ≥300 秒）。
 4. **解析结果**：从响应的 `report.summary` 中提取 `operation_advice`、`trend_prediction`、`analysis_summary`，从 `report.strategy` 中提取 `ideal_buy`、`stop_loss`、`take_profit`，以简洁格式呈现给用户。
@@ -144,10 +145,10 @@ metadata:
 
 ## 股票代码格式
 
-- A股：6位数字（600519、000001）
-- 港股：hk + 5位数字（hk00700）
-- 美股：1–5 字母（AAPL、TSLA、BRK.B）
-- 美股指数：SPX、DJI、IXIC 等
+- 美股：AAPL、TSLA、BRK.B
+- 美期货：ES=F、NQ=F
+- 美股指数：SPX、^GSPC、VIX
+- 不支持：A 股六位数字、港股 hk 前缀（API 400）
 ```
 
 ## Agent 策略问股（可选）
@@ -158,7 +159,7 @@ metadata:
 # 将 {DSA_BASE_URL} 替换为实际配置的 API 地址（如 http://localhost:8000）
 curl -X POST {DSA_BASE_URL}/api/v1/agent/chat \
   -H 'Content-Type: application/json' \
-  -d '{"message": "用缠论分析 600519", "session_id": "optional-session-id"}'
+  -d '{"message": "用均线策略分析 AAPL", "session_id": "optional-session-id"}'
 ```
 
 响应包含 `content`（分析结论）和 `session_id`（用于多轮对话）。

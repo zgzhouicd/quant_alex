@@ -115,15 +115,14 @@ Go to your forked repo → `Settings` → `Secrets and variables` → `Actions` 
 
 | Secret Name | Description | Required |
 |------------|------|:----:|
-| `STOCK_LIST` | Watchlist codes, e.g., `600519,300750,002594` | ✅ |
+| `STOCK_LIST` | Watchlist codes, e.g., `AAPL,MSFT,NVDA` | ✅ |
 | `TAVILY_API_KEYS` | [Tavily](https://tavily.com/) Search API (for news search) | Recommended |
 | `MINIMAX_API_KEYS` | [MiniMax](https://platform.minimaxi.com/) Coding Plan Web Search (structured search results) | Optional |
 | `BOCHA_API_KEYS` | [Bocha Search](https://open.bocha.cn/) Web Search API (Chinese search optimized, supports AI summaries, multiple keys comma-separated) | Optional |
 | `SERPAPI_API_KEYS` | [SerpAPI](https://serpapi.com/baidu-search-api?utm_source=github_daily_stock_analysis) Backup search | Optional |
 | `SEARXNG_BASE_URLS` | SearXNG self-hosted instances (quota-free fallback, enable format: json in settings.yml); when empty the app auto-discovers public instances | Optional |
 | `SEARXNG_PUBLIC_INSTANCES_ENABLED` | Auto-discover public SearXNG instances from `searx.space` when `SEARXNG_BASE_URLS` is empty (default `true`) | Optional |
-| `TUSHARE_TOKEN` | [Tushare Pro](https://tushare.pro/weborder/#/login?reg=834638) Token | Optional |
-| `TICKFLOW_API_KEY` | [TickFlow](https://tickflow.org) API key for CN market review index enhancement; market breadth also uses TickFlow when the plan supports universe queries | Optional |
+| `TICKFLOW_API_KEY` | Legacy CN market-review integration (hidden in Web settings; not used in the US-only product path) | Optional |
 
 #### ✅ Minimum Configuration Example
 
@@ -247,10 +246,10 @@ Default schedule: Every weekday at **18:00 (Beijing Time)** automatic execution.
 
 ### Data Source Configuration
 
+> Default stack is **yfinance + optional Longbridge** (`data_provider/__init__.py`). Legacy keys such as `TUSHARE_TOKEN` / `TICKFLOW_API_KEY` are ignored by the default build; Web settings hide them.
+
 | Variable | Description | Default | Required |
 |--------|------|--------|:----:|
-| `TUSHARE_TOKEN` | Tushare Pro Token | - | Optional |
-| `TICKFLOW_API_KEY` | TickFlow API key; CN market review indices prefer TickFlow when configured, and market breadth does so only when the plan supports universe queries | - | Optional |
 | `ENABLE_REALTIME_QUOTE` | Enable real-time quotes (if disabled, uses historical closing prices for analysis) | `true` | Optional |
 | `ENABLE_REALTIME_TECHNICAL_INDICATORS` | Intraday real-time technicals: Calculate MA5/MA10/MA20 and bull trends using real-time prices when enabled (Issue #234); uses yesterday's close if disabled. | `true` | Optional |
 | `ENABLE_CHIP_DISTRIBUTION` | Enable chip distribution analysis (this API is unstable, recommended to disable for cloud deployment). GitHub Actions users must set `ENABLE_CHIP_DISTRIBUTION=true` in Repository Variables to enable; disabled by default in workflows. | `true` | Optional |
@@ -262,23 +261,11 @@ Default schedule: Every weekday at **18:00 (Beijing Time)** automatic execution.
 | `FUNDAMENTAL_CACHE_TTL_SECONDS` | Fundamental aggregation cache TTL (seconds), short cache to reduce repeated API pulling. | `120` | Optional |
 | `FUNDAMENTAL_CACHE_MAX_ENTRIES` | Maximum entries for fundamental cache (evicted by time within TTL) | `256` | Optional |
 
-> **Behavior Notes:**
-> - **A-shares**: Returns aggregated capabilities by `valuation/growth/earnings/institution/capital_flow/dragon_tiger/boards`.
-> - **ETFs**: Returns available items, marks missing capabilities as `not_supported`, and does not affect the original flow overall.
-> - **US/HK stocks**: Returns `not_supported` fallback block.
-> - Any exception uses fail-open logic, only logs errors without affecting the main technical/news/chip pipeline.
-> - **Field contracts**:
->   - `fundamental_context.belong_boards` = related board list for the stock (currently populated for A-shares only; `[]` when unavailable);
->   - `fundamental_context.boards.data` = `sector_rankings` (sector rise/fall leaderboard, structure `{top, bottom}`);
->   - `get_stock_info.belong_boards` = list of sectors the individual stock belongs to;
->   - `get_stock_info.boards` is a compatibility alias, value is identical to `belong_boards` (removal considered only in major version updates);
->   - `get_stock_info.sector_rankings` stays consistent with `fundamental_context.boards.data`.
->   - `AnalysisReport.details.belong_boards` = related board list in structured report details;
->   - `AnalysisReport.details.sector_rankings` = sector leaderboard in structured report details for board-linkage display.
-> - **Sector leaderboard** uses a fixed fallback order: consistent with global priority.
-> - **Timeout control** is a `best-effort` soft timeout: the stage will quickly degrade and continue execution based on the budget, but does not guarantee a hard interrupt of underlying third-party network calls.
-> - `FUNDAMENTAL_STAGE_TIMEOUT_SECONDS=1.5` indicates the target budget for the newly added fundamental stage, not a strict hard SLA.
-> - For a hard SLA, please upgrade to isolated child process execution in future versions to forcefully terminate timeout tasks.
+> **Behavior notes (US product scope):**
+> - Web/API/CLI **reject** A-share and HK tickers; deep fundamental blocks tied to CN-only sources (dragon-tiger, sector boards, etc.) return `not_supported` in default builds.
+> - US names may receive partial valuation/earnings context via yfinance and optional Longbridge; missing capabilities are fail-open.
+> - Exceptions do not block technical, news, or main analysis pipelines.
+> - `FUNDAMENTAL_STAGE_TIMEOUT_SECONDS` is a soft budget, not a hard SLA.
 
 ### Other Configuration
 
@@ -287,17 +274,10 @@ Default schedule: Every weekday at **18:00 (Beijing Time)** automatic execution.
 | `STOCK_LIST` | Watchlist codes (comma-separated) | - |
 | `MAX_WORKERS` | Concurrent threads | `3` |
 | `MARKET_REVIEW_ENABLED` | Enable market review | `true` |
-| `MARKET_REVIEW_REGION` | Market review region: cn (A-shares), us (US stocks), both | `cn` |
+| `MARKET_REVIEW_REGION` | Market review region (`us` only in the US-focused product build) | `us` |
 | `SCHEDULE_ENABLED` | Enable scheduled tasks | `false` |
 | `SCHEDULE_TIME` | Scheduled execution time | `18:00` |
 | `LOG_DIR` | Log directory | `./logs` |
-
-> Behavior notes:
-> - When `TICKFLOW_API_KEY` is configured, CN market review first tries TickFlow for main indices. Market breadth also tries TickFlow only when the current TickFlow plan supports universe queries.
-> - TickFlow behavior is capability-based rather than just key-based: limited plans can still enhance main CN indices, while plans with `CN_Equity_A` universe query support also enhance market breadth.
-> - The official quickstart documents `quotes.get(universes=["CN_Equity_A"])`, but online smoke tests confirmed two additional real-world constraints: universe access depends on plan permissions, and `quotes.get(symbols=[...])` has a per-request symbol limit.
-> - TickFlow currently returns `change_pct` / `amplitude` as ratio values; this integration normalizes them to the project's percent convention so they match AkShare / Tushare / efinance semantics.
-> - Per-stock analysis, realtime quote priority, and sector rankings fallback remain unchanged.
 
 ---
 
@@ -417,7 +397,7 @@ pip install -r requirements.txt
 python main.py                        # Full analysis (stocks + market review)
 python main.py --market-review        # Market review only
 python main.py --no-market-review     # Stock analysis only
-python main.py --stocks 600519,300750 # Specify stocks
+python main.py --stocks AAPL,MSFT,NVDA # Specify stocks
 python main.py --dry-run              # Fetch data only, no AI analysis
 python main.py --no-notify            # Don't send notifications
 python main.py --schedule             # Scheduled task mode
@@ -532,8 +512,8 @@ Configure `STOCK_GROUP_N` and `EMAIL_GROUP_N` to route different stock groups to
 > GitHub Actions limitation: as of 2026-03-29, the repository's default `daily_analysis.yml` does not auto-import arbitrary numbered `STOCK_GROUP_N` / `EMAIL_GROUP_N` variables. If you only add them in repository Secrets / Variables without extending the workflow `env:` block, they will not reach the runtime process.
 
 ```bash
-STOCK_LIST=600519,300750,002594,AAPL
-STOCK_GROUP_1=600519,300750
+STOCK_LIST=AAPL,MSFT,NVDA
+STOCK_GROUP_1=AAPL,MSFT
 EMAIL_GROUP_1=user1@example.com
 STOCK_GROUP_2=002594,AAPL
 EMAIL_GROUP_2=user2@example.com
@@ -641,7 +621,7 @@ The main pipeline uses **Yahoo Finance (yfinance)** for daily bars and real-time
 ### Yahoo Finance (yfinance)
 - Free, no API key
 - Historical K-lines and quotes for internationally listed symbols
-- CN-style numeric codes are mapped to Yahoo tickers (e.g. `.SS` / `.SZ`) inside the fetcher when applicable
+- Accepts US tickers, US futures (e.g. `ES=F`), and configured crypto perps only; A-share/HK shapes are rejected at the API boundary
 
 ### Longbridge
 - Supplemental source when credentials (`LONGBRIDGE_APP_KEY`, `LONGBRIDGE_APP_SECRET`, `LONGBRIDGE_ACCESS_TOKEN`) are set
@@ -650,14 +630,6 @@ The main pipeline uses **Yahoo Finance (yfinance)** for daily bars and real-time
 ---
 
 ## Advanced Features
-
-### Hong Kong Stock Support
-
-Use `hk` prefix for HK stock codes:
-
-```bash
-STOCK_LIST=600519,hk00700,hk01810
-```
 
 ### Multi-Model Switching
 
@@ -819,10 +791,10 @@ FastAPI provides RESTful API service for configuration management and triggering
 # Health check
 curl http://127.0.0.1:8000/api/health
 
-# Trigger analysis (A-shares)
+# Trigger analysis (US equity)
 curl -X POST http://127.0.0.1:8000/api/v1/analysis/analyze \
   -H 'Content-Type: application/json' \
-  -d '{"stock_code": "600519"}'
+  -d '{"stock_code": "AAPL", "notify": false}'
 
 # Query task status
 curl http://127.0.0.1:8000/api/v1/analysis/status/<task_id>
@@ -835,13 +807,13 @@ curl -X POST http://127.0.0.1:8000/api/v1/backtest/run \
 # Trigger backtest (specific stock)
 curl -X POST http://127.0.0.1:8000/api/v1/backtest/run \
   -H 'Content-Type: application/json' \
-  -d '{"code": "600519", "force": false}'
+  -d '{"code": "AAPL", "force": false}'
 
 # Query overall backtest performance
 curl http://127.0.0.1:8000/api/v1/backtest/performance
 
 # Query per-stock backtest performance
-curl http://127.0.0.1:8000/api/v1/backtest/performance/600519
+curl http://127.0.0.1:8000/api/v1/backtest/performance/AAPL
 
 # Paginated backtest results
 curl "http://127.0.0.1:8000/api/v1/backtest/results?page=1&limit=20"
@@ -859,9 +831,11 @@ python main.py --serve-only --host 0.0.0.0 --port 8888
 
 | Type | Format | Examples |
 |------|------|------|
-| A-shares | 6-digit number | `600519`, `000001`, `300750` |
-| BSE (Beijing) | 8/4/92 prefix, 6-digit | `920748`, `838163`, `430047` |
-| HK stocks | hk + 5-digit number | `hk00700`, `hk09988` |
+| US equity | Letter ticker (optional `.B`, etc.) | `AAPL`, `TSLA`, `BRK.B` |
+| US futures | Yahoo style | `ES=F`, `NQ=F` |
+| Crypto perps | Pair / `PERP` suffix | `BTCUSDT`, `BTC-USD_PERP` |
+| US indices | Symbol or `^` prefix | `SPX`, `^GSPC`, `VIX` |
+| **Not supported** | A-share / HK numeric codes | Rejected at API validation |
 
 ### Notes
 

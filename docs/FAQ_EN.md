@@ -42,14 +42,15 @@ This document compiles common issues encountered by users and their solutions.
 
 ---
 
-### Q3: Tushare data fetch failed, showing Token error?
+### Q3: Quote or historical bars fetch failed?
 
-**Symptom**: Log shows `Tushare data fetch failed: Your token is incorrect, please verify`
+**Symptom**: yfinance / Longbridge timeouts, empty bars, or `DataFetchError` in logs.
 
 **Solution**:
-1. **No Tushare account**: No need to configure `TUSHARE_TOKEN`, system will automatically use free data sources (AkShare, Efinance)
-2. **Have Tushare account**: Verify Token is correct, check in [Tushare Pro](https://tushare.pro/weborder/#/login?reg=834638) personal center
-3. All core features of this project work normally without Tushare
+1. **No Tushare required**: Primary path is **Yahoo Finance (yfinance)**; optional **Longbridge** priority for US names (see `.env.example`).
+2. Check network/proxy; set `NO_PROXY` or HTTP proxy for market domains if needed.
+3. Lower concurrency: reduce `DATA_FETCH_MAX_IN_FLIGHT` / `MAX_WORKERS` and retry.
+4. Symbols must be **US equities / US futures / crypto perps**; A-share / HK codes are rejected.
 
 ---
 
@@ -57,7 +58,7 @@ This document compiles common issues encountered by users and their solutions.
 
 **Symptom**: Log shows `Circuit breaker triggered` or data returns `None`
 
-**Cause**: Free data sources (Eastmoney, Sina, etc.) have anti-scraping mechanisms, high-frequency requests get rate-limited.
+**Cause**: Public quote endpoints (e.g. Yahoo Finance) may rate-limit or block bursts of requests.
 
 **Solution**:
 1. System has built-in multi-source auto-switching and circuit breaker protection
